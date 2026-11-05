@@ -149,3 +149,31 @@ def test_validation_catches_errors(generated):
 def test_published_library_is_up_to_date():
     r = subprocess.run([sys.executable, str(SCRIPT), "--check"], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_excel_workbooks_follow_upstream_v2_layout(generated):
+    openpyxl = pytest.importorskip("openpyxl")
+    tool = load_tool()
+    spec = generated["spec"]
+    workbooks = tool.excel_workbooks(spec, generated["fw"], generated["map"])
+    fw_wb, map_wb = workbooks.values()
+    assert fw_wb.sheetnames == ["library_meta", "fwk_meta", "fwk_content", "imp_grp_meta", "imp_grp_content"]
+    assert map_wb.sheetnames == ["library_meta", "mappings_meta", "mappings_content"]
+    meta = {r[0].value: r[1].value for r in fw_wb["fwk_meta"].iter_rows()}
+    assert meta["type"] == "framework" and meta["base_urn"] == "urn:lyss:risk:req_node:lyss"
+    rows = list(fw_wb["fwk_content"].iter_rows(values_only=True))
+    nodes = generated["fw"]["objects"]["framework"]["requirement_nodes"]
+    assert len(rows) - 1 == len(nodes) and rows[0][:3] == ("assessable", "depth", "ref_id")
+    # upstream builds node URNs as base_urn + ":" + ref_id (lower case): same URNs as the YAML
+    assert all(f"{meta['base_urn']}:{r[2].lower()}" == n["urn"] for r, n in zip(rows[1:], nodes))
+    mappings = list(map_wb["mappings_content"].iter_rows(values_only=True))[1:]
+    assert len(mappings) == len(generated["map"]["objects"]["requirement_mapping_sets"][0]["requirement_mappings"])
+    assert all(rel == "subset" for _, _, rel in mappings)
+
+def test_only_controls_without_text_are_marked_draft(generated):
+    """Controls with a statement must never carry the "Draft control" note (regression guard)."""
+    by_id = {c["id"]: c for c in generated["spec"]["controls"]}
+    for node in generated["fw"]["objects"]["framework"]["requirement_nodes"]:
+        if node["ref_id"] in by_id:
+            has_text = bool(by_id[node["ref_id"]].get("statement"))
+            assert node["annotation"].startswith("Draft control") is not has_text, node["ref_id"]

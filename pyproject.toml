@@ -24,7 +24,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "aiosmtpd>=1.4"]
+dev = ["pytest>=8", "aiosmtpd>=1.4", "openpyxl>=3.1"]
 
 [project.scripts]
 lyss = "lyss.__main__:main"

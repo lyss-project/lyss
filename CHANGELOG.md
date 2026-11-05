@@ -4,6 +4,10 @@ Specification versions (`spec_version`) and tool versions are tracked together u
 
 ## Unreleased
 
+Contributors
+- Thanks to **juanmig7890** for the first outside contribution: Linux and macOS quick start in
+  the tester guide (#5).
+
 Integrations
 - SIEM events: after each scan, JSON events per switch (level, counts), per failed control,
   regression, fix and collection error, plus discovered switches; sent over syslog (UDP/TCP,
@@ -13,8 +17,10 @@ Integrations
 - CISO Assistant library (integrations/ciso-assistant), generated from the specification by
   tools/build_ciso_library.py: the LYSS framework (levels, domains, controls with rationale and
   test procedure; levels as implementation groups) and a LYSS → ISO/IEC 27001:2022 mapping (one
-  direction only: an ISO control judged compliant proves nothing about a switch). Imported and
-  checked in CISO Assistant 4.1.
+  direction only: an ISO control judged compliant proves nothing about a switch). Draft
+  specifications say so in the library name. Imported and checked in CISO Assistant 4.1, including
+  an ISO 27001 audit prefilled from a LYSS audit; `--excel` writes upstream's Excel v2 source
+  workbooks, validated with upstream's checker and converter.
 - Oxidized: `python -m lyss oxidized --url ...` assesses the configurations Oxidized backs up
   (REST API, read-only, no SSH to the switches); a recent successful Oxidized backup is evidence
   for LYSS-BKP-001; secrets hidden by Oxidized give "unknown", never a false verdict; `--events`

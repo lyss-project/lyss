@@ -28,6 +28,30 @@ Library URNs carry no version (`urn:lyss:risk:library:lyss`). The library `versi
 is offered as an update of the loaded library. Two builds of the same `spec_version` have the same
 version: bump `spec_version` before re-importing.
 
+## What CISO Assistant does with the mapping
+
+Tested on a clean CISO Assistant 4.1.1 with the fictitious LYSS demo lab: a LYSS audit (Level 2)
+answered from LYSS results, then an ISO/IEC 27001:2022 audit created with the LYSS audit as baseline.
+
+- CISO Assistant treats `subset` (and `intersect`) the same way: a **non-compliant** LYSS requirement
+  makes the mapped ISO control **non-compliant**; a compliant one makes it at most **partially
+  compliant**; when several LYSS requirements map to one ISO control, the most restrictive wins.
+  This comes from CISO Assistant's mapping engine, not from the library.
+- Evidence attached to LYSS requirements is carried over to the ISO controls, and every ISO result
+  links to the LYSS requirements it was inferred from. Observations are not copied.
+- On the demo lab, 12 ISO controls were prefilled (A.5.10, A.5.16, A.5.17, A.8.5, A.8.8, A.8.15,
+  A.8.16, A.8.17, A.8.20, A.8.21, A.8.22, A.8.24).
+
+## Contributing the library upstream
+
+CISO Assistant keeps its libraries as Excel "v2" workbooks and generates the YAML with its own
+converter. `python tools/build_ciso_library.py --excel DIR` writes the two workbooks (needs
+`openpyxl`). Checked with upstream's tools from CISO Assistant 4.1.1: `check_library_v2.py` accepts
+both workbooks, and `convert_library_v2.py` produces exactly the content of the YAML files here
+(37 nodes, 39 mappings), with one difference: upstream's converter always adds the reverse mapping
+set (ISO → LYSS, `superset`), which this repository leaves out on purpose (see above). Upstream
+asks contributors to sign its CLA.
+
 ## Regenerate
 
 ```

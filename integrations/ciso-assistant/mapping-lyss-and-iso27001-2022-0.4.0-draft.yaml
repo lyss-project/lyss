@@ -1,11 +1,15 @@
 urn: urn:lyss:risk:library:mapping-lyss-and-iso27001-2022
 locale: en
 ref_id: mapping-lyss-and-iso27001-2022
-name: LYSS <-> ISO/IEC 27001:2022
-description: Mapping between LYSS (Lyaazale Switch Security) specification 0.4.0-draft
+name: LYSS (draft 0.4.0) -> ISO/IEC 27001:2022
+description: 'Mapping between LYSS (Lyaazale Switch Security) specification 0.4.0-draft
   and ISO/IEC 27001:2022 Annex A, from the informative references of the specification.
   Each LYSS control is a specific, testable part (subset) of the ISO control it maps
-  to. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py.
+  to: a compliant LYSS requirement gives at most partial coverage of the ISO control,
+  a non-compliant one makes it non-compliant. One direction only: an ISO control judged
+  compliant proves nothing about a given switch. DRAFT: controls, identifiers and
+  mappings may still change before LYSS 1.0. Generated from spec/lyss-spec.yaml by
+  tools/build_ciso_library.py.'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
 version: 40000
 publication_date: 2026-11-05
@@ -18,11 +22,15 @@ objects:
   requirement_mapping_sets:
   - urn: urn:lyss:risk:req_mapping_set:mapping-lyss-and-iso27001-2022
     ref_id: mapping-lyss-and-iso27001-2022
-    name: LYSS <-> ISO/IEC 27001:2022
-    description: Mapping between LYSS (Lyaazale Switch Security) specification 0.4.0-draft
+    name: LYSS (draft 0.4.0) -> ISO/IEC 27001:2022
+    description: 'Mapping between LYSS (Lyaazale Switch Security) specification 0.4.0-draft
       and ISO/IEC 27001:2022 Annex A, from the informative references of the specification.
       Each LYSS control is a specific, testable part (subset) of the ISO control it
-      maps to. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py.
+      maps to: a compliant LYSS requirement gives at most partial coverage of the
+      ISO control, a non-compliant one makes it non-compliant. One direction only:
+      an ISO control judged compliant proves nothing about a given switch. DRAFT:
+      controls, identifiers and mappings may still change before LYSS 1.0. Generated
+      from spec/lyss-spec.yaml by tools/build_ciso_library.py.'
     source_framework_urn: urn:lyss:risk:framework:lyss
     target_framework_urn: urn:intuitem:risk:framework:iso27001-2022
     requirement_mappings:

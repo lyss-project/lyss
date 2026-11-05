@@ -134,6 +134,19 @@ def typical_evidence(control: dict) -> str:
     return "\n".join(lines)
 
 
+DRAFT_NOTE = "DRAFT: controls, identifiers and mappings may still change before LYSS 1.0. "
+
+
+def spec_is_draft(spec: dict) -> bool:
+    return "draft" in str(spec.get("spec_version", "")) or spec.get("status", "draft") == "draft"
+
+
+def display_name(spec: dict) -> str:
+    """Library / framework name; drafts say so in the name, visible in every list of the UI."""
+    number = str(spec["spec_version"]).split("-")[0]
+    return f"{NAME} (draft {number})" if spec_is_draft(spec) else f"{NAME} {number}"
+
+
 def library_header(ref_id: str, name: str, description: str, version: int, date) -> dict:
     # Key order of convert_library_v2.py (without its own convert_library_version marker).
     return {
@@ -155,9 +168,10 @@ def build_framework_library(spec: dict, date) -> dict:
         "Each requirement is one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, "
         "vendor-neutral test procedure and informative references. A device is LYSS Level N "
         "conformant when every control of levels 1 to N is met or not applicable. "
-        "Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py."
+        + (DRAFT_NOTE if spec_is_draft(spec) else "")
+        + "Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py."
     )
-    lib = library_header("LYSS", NAME, description, library_version(version), date)
+    lib = library_header("LYSS", display_name(spec), description, library_version(version), date)
     lib["urn"] = LIBRARY_URN
 
     nodes = []
@@ -197,7 +211,7 @@ def build_framework_library(spec: dict, date) -> dict:
     lib["objects"] = {"framework": {
         "urn": FRAMEWORK_URN,
         "ref_id": "LYSS",
-        "name": NAME,
+        "name": display_name(spec),
         "description": description,
         "implementation_groups_definition": [
             {"ref_id": f"L{n}", "name": f"Level {n} - {levels[n]}",
@@ -215,10 +229,13 @@ def build_mapping_library(spec: dict, date) -> dict:
     description = (
         f"Mapping between LYSS (Lyaazale Switch Security) specification {version} and ISO/IEC "
         "27001:2022 Annex A, from the informative references of the specification. Each LYSS control "
-        "is a specific, testable part (subset) of the ISO control it maps to. "
-        "Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py."
+        "is a specific, testable part (subset) of the ISO control it maps to: a compliant LYSS "
+        "requirement gives at most partial coverage of the ISO control, a non-compliant one makes it "
+        "non-compliant. One direction only: an ISO control judged compliant proves nothing about a "
+        "given switch. " + (DRAFT_NOTE if spec_is_draft(spec) else "")
+        + "Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py."
     )
-    name = "LYSS <-> ISO/IEC 27001:2022"
+    name = f"{display_name(spec).replace(NAME, 'LYSS')} -> ISO/IEC 27001:2022"
     lib = library_header(MAPPING_REF, name, description, library_version(version), date)
     lib["urn"] = MAPPING_LIBRARY_URN
     lib["dependencies"] = [LIBRARY_URN, ISO_LIBRARY_URN]
@@ -345,6 +362,62 @@ def dump(lib: dict) -> str:
     return yaml.dump(lib, Dumper=_NoAliasDumper, sort_keys=False, allow_unicode=False)
 
 
+# --- Excel v2 workbooks (upstream's editable source format) ---------------------------------
+# Upstream keeps libraries as Excel "v2" workbooks (tools/excel/) and generates the YAML with
+# tools/convert_library_v2.py. These workbooks carry the same content as the YAML above, for a
+# contribution upstream. Note: upstream's converter always adds a reverse ("-revert") mapping set.
+
+def _sheet(wb, title: str, rows: list[list]) -> None:
+    ws = wb.create_sheet(title)
+    for row in rows:
+        ws.append(["" if v is None else v for v in row])
+
+
+def _meta_rows(lib: dict, keys: list[str]) -> list[list]:
+    return [[k, lib[k]] for k in keys if lib.get(k) not in (None, "", [])]
+
+
+def excel_workbooks(spec: dict, framework_lib: dict, mapping_lib: dict) -> dict:
+    """{file name: openpyxl Workbook} for the framework and the mapping libraries."""
+    from openpyxl import Workbook  # optional dependency, only for --excel
+
+    lib_keys = ["urn", "version", "locale", "ref_id", "name", "description", "copyright", "provider", "packager"]
+    fw = framework_lib["objects"]["framework"]
+    wb_fw = Workbook()
+    wb_fw.remove(wb_fw.active)
+    _sheet(wb_fw, "library_meta", [["type", "library"]] + _meta_rows(framework_lib, lib_keys))
+    _sheet(wb_fw, "fwk_meta", [["type", "framework"], ["base_urn", NODE_BASE], ["urn", fw["urn"]],
+                               ["ref_id", fw["ref_id"]], ["name", fw["name"]], ["description", fw["description"]],
+                               ["implementation_groups_definition", "imp_grp"]])
+    columns = ["assessable", "depth", "ref_id", "name", "description", "annotation", "typical_evidence",
+               "implementation_groups"]
+    rows = [columns]
+    for n in fw["requirement_nodes"]:
+        rows.append(["x" if n["assessable"] else "", n["depth"], n["ref_id"], n.get("name"), n.get("description"),
+                     n.get("annotation"), n.get("typical_evidence"), ",".join(n.get("implementation_groups", []))])
+    _sheet(wb_fw, "fwk_content", rows)
+    _sheet(wb_fw, "imp_grp_meta", [["type", "implementation_groups"], ["name", "imp_grp"]])
+    _sheet(wb_fw, "imp_grp_content", [["ref_id", "name", "description"]]
+           + [[g["ref_id"], g["name"], g.get("description")] for g in fw["implementation_groups_definition"]])
+
+    ms = mapping_lib["objects"]["requirement_mapping_sets"][0]
+    wb_map = Workbook()
+    wb_map.remove(wb_map.active)
+    _sheet(wb_map, "library_meta", [["type", "library"]] + _meta_rows(mapping_lib, lib_keys)
+           + [["dependencies", ", ".join(mapping_lib["dependencies"])]])
+    _sheet(wb_map, "mappings_meta", [["type", "requirement_mapping_set"], ["urn", ms["urn"]], ["ref_id", ms["ref_id"]],
+                                     ["name", ms["name"]], ["description", ms["description"]],
+                                     ["source_framework_urn", ms["source_framework_urn"]],
+                                     ["target_framework_urn", ms["target_framework_urn"]],
+                                     ["source_node_base_urn", NODE_BASE], ["target_node_base_urn", ISO_NODE_BASE]])
+    _sheet(wb_map, "mappings_content", [["source_node_id", "target_node_id", "relationship"]]
+           + [[m["source_requirement_urn"].split(NODE_BASE + ":")[1],
+               m["target_requirement_urn"].split(ISO_NODE_BASE + ":")[1], m["relationship"]]
+              for m in ms["requirement_mappings"]])
+    names = file_names(spec["spec_version"])
+    return {names[0].replace(".yaml", ".xlsx"): wb_fw, names[1].replace(".yaml", ".xlsx"): wb_map}
+
+
 def build(date) -> tuple[dict, dict, dict]:
     spec = yaml.safe_load(SPEC.read_text(encoding="utf-8"))
     return spec, build_framework_library(spec, date), build_mapping_library(spec, date)
@@ -356,6 +429,8 @@ def main(argv=None) -> int:
     parser.add_argument("--out-dir", type=Path, default=OUT_DIR, help="output folder")
     parser.add_argument("--date", type=datetime.date.fromisoformat, default=datetime.date.today(),
                         help="publication date YYYY-MM-DD (default: today)")
+    parser.add_argument("--excel", type=Path, metavar="DIR",
+                        help="also write the Excel v2 workbooks (upstream source format) to DIR (needs openpyxl)")
     args = parser.parse_args(argv)
 
     spec, framework_lib, mapping_lib = build(args.date)
@@ -388,6 +463,11 @@ def main(argv=None) -> int:
         path = args.out_dir / name
         path.write_text(dump(lib), encoding="utf-8", newline="\n")
         print(f"written {path}")
+    if args.excel:
+        args.excel.mkdir(parents=True, exist_ok=True)
+        for name, wb in excel_workbooks(spec, framework_lib, mapping_lib).items():
+            wb.save(args.excel / name)
+            print(f"written {args.excel / name}")
     return 0
 
 
