@@ -6,7 +6,7 @@
 # "spanning-tree 1-24 bpdu-protection"): edge-port rules use uplink_lists / require_lists.
 # Credentials only appear in the config when "include-credentials" is enabled.
 adapter: hp_procurve
-spec_version: "0.4.0-draft"
+spec_version: "0.5.0-draft"
 platform: HP ProCurve / HPE Aruba AOS-S
 status: draft, validated on synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
 
@@ -79,10 +79,11 @@ checks:
   LYSS-AUTH-002:
     fail_if_any:
       - {line: '^password manager .*\bplaintext\b'}
+      - {line: '^password manager .*\bsha1\b', say: 'manager password stored as SHA-1: not accepted (use a firmware storing it as sha256)'}
     pass_if_all:
-      - {line: '^password manager .*\bsha(1|256)\b'}
+      - {line: '^password manager .*\bsha256\b'}
     otherwise: unknown
-    note: Manager password not visible (include-credentials off) or not set; confirm on the device.
+    note: Manager password not visible (include-credentials off) or not set; confirm on the device. SHA-1 is not accepted.
     remediation: |
       password manager user-name <name> plaintext <new-secret>   ! stored as a hash by the switch
       encrypt-credentials
@@ -139,6 +140,9 @@ checks:
   LYSS-AUTH-011:
     fail_if_any:
       - {line: '^snmp-server community '}
+      # SNMPv3 below authPriv: users without "priv", groups of the auth / noauth security levels
+      - {line: '^snmpv3 user (?!.*\bpriv\b)'}
+      - {line: '^snmpv3 group (manager|operator)(auth|noauth)\b'}
     otherwise: pass
     remediation: |
       no snmp-server community <name>
@@ -156,6 +160,10 @@ checks:
   LYSS-MGMT-011:
     fail_if_any:
       - {block: '^vlan 1$', line: '^ip address (\d|dhcp)'}
+      # access ports (untagged, not tagged in any VLAN, not trunk groups) in the management VLAN
+      - captures_in_both:
+          - [{line: '^management-vlan (\d+)'}, {block: '^vlan (\d+)$', where: '^ip address \d'}]
+          - {untagged_access_vlans: true}
     pass_if_any:
       - {line: '^management-vlan \d+'}
       - {block: '^vlan (?!1$)\d+$', line: '^ip address \d'}
@@ -168,9 +176,11 @@ checks:
       ! then remove the VLAN 1 address once the new one is reachable
 
   LYSS-MGMT-012:
-    pass_if_any:
-      - {line: '^banner (motd|exec)\b'}
+    pass_if_all:
+      - {line: '^banner motd\b'}
+      - {line: '(?i)authori[sz]ed'}
     otherwise: fail
+    note: Only the MOTD banner is shown before authentication ("banner exec" comes after login).
     remediation: |
       banner motd "Authorized access only. Activity is logged."
 
@@ -202,6 +212,7 @@ checks:
       - {line: '^sntp server (priority \d+ )?\S+'}
       - {line: '^ntp server \S+'}
     otherwise: fail
+    note: Synchronization itself is not collected on AOS-S yet; a configured time server passes.
     remediation: |
       timesync sntp
       sntp unicast

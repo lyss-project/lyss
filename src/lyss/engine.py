@@ -166,6 +166,55 @@ def _edge_ports_missing(cfg: Config, spec: dict) -> tuple[bool, list[str]]:
                    f"{', '.join(sorted(uplinks & ports, key=_port_sort)) or 'none'}"]
 
 
+def _captures(cfg: Config, source) -> dict[str, list[str]]:
+    """Values (regex group 1) captured by a source, with the evidence lines of each value.
+    Sources: {line: R} any config line; {block: H, where: W} the block header itself;
+    {block: H, where: W, line: R} a line inside the block; {untagged_access_vlans: true} VLANs
+    with untagged ports that are neither tagged elsewhere nor trunk groups (HP port lists).
+    A list of sources is their union."""
+    found: dict[str, list[str]] = {}
+    if isinstance(source, list):
+        for s in source:
+            for value, evidence in _captures(cfg, s).items():
+                found.setdefault(value, []).extend(evidence)
+        return found
+    if source.get("untagged_access_vlans"):
+        vlan_blocks = [(m.group(1), b) for b in cfg.blocks if (m := re.match(r"^vlan (\d+)$", b.header))]
+        tagged = set()
+        for _, b in vlan_blocks:
+            for c in b.children:
+                if m := re.match(r"^tagged (\S+)", c):
+                    tagged |= expand_ports(m.group(1))
+        for vlan, b in vlan_blocks:
+            for c in b.children:
+                if m := re.match(r"^untagged (\S+)", c):
+                    access = {p for p in expand_ports(m.group(1)) - tagged if not p.startswith("trk")}
+                    if access:
+                        found.setdefault(vlan, []).append(
+                            f"vlan {vlan} / untagged access ports: {', '.join(sorted(access, key=_port_sort))}")
+        return found
+    if "block" not in source:
+        regex = re.compile(source["line"])
+        for line in cfg.lines:
+            if m := regex.search(line):
+                found.setdefault(m.group(1), []).append(line)
+        return found
+    header = re.compile(source["block"])
+    where = re.compile(source["where"]) if source.get("where") else None
+    line = re.compile(source["line"]) if source.get("line") else None
+    for b in cfg.blocks:
+        hm = header.search(b.header)
+        if not hm or (where and not any(where.search(c) for c in b.children)):
+            continue
+        if line is None:
+            found.setdefault(hm.group(1), []).append(b.header)
+            continue
+        for c in b.children:
+            if m := line.search(c):
+                found.setdefault(m.group(1), []).append(f"{b.header} / {c}")
+    return found
+
+
 def evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
     """Return (matched, evidence lines). A rule's "say" replaces the evidence with a sentence."""
     matched, evidence = _evaluate_rule(cfg, rule)
@@ -181,6 +230,17 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
             # pass form: ports were collected and none is missing the setting
             return (not matched and bool(evidence)), evidence
         return matched, evidence
+
+    if "captures_in_both" in rule:
+        # a value captured in two places, e.g. the management VLAN also used by access ports
+        a_source, b_source = rule["captures_in_both"]
+        a, b = _captures(cfg, a_source), _captures(cfg, b_source)
+        common = sorted(set(a) & set(b), key=_port_sort)
+        evidence = []
+        for value in common:
+            more = f" (+{len(b[value]) - 1} more)" if len(b[value]) > 1 else ""
+            evidence.append(f"{a[value][0]}  <->  {b[value][0]}{more}")
+        return bool(common), evidence
 
     if "ports_in_both" in rule:
         # ports present in two state tables, e.g. operationally down AND administratively up

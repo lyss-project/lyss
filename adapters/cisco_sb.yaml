@@ -6,7 +6,7 @@
 # families and firmware versions, so config-only checks often end as "unknown";
 # device state (tools/Collect-State.ps1) resolves them.
 adapter: cisco_sb
-spec_version: "0.2.0-draft"
+spec_version: "0.5.0-draft"
 platform: Cisco Small Business / Business switches
 status: draft, validated on SG300 1.4.11.5, SRW2024P, SG350 2.5.0.83 (real devices, 2026-11)
 
@@ -78,10 +78,22 @@ checks:
 
   LYSS-AUTH-002:
     fail_if_any:
+      # cleartext enable password
       - {line: '^enable password (?:level \d+ )?(?!level\b|encrypted\b)\S'}
-    otherwise: pass
+      # "encrypted" value of 40 hex digits = unsalted SHA-1 (SG200/300/350/500 families)
+      - {line: '^enable password (?:level \d+ )?encrypted [0-9a-fA-F]{40}\b'}
+      - {line: '^username \S+ password (encrypted [0-9a-fA-F]{40}\b|(?!encrypted\b)\S).*\bprivilege 15\b'}
+    pass_if_any:
+      - {line: '^aaa authentication enable (?:authorization )?\S+ (radius|tacacs)\b', say: 'privileged access is authenticated by RADIUS/TACACS+ first, and no weakly stored privileged credential is configured'}
+    otherwise: unknown
+    note: >-
+      SG200/300/350/500 store "encrypted" passwords as unsalted SHA-1 (40 hex digits), which this control
+      does not accept; other formats are not identified yet. Authenticate privileged access with
+      RADIUS/TACACS+ and keep any local privileged account as an emergency fallback.
     remediation: |
-      enable password level 15 <new-secret>   ! stored hashed ("encrypted") by the switch
+      aaa authentication enable authorization default radius enable
+      ! keep one local privilege-15 account for emergencies only; newer Cisco Business firmware
+      ! may store it with a stronger algorithm (check the value format after an upgrade)
 
   LYSS-AUTH-003:
     fail_if_any:
@@ -120,6 +132,11 @@ checks:
   # ---------------- Level 2 ----------------
 
   LYSS-AUTH-010:
+    fail_if_any:
+      - {line: '^aaa authentication login (?:authorization )?default (?!radius\b|tacacs\b)\S'}
+      - captures_in_both:
+          - {block: '^line (ssh|telnet)', line: '^login authentication (\S+)'}
+          - {line: '^aaa authentication login (?:authorization )?(\S+) (?!radius\b|tacacs\b)\S'}
     pass_if_all:
       - {line: '^aaa authentication login (?:authorization )?\S+ (radius|tacacs)\b'}
       - {line: '^(radius|tacacs)-server host '}
@@ -137,6 +154,8 @@ checks:
     fail_if_any:
       - {line: '^snmp-server community '}
       - {line: '^snmp-server group \S+ v(1|2)\b'}
+      # SNMPv3 below authPriv: noauth (noAuthNoPriv) or auth (authNoPriv)
+      - {line: '^snmp-server group \S+ v3 (noauth|auth)\b'}
     otherwise: pass
     remediation: |
       no snmp-server community <name>
@@ -156,6 +175,9 @@ checks:
   LYSS-MGMT-011:
     fail_if_any:
       - {block: '^interface vlan 1$', line: '^ip address (\d|dhcp)'}
+      - captures_in_both:
+          - {block: '^interface vlan (\d+)$', where: '^ip address \d'}
+          - {block: '(?i)^interface (?:gi|te|fa)', line: '^switchport access vlan (\d+)'}
     pass_if_any:
       - {block: '^interface vlan (?!1$)\d+$', line: '^ip address \d'}
     otherwise: unknown
@@ -166,9 +188,11 @@ checks:
       ! then remove the VLAN 1 address once the new one is reachable
 
   LYSS-MGMT-012:
-    pass_if_any:
-      - {line: '^banner (login|motd|exec)\b'}
+    pass_if_all:
+      - {line: '^banner (login|motd)\b'}
+      - {line: '(?i)authori[sz]ed'}
     otherwise: fail
+    note: Only login/MOTD banners are shown before authentication ("banner exec" comes after login).
     remediation: |
       banner login ^
       Authorized access only. Activity is logged.
@@ -190,6 +214,8 @@ checks:
       crypto key generate rsa   ! regenerate a 2048-bit key after upgrading
 
   LYSS-LOG-010:
+    fail_if_any:
+      - {line: '^no logging on\b', say: 'logging is disabled globally ("no logging on"): nothing reaches the syslog hosts'}
     pass_if_any:
       - {line: '^logging host \S+'}
     otherwise: fail
@@ -197,9 +223,12 @@ checks:
       logging host <siem-ip> severity informational
 
   LYSS-LOG-011:
+    fail_if_any:
+      - {state: '(?i)\bunsynchroni[sz]ed\b|\bnot synchroni[sz]ed\b', section: show sntp status}
     pass_if_any:
       - {line: '^sntp server \S+'}
     otherwise: fail
+    note: Synchronization is checked with "show sntp status"; without device state, a configured server passes.
     remediation: |
       clock source sntp
       sntp unicast client enable
@@ -221,20 +250,17 @@ checks:
       exit
 
   LYSS-ACC-011:
-    # edge ports = every port, minus trunk/general/LAG ports in the config and ports where
-    # LLDP sees a pure bridge ("B", not "B, W" access points) or CDP sees a switch ("S")
+    # edge ports = every port minus trunk/general/LAG ports in the config. Neighbour discovery
+    # (LLDP/CDP) never exempts a port: a rogue device can advertise bridge capability.
     fail_if_any:
       - edge_ports_missing: &edge
           ports: {section: show interfaces status, line: '^((?:gi|te|fa)\S+)\s'}
           uplink_config: '^(switchport mode (trunk|general)|channel-group)\b'
-          uplink_state:
-            - {section: show lldp neighbors, line: '^((?:gi|te|fa)\S+)\s.*\sB\s+\d+\s*$'}
-            - {section: show cdp neighbors, line: '^\s*\S+\s+((?:gi|te|fa)\S+)\s+\d+\s+\d+\s+[A-Za-z ]*\bS\b'}
           require: '^spanning-tree bpduguard enable'
     pass_if_any:
       - {edge_ports_missing: *edge, absent: true}
     otherwise: unknown
-    note: Needs "show interfaces status" and neighbour tables (LLDP/CDP) to tell edge ports from uplinks.
+    note: Needs "show interfaces status"; links to other switches must be configured as trunk/general or LAG members.
     remediation: |
       ! only on edge ports (users, printers, APs, servers) - never on links to other switches
       interface range <edge-ports>

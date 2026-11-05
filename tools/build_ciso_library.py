@@ -198,7 +198,8 @@ def build_framework_library(spec: dict, date) -> dict:
             })
             for c in in_domain:
                 node = {
-                    "urn": node_urn(c["id"]), "assessable": True, "depth": 3,
+                    # a control whose text is not written yet cannot be met: not assessable
+                    "urn": node_urn(c["id"]), "assessable": not is_draft(c), "depth": 3,
                     "parent_urn": node_urn(domain_ref), "ref_id": c["id"], "name": c["title"],
                 }
                 if c.get("statement"):
@@ -244,6 +245,8 @@ def build_mapping_library(spec: dict, date) -> dict:
     # No ISO -> LYSS set: an ISO control judged compliant proves nothing about a given switch.
     forward = []
     for c in spec["controls"]:
+        if is_draft(c):
+            continue  # not assessable yet: nothing to infer from it
         for ref in c.get("mappings", {}).get("iso27001_2022", []) or []:
             forward.append({"source_requirement_urn": node_urn(c["id"]),
                             "target_requirement_urn": iso_node_urn(str(ref)), "relationship": RELATIONSHIP})

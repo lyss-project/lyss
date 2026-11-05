@@ -172,11 +172,22 @@ def test_oxidized_assesses_backed_up_configurations(monkeypatch):
     assert "Oxidized" in verdict(core, "LYSS-BKP-001")["evidence"][0]
     assert verdict(by_name["acc-old"], "LYSS-BKP-001")["verdict"] == "fail"
     # secrets hidden by Oxidized never produce a verdict on how they are stored
-    hidden = [f for f in by_name["acc-hidden"]["findings"] if "Oxidized hides" in (f["note"] or "")]
-    assert hidden and all(f["verdict"] == "unknown" for f in hidden)
+    for f in by_name["acc-hidden"]["findings"]:
+        assert not (f["verdict"] in ("pass", "fail") and any("hidden>" in e for e in f["evidence"])), f["control_id"]
     assert verdict(by_name["acc-hidden"], "LYSS-AUTH-002")["verdict"] == "unknown"
     assert verdict(by_name["acc-old"], "LYSS-AUTH-002")["verdict"] == "pass"  # same config, secrets visible
     assert by_name["sb-1"]["vendor"] == "cisco_sb"
+
+
+def test_oxidized_turns_verdicts_based_on_hidden_secrets_into_unknown():
+    config = re.sub(r'(password manager user-name "\S+" sha256) \S+', r"\1 <secret hidden>",
+                    case_config("hp-hardened"))
+    assert "<secret hidden>" in config
+    result = oxidized.assess(node("hp-1", "procurve"), config)
+    f = verdict(result, "LYSS-AUTH-002")
+    assert f["verdict"] == "unknown" and "Oxidized hides" in f["note"]
+    plain = oxidized.assess(node("hp-1", "procurve"), case_config("hp-hardened"))
+    assert verdict(plain, "LYSS-AUTH-002")["verdict"] == "pass"
 
 
 def test_oxidized_results_become_siem_events(monkeypatch):

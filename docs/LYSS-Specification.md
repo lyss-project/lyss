@@ -2,7 +2,7 @@
 
 # LYSS Specification: security controls for network switches
 
-**Version 0.4.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
+**Version 0.5.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
 
 ## 1. Scope
 
@@ -46,7 +46,7 @@ A device is **LYSS Level N conformant** when every control of levels 1 to N is `
 `not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.4.0-draft), assessed 2026-11-03 with LYSS 0.3.0.
+> core-sw-01 is LYSS Level 1 conformant (specification 0.5.0-draft), assessed 2026-11-03 with LYSS 0.3.0.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
 
@@ -137,9 +137,9 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Privileged-mode password is stored as a strong hash**
 
-- **Requirement.** The privileged (enable) credential is stored with a one-way hash, not in cleartext or a reversible encoding.
-- **Rationale.** Reversible encodings (e.g. Cisco type 7) are decoded instantly by public tools from any configuration backup.
-- **Test procedure.** Fail if the privileged credential is stored in cleartext or a reversible form. Pass if it is hashed, or if there is no privileged credential and privileged access is only granted to local accounts whose credentials are hashed or through central AAA.
+- **Requirement.** The privileged (enable) credential is stored with a one-way hash based on SHA-256 or a stronger algorithm (e.g. scrypt, PBKDF2-SHA-256, SHA-256/SHA-512 crypt). Cleartext, reversible encodings, MD5- and SHA-1-based hashes and Cisco type 4 are not accepted.
+- **Rationale.** Reversible encodings (e.g. Cisco type 7) are decoded instantly by public tools from any configuration backup, and MD5- or SHA-1-based hashes (e.g. Cisco type 5) are cracked quickly on commodity hardware.
+- **Test procedure.** Fail if the privileged credential, or a local account with full privileges, is stored in cleartext, a reversible form, or with MD5, SHA-1 or Cisco type 4 (e.g. Cisco "enable password", type 4 or 5, a 40-hex-digit SHA-1 value, HPE "sha1"). Pass if it uses an accepted algorithm, or if there is no privileged credential and privileged access is only granted through central AAA. Unknown if the algorithm cannot be identified.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.5 · NIST SP 800-53 r5 IA-5(1) · CIS Controls v8 3.11
 
@@ -159,7 +159,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Keys shared with RADIUS or TACACS+ servers are never stored in cleartext in the configuration.
 - **Rationale.** A cleartext RADIUS key in a backup lets an attacker impersonate the AAA server or decrypt authentication traffic.
-- **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. Reversible encodings pass Level 1 only.
+- **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding is not cleartext and passes this control; storing keys irreversibly or with a device-specific encryption key is planned as a separate Level 2 control.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.24 · NIST SP 800-53 r5 IA-5, SC-28 · CIS Controls v8 3.11
 
@@ -169,7 +169,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** The vendor still publishes security fixes for the device, and the running firmware has no known critical (CVSS >= 9.0) or known-exploited (CISA KEV) vulnerability whose fix is not installed.
 - **Rationale.** Unsupported or vulnerable firmware is the most common path to switch compromise.
-- **Test procedure.** Identify the model and firmware version from device state and compare them with a sourced knowledge base (vendor advisories, end-of-life bulletins, CISA KEV). Fail if security support has ended or an applicable advisory is unfixed in the running version. Unknown if the platform is not in the knowledge base: a pass is never assumed.
+- **Test procedure.** Identify the model and firmware version from device state and compare them with a sourced knowledge base (vendor advisories, end-of-life bulletins, CISA KEV). Fail if security support has ended, or if an applicable critical (CVSS >= 9.0) or known-exploited (CISA KEV) advisory is unfixed in the running version; other advisories do not affect this control. Unknown if the platform is not in the knowledge base: a pass is never assumed.
 - **Evidence.** state, external_data
 - **References (informative).** ISO/IEC 27001:2022 A.8.8 · NIST SP 800-53 r5 SI-2, SA-22, RA-5 · CIS Controls v8 2.2, 12.1
 
@@ -177,9 +177,9 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Configuration is backed up automatically**
 
-- **Requirement.** A copy of the running configuration is collected automatically at least every 7 days.
+- **Requirement.** The running configuration is collected automatically, so that a copy at most 7 days old exists at any time.
 - **Rationale.** Without a recent backup, recovery after failure or compromise is slow and error-prone.
-- **Test procedure.** Pass if an automatic (scheduled) collection of the running configuration is at most the parameter old, or if an administrator attested an external backup system for the device within the last 90 days. Fail if the last automatic backup is older, or only manual collections exist.
+- **Test procedure.** Pass if the most recent automatic (scheduled) collection of the running configuration is at most the parameter old at the time of assessment; a schedule less frequent than the parameter therefore fails between runs. Otherwise pass on an external backup system only with evidence of its last successful backup for this device, at most the parameter old (for example from the backup system's records), or with an administrator attestation, renewed at least every 90 days, that the external system backs the device up at least as often as the parameter and alerts on failure. Fail if the last automatic backup is older, or only manual collections exist.
 - **Parameters.** `max_age_days` = 7
 - **Evidence.** backup_system
 - **References (informative).** ISO/IEC 27001:2022 A.8.9, A.8.13 · NIST SP 800-53 r5 CP-9, CM-2(3) · CIS Controls v8 11.2
@@ -192,7 +192,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Administrator logins are authenticated by a RADIUS or TACACS+ server first; local accounts are only a fallback.
 - **Rationale.** Central AAA gives individual accounts, immediate revocation and an audit trail; shared local passwords do not.
-- **Test procedure.** Pass if an AAA server is defined and the login method list tries it before local accounts.
+- **Test procedure.** Pass if an AAA server is defined and every login method list used for remote administrative access starts with the AAA server, local accounts coming only after it. Fail if any such list starts with a local account, a line password or no authentication.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.16, A.8.5 · NIST SP 800-53 r5 IA-2, AC-2 · CIS Controls v8 12.5
 
@@ -202,7 +202,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** No SNMPv1/v2c community is configured; SNMP, if used, is SNMPv3 with authentication and encryption.
 - **Rationale.** SNMPv1/v2c communities travel in cleartext and are equivalent to shared passwords.
-- **Test procedure.** Fail if any SNMPv1/v2c community or v1/v2 group is configured.
+- **Test procedure.** Fail if any SNMPv1/v2c community or v1/v2 group is configured, or if any SNMPv3 group or user has a security level below authentication with privacy (noAuthNoPriv or authNoPriv).
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.21, A.8.24 · NIST SP 800-53 r5 SC-8, SC-13, IA-5 · CIS Controls v8 12.6
 
@@ -220,9 +220,9 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Management interface is on a dedicated management VLAN**
 
-- **Requirement.** The switch management address is not on the default VLAN (1) shared with user traffic.
+- **Requirement.** The switch management address is on a VLAN reserved for management: not the default VLAN (1), and no user access port is a member of it.
 - **Rationale.** Separating management from user networks prevents users from reaching the management plane.
-- **Test procedure.** Fail if VLAN 1 carries a management address. Pass if the management address is on another VLAN.
+- **Test procedure.** Fail if VLAN 1 carries a management address, or if an access (untagged, non-uplink) port is a member of the management VLAN. Pass if the management address is on another VLAN with no access port.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.22 · NIST SP 800-53 r5 SC-7, AC-4 · CIS Controls v8 12.2
 
@@ -232,7 +232,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** A banner stating authorized use only is displayed before authentication.
 - **Rationale.** The warning supports legal action against intruders and informs users that activity is monitored.
-- **Test procedure.** Pass if a login or message-of-the-day banner is configured.
+- **Test procedure.** Pass if a banner displayed before authentication (login or message-of-the-day, not a post-login exec banner) is configured and its text states the authorized-use restriction ("authorized", "authorised", "unauthorized" or "unauthorised"). Fail otherwise.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.10 · NIST SP 800-53 r5 AC-8 · CIS Controls v8 —
 
@@ -252,7 +252,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** The switch forwards its logs to at least one remote syslog or SIEM collector.
 - **Rationale.** Local logs are lost on reboot and can be erased by an intruder; remote logs support detection and investigation.
-- **Test procedure.** Pass if at least one remote syslog destination is configured.
+- **Test procedure.** Fail if logging is disabled globally (e.g. "no logging on"). Pass if at least one remote syslog destination is configured and logging is enabled.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.15, A.8.16 · NIST SP 800-53 r5 AU-4(1), AU-6 · CIS Controls v8 8.2, 8.9
 
@@ -262,8 +262,8 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** The switch clock is synchronized with at least one configured time server.
 - **Rationale.** Without a reliable clock, logs cannot be correlated and certificates and schedules misbehave.
-- **Test procedure.** Pass if at least one NTP or SNTP server is configured.
-- **Evidence.** config
+- **Test procedure.** Fail if no NTP or SNTP server is configured, or if the device state reports the clock as not synchronized. Pass if a time server is configured and the clock is reported synchronized; without device state, a configured time server passes and the report says that synchronization was not verified.
+- **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.17 · NIST SP 800-53 r5 AU-8, SC-45 · CIS Controls v8 8.4
 
 #### LYSS-ACC-010
@@ -280,9 +280,9 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Edge ports are protected against rogue spanning-tree participants (BPDU guard)**
 
-- **Requirement.** Every edge port (not connected to another switch) disables itself when it receives a spanning-tree BPDU.
+- **Requirement.** Every edge port disables itself when it receives a spanning-tree BPDU. Links to other switches are configured as such (trunks or link aggregations); every other port is an edge port.
 - **Rationale.** A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
-- **Test procedure.** Edge ports are all ports minus uplinks (trunk / aggregation members in the configuration, and ports where neighbour discovery sees a bridge). Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
+- **Test procedure.** Edge ports are all ports minus uplinks, and uplinks are only the ports configured as trunks or link-aggregation members (tagged on HPE AOS-S). Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
 - **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 SC-5, CM-6 · CIS Controls v8 12.2
 

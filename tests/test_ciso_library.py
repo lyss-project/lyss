@@ -84,15 +84,17 @@ def test_tree_structure(generated):
         by_urn[n["urn"]] = n
     groups = {g["ref_id"] for g in fw["implementation_groups_definition"]}
     assert all(set(n["implementation_groups"]) <= groups for n in nodes)
-    # Only controls are assessable, and they sit at depth 3 under level / domain nodes.
-    assert all(n["assessable"] == (n["depth"] == 3) for n in nodes)
+    # Only controls are assessable, and they sit at depth 3 under level / domain nodes;
+    # controls whose text is not written yet (drafts) are not assessable.
+    assert all(not n["assessable"] or n["depth"] == 3 for n in nodes)
+    assert all(n["assessable"] or n["annotation"].startswith("Draft control") for n in nodes if n["depth"] == 3)
 
 
 def test_every_control_is_one_assessable_requirement(generated):
     spec = generated["spec"]
     nodes = {n["ref_id"]: n for n in generated["fw"]["objects"]["framework"]["requirement_nodes"]}
     controls = spec["controls"]
-    assert sum(n["assessable"] for n in nodes.values()) == len(controls)
+    assert sum(n["assessable"] for n in nodes.values()) == sum(1 for c in controls if c.get("statement"))
     for c in controls:
         n = nodes[c["id"]]
         assert n["urn"] == f"urn:lyss:risk:req_node:lyss:{c['id'].lower()}"
@@ -113,7 +115,8 @@ def test_iso_mappings_match_the_specification(generated):
     spec = generated["spec"]
     expected = {(f"urn:lyss:risk:req_node:lyss:{c['id'].lower()}",
                  f"urn:intuitem:risk:req_node:iso27001-2022:{ref.lower()}")
-                for c in spec["controls"] for ref in c.get("mappings", {}).get("iso27001_2022", [])}
+                for c in spec["controls"] if c.get("statement")
+                for ref in c.get("mappings", {}).get("iso27001_2022", [])}
     # LYSS -> ISO only: an ISO control judged compliant must never mark LYSS controls compliant
     (forward,) = generated["map"]["objects"]["requirement_mapping_sets"]
     assert forward["source_framework_urn"] == "urn:lyss:risk:framework:lyss"

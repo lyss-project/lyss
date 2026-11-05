@@ -10,10 +10,14 @@
 #   {state: R, section: S}          true if a line of collected state section S matches R
 #   add absent: true to a state rule  true if section S was collected and no line matches R
 #   {ports_in_both: [A, B]}         true if some port (group 1) appears in both state tables A and B
+#   {captures_in_both: [A, B]}      true if a value (group 1) is captured by both A and B, where a
+#                                   capture is {line: R}, {block: H, where: W} (group 1 of the header),
+#                                   {block: H, where: W, line: R}, {untagged_access_vlans: true}
+#                                   (port-list platforms) or a list of these
 # Per control: fail_if_any -> fail; firmware -> data/firmware.yaml; pass_if_all / pass_if_any -> pass;
 # else `otherwise`. A state rule never matches when that state was not collected.
 adapter: cisco_ios
-spec_version: "0.2.0-draft"
+spec_version: "0.5.0-draft"
 platform: Cisco IOS / IOS-XE
 status: draft, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
 
@@ -81,12 +85,15 @@ checks:
   LYSS-AUTH-002:
     fail_if_any:
       - {line: '^enable password\b'}
+      # type 5 = MD5-crypt, type 4 = flawed unsalted SHA-256: not accepted (cracked quickly)
+      - {line: '^enable (algorithm-type md5 )?secret [45] '}
+      - {line: '^username \S+ (.* )?privilege 15 (.* )?(secret [45]|password) '}
     pass_if_any:
-      - {line: '^enable (algorithm-type \S+ )?secret\b'}
-      # no enable credential at all: privilege 15 only through local accounts stored as a hash
-      - {line: '^username \S+ (.* )?privilege 15 (.* )?secret\b', say: 'no enable credential; privileged access only through hashed local accounts (username ... privilege 15 secret)'}
+      - {line: '^enable (algorithm-type (scrypt|sha256) )?secret [89] '}
+      # no enable credential at all: privilege 15 only through local accounts with a strong hash
+      - {line: '^username \S+ (.* )?privilege 15 (.* )?secret [89] ', say: 'no enable credential; privileged access only through local accounts hashed with scrypt / PBKDF2-SHA-256 (secret 9 / 8)'}
     otherwise: unknown
-    note: No enable credential in config; acceptable only if privilege 15 comes from AAA or hashed local users.
+    note: Accepted hashes are type 9 (scrypt) and type 8 (PBKDF2-SHA-256); without an enable credential, privilege 15 must come from AAA or such local users.
     remediation: |
       no enable password
       enable algorithm-type scrypt secret <new-secret>
@@ -105,7 +112,7 @@ checks:
       - {block: '^(radius|tacacs) server', line: '^key (0 )?(?!(6|7) )\S'}
       - {line: '^(radius|tacacs)-server (.* )?key (0 )?(?!(6|7) )\S'}
     otherwise: pass
-    note: Type 7 is accepted at Level 1 but is reversible; Level 2 will require type 6 (AES).
+    note: Type 7 is not cleartext but is reversible; prefer type 6 (AES with a device master key).
     remediation: |
       key config-key password-encrypt <master-key>
       password encryption aes
@@ -131,10 +138,18 @@ checks:
   # ---------------- Level 2 ----------------
 
   LYSS-AUTH-010:
+    fail_if_any:
+      # the default list (used by vty lines without "login authentication") must start with AAA
+      - {line: '^aaa authentication login default (?!group\b)\S'}
+      # a named list used by a vty line must start with AAA too
+      - captures_in_both:
+          - {block: '^line vty', line: '^login authentication (\S+)'}
+          - {line: '^aaa authentication login (\S+) (?!group\b)\S'}
     pass_if_all:
       - {line: '^aaa new-model'}
       - {line: '^aaa authentication login \S+ group \S+'}
     otherwise: fail
+    note: Every login list used for remote access must start with "group <radius/tacacs>"; local only after it.
     remediation: |
       aaa new-model
       aaa authentication login default group <radius-group> local
@@ -143,6 +158,9 @@ checks:
   LYSS-AUTH-011:
     fail_if_any:
       - {line: '^snmp-server community '}
+      - {line: '^snmp-server group \S+ v(1|2c?)\b'}
+      # SNMPv3 below authPriv: noauth (noAuthNoPriv) or auth (authNoPriv)
+      - {line: '^snmp-server group \S+ v3 (noauth|auth)\b'}
     otherwise: pass
     remediation: |
       no snmp-server community <name>
@@ -162,6 +180,10 @@ checks:
   LYSS-MGMT-011:
     fail_if_any:
       - {block: '^interface Vlan1$', line: '^ip address (\d|dhcp)'}
+      # an access port in the management VLAN puts user traffic next to the management address
+      - captures_in_both:
+          - {block: '^interface Vlan(\d+)$', where: '^ip address \d'}
+          - {block: '^interface \S*Ethernet', where: '^switchport mode access', line: '^switchport access vlan (\d+)'}
     pass_if_any:
       - {block: '^interface Vlan(?!1$)\d+$', line: '^ip address \d'}
     otherwise: unknown
@@ -173,9 +195,11 @@ checks:
        shutdown
 
   LYSS-MGMT-012:
-    pass_if_any:
+    pass_if_all:
       - {line: '^banner (login|motd) '}
+      - {line: '(?i)authori[sz]ed'}
     otherwise: fail
+    note: The login or MOTD banner (shown before authentication) must state the authorized-use restriction.
     remediation: |
       banner login ^Authorized access only. Activity is logged.^
 
@@ -195,6 +219,8 @@ checks:
       ! if the image offers no SHA-2 key exchange, upgrade IOS (check "ip ssh server algorithm kex ?")
 
   LYSS-LOG-010:
+    fail_if_any:
+      - {line: '^no logging on\b', say: 'logging is disabled globally ("no logging on"): nothing reaches the syslog hosts'}
     pass_if_any:
       - {line: '^logging (host )?\d+\.\d+\.\d+\.\d+'}
     otherwise: fail
@@ -203,9 +229,12 @@ checks:
       logging trap informational
 
   LYSS-LOG-011:
+    fail_if_any:
+      - {state: '(?i)\bunsynchroni[sz]ed\b', section: show ntp status}
     pass_if_any:
       - {line: '^ntp server '}
     otherwise: fail
+    note: Synchronization is checked with "show ntp status"; without device state, a configured server passes.
     remediation: |
       ntp server <ntp-ip>
 

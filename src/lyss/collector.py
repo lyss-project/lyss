@@ -28,7 +28,8 @@ COMMANDS = {
         "config": "show running-config",
         "state": ["show version", "show inventory", "show system", "show ip ssh",
                   "show services tcp-udp", "show interfaces status", "show interfaces configuration",
-                  "show lldp neighbors", "show cdp neighbors", "show cdp neighbors detail"],
+                  "show lldp neighbors", "show cdp neighbors", "show cdp neighbors detail",
+                  "show sntp status"],
     },
     "cisco_ios": {
         "netmiko": "cisco_ios",
@@ -36,7 +37,7 @@ COMMANDS = {
         "state": ["show version", "show inventory", "show ip ssh",
                   "show control-plane host open-ports", "show interfaces status",
                   "show lldp neighbors", "show cdp neighbors",
-                  "show lldp neighbors detail", "show cdp neighbors detail"],
+                  "show lldp neighbors detail", "show cdp neighbors detail", "show ntp status"],
     },
     "hp_procurve": {
         # netmiko answers "Press any key to continue" and disables paging ("no page")

@@ -4,6 +4,28 @@ Specification versions (`spec_version`) and tool versions are tracked together u
 
 ## Unreleased
 
+Specification 0.5.0-draft
+Test procedures tightened where they were looser than their statements (review of the CISO
+Assistant library, intuitem/ciso-assistant-community#5246); verdicts can change from pass to fail.
+- LYSS-AUTH-002: strong hash only (SHA-256 or stronger: scrypt, PBKDF2-SHA-256, SHA-256/512
+  crypt). MD5 (Cisco type 5), SHA-1 (40-hex values on Cisco Business, HPE "sha1") and Cisco type 4
+  fail; a full-privilege local account with a weak or reversible password fails too.
+- LYSS-AUTH-004: the procedure no longer depends on the level (reversible encodings are not
+  cleartext; irreversible storage is planned as a separate Level 2 control).
+- LYSS-AUTH-010: every login list used for remote access must start with RADIUS/TACACS+.
+- LYSS-AUTH-011: SNMPv3 groups or users below authPriv fail.
+- LYSS-MGMT-011: an access port in the management VLAN fails.
+- LYSS-MGMT-012: the pre-login banner must state the authorized-use restriction; exec banners
+  (after login) do not count.
+- LYSS-LOG-010: "no logging on" fails. LYSS-LOG-011: an unsynchronized clock fails (device state).
+- LYSS-ACC-011: only trunk / aggregation ports are uplinks; neighbour discovery never exempts a port.
+- LYSS-VULN-001, LYSS-BKP-001: procedures aligned with their statements.
+- Level 3 controls without text are not assessable in the CISO Assistant library.
+
+Tool
+- New rule form `captures_in_both` (a value found in two places, e.g. the management VLAN on
+  access ports); `show ntp status` (IOS) and `show sntp status` (Cisco Business) collected.
+
 Contributors
 - Thanks to **juanmig7890** for the first outside contribution: Linux and macOS quick start in
   the tester guide (#5).
