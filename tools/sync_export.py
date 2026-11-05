@@ -44,6 +44,16 @@ def main() -> int:
         sys.exit("the export repository must be outside the private repository")
     if git("status", "--porcelain", cwd=repo).stdout.strip():
         sys.exit(f"{repo} has uncommitted changes: commit or discard them first")
+    # never overwrite work merged on the remote (e.g. a contributor's pull request)
+    if subprocess.run(["git", "rev-parse", "--abbrev-ref", "@{u}"], cwd=repo, capture_output=True).returncode == 0:
+        fetched = subprocess.run(["git", "fetch", "--quiet"], cwd=repo, capture_output=True, text=True)
+        if fetched.returncode != 0:
+            sys.exit(f"cannot fetch the remote of {repo}: {fetched.stderr.strip()[:300]}")
+        unknown = git("rev-list", "--count", "HEAD..@{u}", cwd=repo).stdout.decode().strip()
+        if unknown != "0":
+            sys.exit(f"the remote has {unknown} commit(s) that are not in {repo} (merged pull requests?).\n"
+                     "Bring those changes into the private repository first, then run "
+                     "`git pull --ff-only` in the export repository, and sync again.")
     if not args.gitleaks or not Path(args.gitleaks).exists():
         sys.exit("gitleaks not found: pass --gitleaks <path to gitleaks.exe>")
     if git("status", "--porcelain", "--untracked-files=no").stdout.strip():

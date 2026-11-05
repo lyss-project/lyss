@@ -66,6 +66,12 @@ simulator and synthetic outputs so far (reports from real AOS-S switches are wel
 - **Topology map** built from neighbour tables.
 - **History**: configuration versions with diffs, scan trends, regression alerts.
 - **Scheduled scans**, **e-mail alerts**, **CISO Assistant** evidence push (disabled by default).
+- **SIEM events** over syslog or a JSON-lines file, with ready Wazuh decoder and rules
+  ([integrations/wazuh](integrations/wazuh/README.md)).
+- **Oxidized**: assess the configurations Oxidized already backs up, without SSH
+  ([integrations/oxidized](integrations/oxidized/README.md)).
+- **CISO Assistant library**: the LYSS framework and its ISO 27001:2022 mapping, ready to import
+  ([integrations/ciso-assistant](integrations/ciso-assistant/README.md)).
 - **Reports**: standalone HTML (printable to PDF) and JSON, with ISO 27001 / NIST / CIS mappings.
 - **Optional remediation** (off by default): low-risk fixes only, previewed, applied one switch at
   a time, verified over a new connection, rolled back automatically, saved only after

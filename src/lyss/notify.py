@@ -6,6 +6,7 @@
   discovered switches; or a summary after every scan.
 - CISO Assistant (open-source GRC): the fleet report is uploaded as a new revision of an evidence
   (REST API, token authentication), on demand or after scheduled scans.
+- SIEM events (events.py): scan results as JSON events over syslog and/or a JSON-lines file.
 Secrets (SMTP password, API token) are stored with the vault, never returned to the browser.
 """
 
@@ -16,7 +17,7 @@ from email.message import EmailMessage
 
 import httpx
 
-from . import PROJECT_LONG_NAME, PROJECT_NAME, inventory, vault
+from . import PROJECT_LONG_NAME, PROJECT_NAME, events, inventory, vault
 
 _ciso_transport = None  # tests inject an httpx.MockTransport here
 
@@ -125,6 +126,13 @@ def after_scan(job: dict, changes: dict, discovered: int) -> list[str]:
                 notices.append("alert e-mail sent")
         except Exception as exc:
             notices.append(f"e-mail failed: {type(exc).__name__}: {exc}"[:200])
+    siem = events.settings()
+    if siem.get("enabled"):
+        try:
+            sent = events.send(events.build(job, changes, discovered, siem), siem)
+            notices.append(f"{sent} event(s) sent to the SIEM")
+        except Exception as exc:
+            notices.append(f"SIEM events failed: {type(exc).__name__}: {exc}"[:200])
     ciso = ciso_settings()
     if ciso.get("enabled") and ciso.get("auto_push") and job.get("trigger") == "schedule":
         try:

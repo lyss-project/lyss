@@ -186,6 +186,35 @@
   </div>
 </form>
 
+<form method="post" action="/settings/siem" class="card form-grid" autocomplete="off" id="siem">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="span-2">
+    <h2>SIEM events (syslog / Wazuh)</h2>
+    <p class="muted">After each scan, one JSON event per switch (level, counts), per failed control, per regression or fix, and per collection error. Ready-made Wazuh rules: <code>integrations/wazuh</code>.</p>
+  </div>
+  <label class="check span-2"><input type="checkbox" name="enabled" {% if siem.enabled %}checked{% endif %}> Enable SIEM events</label>
+  <label>Syslog server (optional)<input name="host" value="{{ siem.host or '' }}" maxlength="253" placeholder="wazuh.example.local"></label>
+  <label>Port and protocol
+    <span class="inline-pair"><input name="port" value="{{ siem.port or 514 }}" inputmode="numeric" pattern="[0-9]{1,5}" aria-label="Port">
+    <select name="protocol" aria-label="Protocol">
+      <option value="udp" {% if siem.protocol != "tcp" %}selected{% endif %}>UDP</option>
+      <option value="tcp" {% if siem.protocol == "tcp" %}selected{% endif %}>TCP</option>
+    </select></span>
+  </label>
+  <label>Events file (optional, JSON lines)<input name="file" value="{{ siem.file or '' }}" maxlength="400" placeholder="{{ siem_default_file }}"></label>
+  <label>Failed controls
+    <select name="findings">
+      <option value="all" {% if siem.findings != "changes" %}selected{% endif %}>Every failed control after each scan</option>
+      <option value="changes" {% if siem.findings == "changes" %}selected{% endif %}>Only regressions and fixes</option>
+    </select>
+  </label>
+  <p class="muted span-2">The events file is for a local agent (Wazuh <code>&lt;localfile&gt;</code> with <code>&lt;log_format&gt;json&lt;/log_format&gt;</code>, Filebeat). Evidence lines are redacted: no password hashes, keys or communities.</p>
+  <div class="form-actions span-2">
+    <button class="btn btn-ghost" type="submit" formaction="/settings/siem/test" formnovalidate>Send test event</button>
+    <button class="btn btn-primary" type="submit">Save SIEM events</button>
+  </div>
+</form>
+
 <form method="post" action="/settings/ciso" class="card form-grid" autocomplete="off">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="span-2">

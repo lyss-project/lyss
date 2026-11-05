@@ -2,6 +2,24 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## Unreleased
+
+Integrations
+- SIEM events: after each scan, JSON events per switch (level, counts), per failed control,
+  regression, fix and collection error, plus discovered switches; sent over syslog (UDP/TCP,
+  RFC 3164, program "lyss") and/or appended to a JSON-lines file for a local agent. Settings →
+  SIEM events, with a test event. Wazuh decoder, rules (100800-100809) and install script in
+  integrations/wazuh, tested with wazuh-logtest and end to end (syslog UDP) on Wazuh 4.14.
+- CISO Assistant library (integrations/ciso-assistant), generated from the specification by
+  tools/build_ciso_library.py: the LYSS framework (levels, domains, controls with rationale and
+  test procedure; levels as implementation groups) and a LYSS → ISO/IEC 27001:2022 mapping (one
+  direction only: an ISO control judged compliant proves nothing about a switch). Imported and
+  checked in CISO Assistant 4.1.
+- Oxidized: `python -m lyss oxidized --url ...` assesses the configurations Oxidized backs up
+  (REST API, read-only, no SSH to the switches); a recent successful Oxidized backup is evidence
+  for LYSS-BKP-001; secrets hidden by Oxidized give "unknown", never a false verdict; `--events`
+  sends the results to the SIEM.
+
 ## 0.6.0 (2026-11-05): first public release
 
 Licence

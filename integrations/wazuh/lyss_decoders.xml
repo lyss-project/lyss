@@ -1,0 +1,13 @@
+<!--
+  SPDX-License-Identifier: AGPL-3.0-only
+  Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+
+  Wazuh decoder for LYSS events received over syslog ("<host> lyss: {json}").
+  Wazuh's built-in "json" decoder only reads lines that start with "{" (the LYSS events file);
+  behind a syslog header the JSON is read by this decoder.
+  Install: copy to /var/ossec/etc/decoders/lyss_decoders.xml, then restart wazuh-manager.
+-->
+<decoder name="lyss">
+  <program_name>^lyss$</program_name>
+  <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>

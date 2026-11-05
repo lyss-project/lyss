@@ -23,8 +23,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .. import (PROJECT_LONG_NAME, PROJECT_NAME, __version__, collector, discovery, firmware, history, inventory,
-                notify, remediate, report, scan, sites, topology, vault)
+from .. import (PROJECT_LONG_NAME, PROJECT_NAME, __version__, collector, discovery, events, firmware, history,
+                inventory, notify, remediate, report, scan, sites, topology, vault)
 from ..engine import ADAPTER_DIR, load_spec
 
 HERE = Path(__file__).parent
@@ -447,6 +447,7 @@ def _settings_page(request: Request, session: dict, status: int = 200, **ctx):
                    organization=settings.get("organization", ""),
                    schedule=settings.get("schedule", {"time": "02:30", "days": list(range(7))}),
                    smtp=_public(settings.get("smtp", {})), ciso=_public(settings.get("ciso", {})),
+                   siem=settings.get("siem", {}), siem_default_file=str(inventory.PRIVATE / "lyss-events.jsonl"),
                    remediation=remediate.settings(), suggested=remediate.suggest_defaults(),
                    weekdays=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], **ctx)
 
@@ -564,6 +565,49 @@ def test_ciso(request: Request, csrf: str = Form("")):
     except Exception as exc:
         return _settings_page(request, session, status=502, errors=[f"CISO Assistant test failed: {type(exc).__name__}: {exc}"[:300]])
     return _settings_page(request, session, saved=f"Connected: evidence \"{name}\" found.")
+
+
+@app.post("/settings/siem")
+def save_siem(request: Request, csrf: str = Form(""), enabled: str | None = Form(None), host: str = Form(""),
+              port: str = Form("514"), protocol: str = Form("udp"), file: str = Form(""),
+              findings: str = Form("all")):
+    session = _session(request)
+    _check_csrf(session, csrf)
+    host, file = host.strip(), file.strip()
+    errors = []
+    if host and not inventory.HOST_PATTERN.match(host):
+        errors.append("SIEM: invalid syslog server address.")
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        errors.append("SIEM: port must be a number between 1 and 65535.")
+    if protocol not in ("udp", "tcp") or findings not in ("all", "changes"):
+        errors.append("SIEM: invalid option.")
+    if file and not (Path(file).is_absolute() and Path(file).suffix.lower() in (".jsonl", ".json", ".log")):
+        errors.append("SIEM: the events file must be an absolute path ending in .jsonl, .json or .log.")
+    if enabled == "on" and not (host or file):
+        errors.append("SIEM: give a syslog server, an events file, or both.")
+    if errors:
+        return _settings_page(request, session, status=400, errors=errors)
+    settings = inventory.load_settings()
+    settings["siem"] = {"enabled": enabled == "on", "host": host, "port": int(port), "protocol": protocol,
+                        "file": file, "findings": findings}
+    inventory.save_settings(settings)
+    return _settings_page(request, session, saved="SIEM events saved.")
+
+
+@app.post("/settings/siem/test")
+def test_siem(request: Request, csrf: str = Form("")):
+    session = _session(request)
+    _check_csrf(session, csrf)
+    cfg = inventory.load_settings().get("siem", {})
+    if not (cfg.get("host") or cfg.get("file")):
+        return _settings_page(request, session, status=400, errors=["SIEM: save a syslog server or an events file first."])
+    try:
+        events.send([events.test_event()], cfg)
+    except Exception as exc:
+        return _settings_page(request, session, status=502, errors=[f"SIEM test failed: {type(exc).__name__}: {exc}"[:300]])
+    where = " and ".join(x for x in (f"{cfg['host']}:{cfg['port']}/{cfg.get('protocol', 'udp')}" if cfg.get("host") else "",
+                                     cfg.get("file", "")) if x)
+    return _settings_page(request, session, saved=f"Test event sent to {where} (lyss.event = test).")
 
 
 @app.post("/export/ciso")

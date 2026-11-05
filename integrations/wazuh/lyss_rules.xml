@@ -1,0 +1,83 @@
+<!--
+  SPDX-License-Identifier: AGPL-3.0-only
+  Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+
+  Wazuh rules for LYSS (Lyaazale Switch Security) SIEM events.
+  LYSS sends JSON events {"lyss": {...}} over syslog or writes them to a JSON-lines file;
+  Wazuh's built-in JSON decoder extracts the fields (lyss.event, lyss.device, lyss.control...).
+  Install: copy to /var/ossec/etc/rules/lyss_rules.xml, then restart wazuh-manager.
+  Rule ids 100800-100819: change them if they collide with your own local rules.
+-->
+<group name="lyss,network_switch,">
+
+  <!-- events received over syslog (lyss_decoders.xml) -->
+  <rule id="100800" level="0">
+    <decoded_as>lyss</decoded_as>
+    <field name="lyss.event">\.+</field>
+    <description>LYSS: switch security event</description>
+  </rule>
+
+  <!-- events read from the LYSS events file by a Wazuh agent (<log_format>json</log_format>) -->
+  <rule id="100809" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="lyss.event">\.+</field>
+    <description>LYSS: switch security event</description>
+  </rule>
+
+  <rule id="100801" level="3">
+    <if_sid>100800, 100809</if_sid>
+    <field name="lyss.event">^scan$</field>
+    <description>LYSS: $(lyss.device) assessed, level $(lyss.level), $(lyss.fail) failed control(s)</description>
+    <group>lyss_scan,</group>
+  </rule>
+
+  <rule id="100802" level="5">
+    <if_sid>100800, 100809</if_sid>
+    <field name="lyss.event">^finding$</field>
+    <description>LYSS: $(lyss.device) fails $(lyss.control) (Level $(lyss.control_level)): $(lyss.title)</description>
+    <group>lyss_finding,</group>
+  </rule>
+
+  <rule id="100803" level="7">
+    <if_sid>100802</if_sid>
+    <field name="lyss.control_level">^1$</field>
+    <description>LYSS: $(lyss.device) fails Baseline control $(lyss.control): $(lyss.title)</description>
+    <group>lyss_finding,lyss_baseline,</group>
+  </rule>
+
+  <rule id="100804" level="10">
+    <if_sid>100800, 100809</if_sid>
+    <field name="lyss.event">^regression$</field>
+    <description>LYSS: new failure on $(lyss.device): $(lyss.control) $(lyss.title)</description>
+    <group>lyss_regression,configuration_changed,</group>
+  </rule>
+
+  <rule id="100805" level="3">
+    <if_sid>100800, 100809</if_sid>
+    <field name="lyss.event">^fixed$</field>
+    <description>LYSS: $(lyss.device) now passes $(lyss.control) $(lyss.title)</description>
+    <group>lyss_fixed,</group>
+  </rule>
+
+  <rule id="100806" level="6">
+    <if_sid>100800, 100809</if_sid>
+    <field name="lyss.event">^collection_error$</field>
+    <description>LYSS: $(lyss.device) could not be collected: $(lyss.message)</description>
+    <group>lyss_error,</group>
+  </rule>
+
+  <rule id="100807" level="6">
+    <if_sid>100800, 100809</if_sid>
+    <field name="lyss.event">^discovered$</field>
+    <description>LYSS: $(lyss.count) unmanaged switch(es) discovered on the network</description>
+    <group>lyss_discovery,</group>
+  </rule>
+
+  <rule id="100808" level="3">
+    <if_sid>100800, 100809</if_sid>
+    <field name="lyss.event">^test$</field>
+    <description>LYSS: test event received</description>
+    <group>lyss_test,</group>
+  </rule>
+
+</group>

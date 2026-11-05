@@ -4,6 +4,7 @@
 
   python -m lyss audit --vendor <adapter> <file-or-folder>   assess saved configurations
   python -m lyss collect [--only id ...]                     collect + audit inventory devices
+  python -m lyss oxidized --url http://oxidized:8888         assess the configs backed up by Oxidized
   python -m lyss import-legacy <inventory.csv> <cred-dir>    import devices + PowerShell cred files
   python -m lyss ui [--port 8765]                            start the local web interface
   python -m lyss sim [--lab demo] [--base-port 2201]         simulated switches over SSH (127.0.0.1)
@@ -83,6 +84,38 @@ def cmd_collect(args) -> int:
         print(notice)
     print(f"total {time.monotonic() - started:.0f}s")
     return 1 if any(i["status"] == "error" for i in job["items"].values()) else 0
+
+
+def cmd_oxidized(args) -> int:
+    """Assess the configurations backed up by Oxidized (REST API), without connecting to the switches."""
+    import os
+
+    from . import events, oxidized
+    password = os.environ.get("LYSS_OXIDIZED_PASSWORD", "")  # never on the command line
+    with oxidized.client(args.url, args.user or "", password, not args.insecure) as http:
+        results, skipped = oxidized.assess_all(http, args.level, args.only)
+    if args.json:
+        json.dump({"tool": PROJECT_NAME, "version": __version__, "source": "oxidized",
+                   "spec_version": load_spec()["spec_version"], "results": results, "skipped": skipped},
+                  sys.stdout, indent=2, ensure_ascii=False)
+    else:
+        from .engine import Finding
+        for r in results:
+            print_text(f"{r['device']} ({r['host']}, {r['vendor']}, from Oxidized)",
+                       [Finding(**f) for f in r["findings"]], r["summary"])
+        for s in skipped:
+            print(f"\n--- {s['device']}: skipped, {s['reason']}")
+        print(f"\n{len(results)} switch(es) assessed from Oxidized, {len(skipped)} skipped.")
+    if args.events:
+        cfg = events.settings()
+        if not (cfg.get("host") or cfg.get("file")):
+            print("SIEM events: configure a syslog server or an events file in Settings first.", file=sys.stderr)
+            return 2
+        sent = events.send(events.wrap([e for r in results for e in events.result_events(
+            {"device": r["device"], "host": r["host"], "site": r["group"]}, r, {}, cfg.get("findings", "all"),
+            "oxidized")]), cfg)
+        print(f"{sent} event(s) sent to the SIEM.", file=sys.stderr)
+    return 0
 
 
 def cmd_import_legacy(args) -> int:
@@ -170,6 +203,16 @@ def main(argv=None) -> int:
     c.add_argument("--scheduled", action="store_true",
                    help="run from cron / Task Scheduler: counts as an automatic configuration backup")
     c.set_defaults(func=cmd_collect)
+
+    o = sub.add_parser("oxidized", help="assess the configurations backed up by Oxidized (no SSH to the switches)")
+    o.add_argument("--url", required=True, help="Oxidized REST API, e.g. http://oxidized:8888")
+    o.add_argument("--user", help="HTTP basic auth user (password in LYSS_OXIDIZED_PASSWORD)")
+    o.add_argument("--insecure", action="store_true", help="do not verify the TLS certificate")
+    o.add_argument("--level", type=int, default=2, help="highest level to assess (default 2)")
+    o.add_argument("--only", nargs="*", help="node names (default: all supported nodes)")
+    o.add_argument("--json", action="store_true", help="output JSON instead of text")
+    o.add_argument("--events", action="store_true", help="also send SIEM events (Settings > SIEM events)")
+    o.set_defaults(func=cmd_oxidized)
 
     i = sub.add_parser("import-legacy", help="import devices from CSV + PowerShell cred files")
     i.add_argument("csv", type=Path)
