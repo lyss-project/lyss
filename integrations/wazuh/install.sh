@@ -3,20 +3,34 @@
 # Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
 #
 # Installs the LYSS decoder and rules on a Wazuh manager, checks the configuration, restarts the
-# manager. Run as root on the manager:  sudo sh install.sh        (uninstall: sudo sh install.sh --remove)
+# manager. Run as root on the manager:
+#   sudo sh install.sh                          install / update
+#   sudo sh install.sh --regression-level 12    same, regressions raised to level 12 (e.g. to reach
+#                                               the manager's email_alert_level)
+#   sudo sh install.sh --remove                 uninstall
 # Nothing else is changed. If the configuration check fails, the previous state is restored.
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 OSSEC=${OSSEC:-/var/ossec}
 DEC="$OSSEC/etc/decoders/lyss_decoders.xml"
 RUL="$OSSEC/etc/rules/lyss_rules.xml"
+REGRESSION_LEVEL=""
 
-if [ "${1:-}" = "--remove" ]; then
-    rm -f "$DEC" "$RUL"
-    systemctl restart wazuh-manager
-    echo "LYSS decoder and rules removed, wazuh-manager restarted."
-    exit 0
-fi
+case "${1:-}" in
+    --remove)
+        rm -f "$DEC" "$RUL"
+        systemctl restart wazuh-manager
+        echo "LYSS decoder and rules removed, wazuh-manager restarted."
+        exit 0 ;;
+    --regression-level)
+        REGRESSION_LEVEL="${2:-}"
+        case "$REGRESSION_LEVEL" in
+            [0-9]|1[0-6]) ;;
+            *) echo "--regression-level needs a level from 0 to 16" >&2; exit 2 ;;
+        esac ;;
+    "") ;;
+    *) echo "usage: sudo sh install.sh [--regression-level N | --remove]" >&2; exit 2 ;;
+esac
 
 # refuse rule ids already used by other rule files
 for id in $(grep -o 'rule id="[0-9]*"' "$DIR/lyss_rules.xml" | grep -o '[0-9][0-9]*'); do
@@ -31,6 +45,11 @@ backup=$(mktemp -d)
 [ -f "$RUL" ] && cp -p "$RUL" "$backup/"
 install -m 660 -o wazuh -g wazuh "$DIR/lyss_decoders.xml" "$DEC"
 install -m 660 -o wazuh -g wazuh "$DIR/lyss_rules.xml" "$RUL"
+if [ -n "$REGRESSION_LEVEL" ]; then
+    # generic regression rule 100804 and per-control regression rules 100840-100869
+    sed -i -E "/<rule id=\"(100804|1008[4-6][0-9])\"/ s/level=\"[0-9]+\"/level=\"$REGRESSION_LEVEL\"/" "$RUL"
+    echo "regressions set to level $REGRESSION_LEVEL"
+fi
 
 if ! "$OSSEC/bin/wazuh-analysisd" -t; then
     echo "Configuration check FAILED: restoring the previous state." >&2
