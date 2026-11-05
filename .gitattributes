@@ -1,2 +1,4 @@
 # Windows batch files must keep CRLF line endings, also in GitHub ZIP downloads
 *.cmd -text
+# shell scripts run on Linux (Wazuh manager, CI): always LF
+*.sh text eol=lf

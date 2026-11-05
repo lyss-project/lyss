@@ -104,8 +104,14 @@ def test_wazuh_rules_and_decoder_are_valid_and_cover_every_event():
     assert len(ids) == len(set(ids)) and all(100000 <= int(i) <= 120000 for i in ids)
     matched = {f.text.strip("^$") for f in rules.iter("field") if f.get("name") == "lyss.event"}
     assert {"scan", "finding", "regression", "fixed", "collection_error", "discovered", "test"} <= matched
-    decoder = ElementTree.fromstring((WAZUH / "lyss_decoders.xml").read_text(encoding="utf-8"))
-    assert decoder.findtext("program_name") == "^lyss$" and decoder.findtext("plugin_decoder") == "JSON_Decoder"
+    decoders = ElementTree.fromstring("<root>" + (WAZUH / "lyss_decoders.xml").read_text(encoding="utf-8") + "</root>")
+    lyss = [d for d in decoders.iter("decoder") if d.get("name") == "lyss"]
+    assert len(lyss) == 1
+    assert lyss[0].findtext("program_name") == "^lyss$" and lyss[0].findtext("plugin_decoder") == "JSON_Decoder"
+    # Wazuh's regex engine (OS_Regex) has no \u class: only its documented escapes may be used
+    for d in decoders.iter("decoder"):
+        for e in list(d.iter("prematch")) + list(d.iter("regex")):
+            assert not re.search(r"\\[^wWdDsSpt.$()\[\]|^*+?\\]", e.text), (d.get("name"), e.text)
 
 
 def test_settings_siem_form(data_dir):

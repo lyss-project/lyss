@@ -66,11 +66,16 @@ def start_background(interval: int = 30) -> None:
     _started = True
 
     def loop():
+        from . import changes  # late import: changes imports scan too
         while True:
             try:
                 tick()
             except Exception:
                 pass  # never let the scheduler thread die
+            try:
+                changes.tick()  # rescan on change (disabled unless configured)
+            except Exception:
+                pass  # SIEM unreachable: retried at the next interval
             time.sleep(interval)
 
     threading.Thread(target=loop, daemon=True, name="lyss-scheduler").start()

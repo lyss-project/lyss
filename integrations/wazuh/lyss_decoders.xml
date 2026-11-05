@@ -2,12 +2,109 @@
   SPDX-License-Identifier: AGPL-3.0-only
   Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
 
-  Wazuh decoder for LYSS events received over syslog ("<host> lyss: {json}").
+  Wazuh decoders for LYSS.
+  Install: copy to /var/ossec/etc/decoders/lyss_decoders.xml, then restart wazuh-manager (install.sh).
+-->
+
+<!--
+  LYSS events received over syslog ("<host> lyss: {json}").
   Wazuh's built-in "json" decoder only reads lines that start with "{" (the LYSS events file);
   behind a syslog header the JSON is read by this decoder.
-  Install: copy to /var/ossec/etc/decoders/lyss_decoders.xml, then restart wazuh-manager.
 -->
 <decoder name="lyss">
   <program_name>^lyss$</program_name>
   <plugin_decoder>JSON_Decoder</plugin_decoder>
+</decoder>
+
+<!--
+  Cisco IOS / IOS-XE messages whose timestamp carries a time zone OFFSET ("UTC+1", "CET-1"), with or
+  without a message counter and milliseconds ("service timestamps log datetime msec localtime
+  show-timezone" with a non-UTC zone). Wazuh's own cisco-ios decoders expect a letters-only zone
+  ("UTC"), so these messages, including %SYS-5-CONFIG_I (rule 4721, configuration changed), were
+  not decoded. Same decoder name: Wazuh's child decoders and rules apply unchanged.
+  - 972: Nov  5 19:42:37.960 UTC+1: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.5)
+  - 972: Nov  5 19:42:37 UTC+1: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.5)
+  - Nov  5 19:42:37.960 UTC+1: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.5)
+  - *Nov  5 2026 19:42:37.960 CET-1: %LINK-3-UPDOWN: Interface GigabitEthernet1/0/3, changed state to up
+-->
+<decoder name="cisco-ios">
+  <prematch>^\d+:\s\p*\w+\s+\d*\s\d+:\d+:\d+.\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\d+:\s\p*\w+\s+\d*\s\d+\s\d+:\d+:\d+.\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\d+:\s\p*\w+\s+\d*\s\d+:\d+:\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\d+:\s\p*\w+\s+\d*\s\d+\s\d+:\d+:\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\p*\w+\s+\d*\s\d+:\d+:\d+.\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\p*\w+\s+\d*\s\d+\s\d+:\d+:\d+.\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\p*\w+\s+\d*\s\d+:\d+:\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\p*\w+\s+\d*\s\d+\s\d+:\d+:\d+\s+\w+\p\d+:\s+%|</prematch>
+  <!-- timestamp already removed by the pre-decoder ("972: Nov  5 19:42:37" is a syslog date): "UTC+1: %..." -->
+  <prematch>^\w+\p\d+:\s+%</prematch>
+</decoder>
+
+<!--
+  Cisco Small Business / Business switches (SG200-SG550X, CBS): "%FACILITY-L-MNEMONIC: text", where
+  the severity is a letter (I, N, W, E...), without date or hostname. Not decoded by Wazuh's ruleset.
+  - %AAA-I-CONNECT: User CLI session for user admin over ssh , source 192.0.2.5 destination  192.0.2.21 ACCEPTED
+  - %AAA-I-DISCONNECT: User CLI session for user admin over ssh , source 192.0.2.5 destination  192.0.2.21  TERMINATED.
+  - %AAA-W-REJECT: New ssh connection for user admin, source 192.0.2.5 destination 192.0.2.21  REJECTED
+-->
+<decoder name="cisco-sb">
+  <prematch>^%\w+-\w-\w+: </prematch>
+</decoder>
+
+<decoder name="cisco-sb">
+  <program_name />
+  <prematch>^%\w+-\w-\w+: </prematch>
+</decoder>
+
+<decoder name="cisco-sb-aaa-session">
+  <parent>cisco-sb</parent>
+  <prematch>^%AAA-\w-\w+: User \w+ session for user </prematch>
+  <regex>^%(\w+)-(\w)-(\w+): User \w+ session for user (\S+) over (\w+) , source (\S+) destination\s+(\S+)\s+(\w+)</regex>
+  <order>cisco.facility, cisco.severity, cisco.mnemonic, srcuser, protocol, srcip, dstip, action</order>
+</decoder>
+
+<decoder name="cisco-sb-aaa-reject">
+  <parent>cisco-sb</parent>
+  <prematch>^%AAA-\w-REJECT: </prematch>
+  <regex>^%(\w+)-(\w)-(\w+): New (\w+) connection for user (\S+), source (\S+) destination (\S+)\s+(\w+)</regex>
+  <order>cisco.facility, cisco.severity, cisco.mnemonic, protocol, srcuser, srcip, dstip, action</order>
+</decoder>
+
+<decoder name="cisco-sb-generic">
+  <parent>cisco-sb</parent>
+  <regex>^%(\w+)-(\w)-(\w+): </regex>
+  <order>cisco.facility, cisco.severity, cisco.mnemonic</order>
+</decoder>
+
+<decoder name="cisco-ios">
+  <program_name />
+  <prematch>^\d+:\s\p*\w+\s+\d*\s\d+:\d+:\d+.\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\d+:\s\p*\w+\s+\d*\s\d+\s\d+:\d+:\d+.\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\d+:\s\p*\w+\s+\d*\s\d+:\d+:\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\d+:\s\p*\w+\s+\d*\s\d+\s\d+:\d+:\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\p*\w+\s+\d*\s\d+:\d+:\d+.\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\p*\w+\s+\d*\s\d+\s\d+:\d+:\d+.\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\p*\w+\s+\d*\s\d+:\d+:\d+\s+\w+\p\d+:\s+%|</prematch>
+  <prematch>^\p*\w+\s+\d*\s\d+\s\d+:\d+:\d+\s+\w+\p\d+:\s+%|</prematch>
+  <!-- timestamp already removed by the pre-decoder ("972: Nov  5 19:42:37" is a syslog date): "UTC+1: %..." -->
+  <prematch>^\w+\p\d+:\s+%</prematch>
+</decoder>
+
+<!--
+  Child decoders for the Cisco IOS variants above: Wazuh attaches child decoders to the parents
+  loaded before them, so the children of Wazuh's own cisco-ios decoders do not apply to these later
+  variants. These extract the same fields (cisco.facility, cisco.severity, cisco.mnemonic, srcuser,
+  srcip), so Wazuh's Cisco IOS rules (e.g. 4721, configuration changed) fire unchanged.
+-->
+<decoder name="cisco-ios-lyss-config">
+  <parent>cisco-ios</parent>
+  <prematch>%SYS-5-CONFIG_I: Configured from </prematch>
+  <regex>%(\w+)-(\d)-(\w+): Configured from \w+ by (\S+) on \w+ \((\d+.\d+.\d+.\d+)\)</regex>
+  <order>cisco.facility, cisco.severity, cisco.mnemonic, srcuser, srcip</order>
+</decoder>
+
+<decoder name="cisco-ios-lyss-fields">
+  <parent>cisco-ios</parent>
+  <regex>%(\w+)-(\d)-(\w+):</regex>
+  <order>cisco.facility, cisco.severity, cisco.mnemonic</order>
 </decoder>

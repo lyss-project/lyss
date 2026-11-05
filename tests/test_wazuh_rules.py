@@ -57,7 +57,18 @@ def test_every_assessable_control_has_a_finding_and_a_regression_rule_with_its_n
 def test_rule_ids_are_unique_and_in_the_reserved_range():
     text = RULES.read_text(encoding="utf-8")
     ids = re.findall(r'<rule id="(\d+)"', text)
-    assert len(ids) == len(set(ids)) and all(100800 <= int(i) <= 100869 for i in ids)
+    assert len(ids) == len(set(ids)) and all(100800 <= int(i) <= 100879 for i in ids)
+
+
+def test_logtest_samples_and_expectations_line_up():
+    """integrations/wazuh/test (run with Docker): one expected rule id per sample, all known rules."""
+    folder = RULES.parent / "test"
+    samples = (folder / "samples.log").read_text(encoding="utf-8").splitlines()
+    expected = (folder / "expected.txt").read_text(encoding="utf-8").split()
+    assert len(samples) == len(expected) and all(s.strip() for s in samples)
+    lyss_ids = set(rules())
+    assert all(i in lyss_ids or int(i) < 100000 for i in expected)  # LYSS rules, or Wazuh's own (4721...)
+    assert not re.search(r"\b(10\.\d+|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d+\.\d+", "\n".join(samples))  # fictitious only
 
 
 def test_nist_references_become_wazuh_groups():

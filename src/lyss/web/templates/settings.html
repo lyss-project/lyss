@@ -215,6 +215,24 @@
   </div>
 </form>
 
+<form method="post" action="/settings/changes" class="card form-grid" autocomplete="off" id="changes">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="span-2">
+    <h2>Rescan on change (Wazuh)</h2>
+    <p class="muted">When Wazuh reports that a switch configuration changed, or that an administrator session on it ended, LYSS rescans that switch at once. LYSS queries the Wazuh dashboard with a read-only account (<code>integrations/wazuh/reader-account.sh</code>); nothing connects to this machine. LYSS's own sessions are ignored.</p>
+  </div>
+  <label class="check span-2"><input type="checkbox" name="enabled" {% if changes.enabled %}checked{% endif %}> Enable rescan on change</label>
+  <label>Wazuh dashboard URL<input name="url" value="{{ changes.url or '' }}" maxlength="300" placeholder="https://wazuh.example.local"></label>
+  <label>Check every (minutes)<input name="interval" value="{{ changes.interval_minutes or 5 }}" inputmode="numeric" pattern="[0-9]{1,2}"></label>
+  <label>Read-only account<input name="username" value="{{ changes.username or '' }}" maxlength="64" autocomplete="off"></label>
+  <label>Password<input type="password" name="password" autocomplete="new-password" placeholder="{{ 'Stored: leave empty to keep it' if changes.has_secret else '' }}"></label>
+  <label class="check span-2"><input type="checkbox" name="verify_tls" {% if changes.verify_tls is not defined or changes.verify_tls %}checked{% endif %}> Verify the TLS certificate</label>
+  <div class="form-actions span-2">
+    <button class="btn btn-ghost" type="submit" formaction="/settings/changes/test" formnovalidate>Test connection</button>
+    <button class="btn btn-primary" type="submit">Save rescan on change</button>
+  </div>
+</form>
+
 <form method="post" action="/settings/ciso" class="card form-grid" autocomplete="off">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="span-2">

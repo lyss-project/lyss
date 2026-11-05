@@ -26,7 +26,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   remote logging and time synchronization, access-port hygiene.
 - **Level 3, Advanced**: access-layer protections (draft).
 
-> Status: **0.6.0, draft specification, preview.** The specification and the tool may still change
+> Status: **0.7.0, draft specification 0.5, preview.** The specification and the tool may still change
 > before 1.0. Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 

@@ -1,0 +1,18 @@
+972: Nov  5 19:42:37.960 UTC+1: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.252)
+972: Nov  5 19:42:37 UTC+1: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.252)
+Nov  5 19:42:37.960 CET-1: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.252)
+*Nov  5 2026 19:42:37.960 UTC+1: %LINK-3-UPDOWN: Interface GigabitEthernet1/0/3, changed state to down
+Nov  5 19:42:37: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.252)
+%AAA-I-CONNECT: User CLI session for user admin over ssh , source 192.0.2.5 destination  192.0.2.21 ACCEPTED
+%AAA-I-DISCONNECT: User CLI session for user admin over ssh , source 192.0.2.5 destination  192.0.2.21  TERMINATED. The Telnet/SSH session may still be connected.
+%AAA-W-REJECT: New ssh connection for user admin, source 192.0.2.9 destination 192.0.2.21  REJECTED
+%AAA-W-REJECT: New ssh connection for user admin, source 192.0.2.9 destination 192.0.2.21  REJECTED
+%AAA-W-REJECT: New ssh connection for user admin, source 192.0.2.9 destination 192.0.2.21  REJECTED
+%AAA-W-REJECT: New ssh connection for user admin, source 192.0.2.9 destination 192.0.2.21  REJECTED
+%AAA-W-REJECT: New ssh connection for user admin, source 192.0.2.9 destination 192.0.2.21  REJECTED
+%STP-W-PORTSTATUS: gi1/0/3: STP status Forwarding
+Nov  5 19:00:00 lyss-host lyss: {"lyss":{"event":"regression","device":"demo-acc-02","control":"LYSS-MGMT-001","control_level":1,"title":"Telnet management access is disabled"}}
+{"lyss":{"event":"finding","device":"demo-sb-02","control":"LYSS-AUTH-002","control_level":1,"title":"Privileged-mode password is stored as a strong hash","verdict":"fail"}}
+972: Nov 15 19:42:37 UTC+1: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.252)
+Nov  5 19:42:37 UTC+1: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.252)
+972: Nov  5 19:42:37 UTC: %SYS-5-CONFIG_I: Configured from console by admin on vty0 (192.0.2.252)

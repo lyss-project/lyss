@@ -15,7 +15,7 @@ from .config import parse
 from .engine import audit, conformance, extract_facts, load_adapter, load_spec
 
 MAX_LEVEL = 2
-TRIGGERS = ("manual", "schedule", "cli")
+TRIGGERS = ("manual", "schedule", "cli", "change")  # change: rescan after a SIEM change alert (changes.py)
 _lock = threading.Lock()
 _job: dict | None = None
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lyss"
-version = "0.6.0"
+version = "0.7.0"
 description = "LYSS (Lyaazale Switch Security): open, vendor-neutral security standard and assessment tool for network switches"
 readme = "README.md"
 license = {text = "AGPL-3.0-only with additional terms, see NOTICE (code); CC-BY-4.0 (specification)"}

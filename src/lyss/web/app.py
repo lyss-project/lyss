@@ -23,8 +23,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .. import (PROJECT_LONG_NAME, PROJECT_NAME, __version__, collector, discovery, events, firmware, history,
-                inventory, notify, remediate, report, scan, sites, topology, vault)
+from .. import (PROJECT_LONG_NAME, PROJECT_NAME, __version__, changes, collector, discovery, events, firmware,
+                history, inventory, notify, remediate, report, scan, sites, topology, vault)
 from ..engine import ADAPTER_DIR, load_spec
 
 HERE = Path(__file__).parent
@@ -448,6 +448,7 @@ def _settings_page(request: Request, session: dict, status: int = 200, **ctx):
                    schedule=settings.get("schedule", {"time": "02:30", "days": list(range(7))}),
                    smtp=_public(settings.get("smtp", {})), ciso=_public(settings.get("ciso", {})),
                    siem=settings.get("siem", {}), siem_default_file=str(inventory.PRIVATE / "lyss-events.jsonl"),
+                   changes=_public(settings.get("change_watch", {})),
                    remediation=remediate.settings(), suggested=remediate.suggest_defaults(),
                    weekdays=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"], **ctx)
 
@@ -608,6 +609,43 @@ def test_siem(request: Request, csrf: str = Form("")):
     where = " and ".join(x for x in (f"{cfg['host']}:{cfg['port']}/{cfg.get('protocol', 'udp')}" if cfg.get("host") else "",
                                      cfg.get("file", "")) if x)
     return _settings_page(request, session, saved=f"Test event sent to {where} (lyss.event = test).")
+
+
+@app.post("/settings/changes")
+def save_changes(request: Request, csrf: str = Form(""), enabled: str | None = Form(None), url: str = Form(""),
+                 username: str = Form(""), password: str = Form(""), interval: str = Form("5"),
+                 verify_tls: str | None = Form(None)):
+    session = _session(request)
+    _check_csrf(session, csrf)
+    errors = []
+    if enabled == "on" and not re.match(r"^https://[A-Za-z0-9.-]+(:\d+)?/?$", url.strip()):
+        errors.append("Rescan on change: the Wazuh dashboard URL must look like https://host[:port].")
+    if enabled == "on" and not re.match(r"^[\w.@-]{1,64}$", username.strip()):
+        errors.append("Rescan on change: a read-only Wazuh account is required.")
+    if not interval.isdigit() or not 1 <= int(interval) <= 60:
+        errors.append("Rescan on change: the interval must be 1 to 60 minutes.")
+    if errors:
+        return _settings_page(request, session, status=400, errors=errors)
+    old = inventory.load_settings().get("change_watch", {})
+    _save_integration("change_watch", {"enabled": enabled == "on", "url": url.strip().rstrip("/"),
+                                       "username": username.strip(), "interval_minutes": int(interval),
+                                       "verify_tls": verify_tls == "on",
+                                       "last_checked": old.get("last_checked")}, password)
+    return _settings_page(request, session, saved="Rescan on change saved.")
+
+
+@app.post("/settings/changes/test")
+def test_changes(request: Request, csrf: str = Form("")):
+    session = _session(request)
+    _check_csrf(session, csrf)
+    cfg = inventory.load_settings().get("change_watch", {})
+    if not cfg.get("url") or not cfg.get("secret"):
+        return _settings_page(request, session, status=400, errors=["Rescan on change: save the URL and account first."])
+    try:
+        message = changes.test_connection(cfg)
+    except Exception as exc:
+        return _settings_page(request, session, status=502, errors=[f"Rescan on change test failed: {type(exc).__name__}: {exc}"[:300]])
+    return _settings_page(request, session, saved=f"Rescan on change: {message}.")
 
 
 @app.post("/export/ciso")

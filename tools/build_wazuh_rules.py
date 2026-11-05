@@ -38,7 +38,7 @@ HEADER = """<!--
   LYSS sends JSON events {{"lyss": {{...}}}} over syslog (decoder "lyss", lyss_decoders.xml) or writes
   them to a JSON-lines file read by a Wazuh agent (built-in "json" decoder).
   Install: sudo sh install.sh (copies the decoder and these rules, checks, restarts the manager).
-  Rule ids 100800-100869: change them if they collide with your own local rules.
+  Rule ids 100800-100879: change them if they collide with your own local rules.
 -->
 <group name="lyss,network_switch,">
 
@@ -105,6 +105,43 @@ HEADER = """<!--
     <field name="lyss.event">^test$</field>
     <description>LYSS: test event received</description>
     <group>lyss_test,</group>
+  </rule>
+
+  <!-- ======== Cisco Small Business / Business switch messages (decoder "cisco-sb") ======== -->
+
+  <rule id="100870" level="0">
+    <decoded_as>cisco-sb</decoded_as>
+    <description>Cisco Business switch message</description>
+    <group>cisco_sb,</group>
+  </rule>
+
+  <rule id="100871" level="3">
+    <if_sid>100870</if_sid>
+    <field name="cisco.mnemonic">^CONNECT$</field>
+    <description>Cisco Business switch: $(srcuser) opened a $(protocol) management session from $(srcip)</description>
+    <group>cisco_sb,authentication_success,lyss_switch_session,nist_800_53_AC.17,nist_800_53_AU.14,</group>
+  </rule>
+
+  <!-- an administrator session ended: LYSS can rescan the switch (its configuration may have changed) -->
+  <rule id="100872" level="3">
+    <if_sid>100870</if_sid>
+    <field name="cisco.mnemonic">^DISCONNECT$</field>
+    <description>Cisco Business switch: management session of $(srcuser) from $(srcip) closed</description>
+    <group>cisco_sb,lyss_switch_session,lyss_admin_session_end,nist_800_53_AU.14,</group>
+  </rule>
+
+  <rule id="100873" level="5">
+    <if_sid>100870</if_sid>
+    <field name="cisco.mnemonic">^REJECT$</field>
+    <description>Cisco Business switch: $(protocol) login refused for $(srcuser) from $(srcip)</description>
+    <group>cisco_sb,authentication_failed,lyss_switch_session,nist_800_53_AC.7,nist_800_53_AU.14,</group>
+  </rule>
+
+  <rule id="100874" level="10" frequency="5" timeframe="120">
+    <if_matched_sid>100873</if_matched_sid>
+    <same_srcip />
+    <description>Cisco Business switch: repeated refused logins from $(srcip) (password guessing?)</description>
+    <group>cisco_sb,authentication_failures,lyss_switch_session,nist_800_53_AC.7,nist_800_53_SI.4,</group>
   </rule>
 """
 

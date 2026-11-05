@@ -2,7 +2,7 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
-## Unreleased
+## 0.7.0 (2026-11-05)
 
 Specification 0.5.0-draft
 Test procedures tightened where they were looser than their statements (review of the CISO
@@ -25,6 +25,16 @@ Assistant library, intuitem/ciso-assistant-community#5246); verdicts can change 
 Tool
 - New rule form `captures_in_both` (a value found in two places, e.g. the management VLAN on
   access ports); `show ntp status` (IOS) and `show sntp status` (Cisco Business) collected.
+
+Wazuh
+- Per-control rules (100810-100869) generated from the specification, with NIST SP 800-53 groups:
+  LYSS findings appear in Wazuh's NIST 800-53 compliance dashboard. `install.sh --regression-level`.
+- Dashboard "LYSS - Switch security" (lyss-dashboard.ndjson); agent group script for the events file.
+- Decoders for Cisco IOS timestamps with a time zone offset and for Cisco Business messages, with
+  rules for management sessions, refused logins and password guessing.
+- Rescan on change (Settings): LYSS reads configuration-change and session-end alerts from the Wazuh
+  dashboard with a read-only account (reader-account.sh) and rescans the switch at once; LYSS's own
+  sessions are ignored.
 
 Contributors
 - Thanks to **juanmig7890** for the first outside contribution: Linux and macOS quick start in

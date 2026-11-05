@@ -79,6 +79,37 @@ echo 'Nov  5 12:00:00 host lyss: {"lyss":{"event":"regression","device":"sw1","c
 
 Expected: decoder `lyss`, rule 100840 (regression of LYSS-MGMT-001, NIST groups CM.7, SC.8, AC.17).
 
+## 5. Switch logs: decoders included
+
+`lyss_decoders.xml` also makes Wazuh understand switch messages it misses out of the box:
+
+- **Cisco IOS with a time zone offset** (`972: Nov  5 19:42:37.960 UTC+1: %SYS-5-CONFIG_I: ...`,
+  from `service timestamps log datetime msec localtime show-timezone` with a non-UTC zone). Wazuh's
+  own `cisco-ios` decoders only accept a letters-only zone; the extra variants keep the same name,
+  so Wazuh's Cisco IOS rules apply unchanged (4721: configuration changed).
+- **Cisco Small Business / Business** (`%AAA-I-CONNECT: User CLI session for user ...`), with rules
+  100870-100874: management session opened / closed, login refused, repeated refused logins
+  (level 10, password guessing).
+
+**Tested.** `bash test/run.sh` starts a disposable Wazuh manager (Docker), installs the decoder and
+rules, and checks that every line of `test/samples.log` (fictitious data) fires the rule on the same
+line of `test/expected.txt`. It also runs on GitHub whenever these files change.
+
+## 6. Rescan on change
+
+When Wazuh reports that a switch configuration changed (rule group `config_changed`, e.g. Cisco IOS
+4721) or that an administrator session on a Cisco Business switch ended (`lyss_admin_session_end`,
+rule 100872), LYSS rescans that switch at once instead of waiting for the next scheduled scan.
+
+1. On the Wazuh indexer: `sudo sh reader-account.sh` creates the read-only account `lyss-reader`.
+   It can only read those alerts (document-level security) and 5 of their fields (field-level
+   security). The password is written to `/root/.lyss-reader.pw`.
+2. In LYSS: Settings → Rescan on change → the Wazuh dashboard URL (`https://<wazuh>`), the account
+   and its password, the interval (5 minutes) → **Test connection**.
+
+LYSS only connects out to the dashboard (HTTPS); nothing connects to the LYSS machine. LYSS's own
+SSH sessions are recognised and never trigger a rescan.
+
 ## Oxidized
 
 `python -m lyss oxidized --url http://oxidized:8888 --events` assesses the configurations Oxidized

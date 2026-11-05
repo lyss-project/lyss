@@ -1,0 +1,19 @@
+name: wazuh
+
+# Validates the Wazuh decoders and rules on a disposable Wazuh manager (Docker) whenever they change.
+on:
+  push:
+    paths: ["integrations/wazuh/**", "tools/build_wazuh_rules.py", "spec/lyss-spec.yaml"]
+  pull_request:
+    paths: ["integrations/wazuh/**", "tools/build_wazuh_rules.py", "spec/lyss-spec.yaml"]
+
+permissions:
+  contents: read
+
+jobs:
+  logtest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Decoders and rules fire the expected rules (wazuh-logtest)
+        run: bash integrations/wazuh/test/run.sh 4.14.9
