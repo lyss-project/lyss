@@ -14,7 +14,7 @@ example to `C:\LYSS`. If you use git: `git clone https://github.com/lyss-project
 
 - **Windows**: install Python 3.10 or later from https://www.python.org/downloads/ and tick
   **"Add python.exe to PATH"** during the installation.
-- **Linux**: Python 3.10+ with the `venv` module (Debian/Ubuntu: `sudo apt install python3-venv`).
+- **Linux / macOS**: Python 3.10+ with the `venv` module (Debian/Ubuntu: `sudo apt install python3-venv`, macOS: install via Homebrew `brew install python@3.11`).
 
 ## 3. Try the demo first
 
@@ -23,10 +23,12 @@ LYSS web interface on http://127.0.0.1:8766. It never touches your network.
 
 - **Windows**: double-click **`Start-LYSS-Demo.cmd`**. The first start installs LYSS into a
   `.venv` folder (one or two minutes, needs internet access).
-- **Linux**:
+- **Linux / macOS**:
   ```sh
-  python3 -m venv .venv && .venv/bin/pip install -e .
-  .venv/bin/python -m lyss demo --open
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install -e .
+  python -m lyss demo --open
   ```
 
 The demo **administrator password is printed once** in the console window: keep the window open
@@ -60,8 +62,8 @@ only from your admin network, and delete the account when you have finished test
 
 **Run it.**
 
-1. **Windows**: double-click **`Start-LYSS.cmd`** (http://127.0.0.1:8765 opens). Linux:
-   `.venv/bin/python -m lyss ui`.
+1. **Windows**: double-click **`Start-LYSS.cmd`** (http://127.0.0.1:8765 opens).
+   **Linux / macOS**: `.venv/bin/python -m lyss ui`.
 2. The first start asks you to choose the LYSS administrator password.
 3. **Settings → Credential profiles**: add the switch account.
 4. **Add switch**: name, IP address, platform (Cisco IOS, Cisco Business or HPE Aruba), profile.
