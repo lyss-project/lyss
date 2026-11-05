@@ -118,7 +118,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Interactive CLI sessions (console and remote) are closed after at most 10 minutes of inactivity.
 - **Rationale.** Abandoned privileged sessions can be reused by anyone with access to the terminal or session.
-- **Test procedure.** Fail if any console or remote CLI line has no timeout (0) or a timeout above the parameter. The platform default applies when no timeout is configured.
+- **Test procedure.** Determine the effective idle timeout of every console and remote CLI line: the configured value, or the platform's documented default when none is configured. Fail if any effective timeout is disabled (0, never) or above the parameter. For example, Cisco IOS and Cisco Business default to 10 minutes (pass when unset); HPE AOS-S defaults to no timeout (fail when unset).
 - **Parameters.** `max_idle_minutes` = 10
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.5 · NIST SP 800-53 r5 AC-12, SC-10 · CIS Controls v8 4.3

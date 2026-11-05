@@ -169,7 +169,7 @@ def build_framework_library(spec: dict, date) -> dict:
         "vendor-neutral test procedure and informative references. A device is LYSS Level N "
         "conformant when every control of levels 1 to N is met or not applicable. "
         + (DRAFT_NOTE if spec_is_draft(spec) else "")
-        + "Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py."
+        + "Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss)."
     )
     lib = library_header("LYSS", display_name(spec), description, library_version(version), date)
     lib["urn"] = LIBRARY_URN
@@ -234,7 +234,7 @@ def build_mapping_library(spec: dict, date) -> dict:
         "requirement gives at most partial coverage of the ISO control, a non-compliant one makes it "
         "non-compliant. One direction only: an ISO control judged compliant proves nothing about a "
         "given switch. " + (DRAFT_NOTE if spec_is_draft(spec) else "")
-        + "Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py."
+        + "Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss)."
     )
     name = f"{display_name(spec).replace(NAME, 'LYSS')} -> ISO/IEC 27001:2022"
     lib = library_header(MAPPING_REF, name, description, library_version(version), date)
