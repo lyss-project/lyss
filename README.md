@@ -35,7 +35,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
 ```sh
 python -m venv lyss-env
 lyss-env/bin/pip install lyss           # Windows: lyss-env\Scripts\pip install lyss
-lyss-env/bin/lyss demo --open           # Windows: lyss-env\Scripts\lyss demo --open
+lyss-env/bin/lyss demo --open           # Windows: lyss-env\Scripts\python -m lyss demo --open
 ```
 
 Or from the source code (to contribute, or to read the adapters and the specification next to it):
