@@ -54,10 +54,14 @@ you found in the [issues](https://github.com/lyss-project/lyss/issues). Website:
 | Cisco IOS / IOS-XE (Catalyst) | yes | yes | yes | yes | Catalyst 1000 |
 | Cisco Small Business / Business (SG200-550X, CBS) | yes | yes | yes | yes | SG200/300/500, 350, CBS250/350 |
 | HP ProCurve / HPE Aruba AOS-S | yes | yes | yes | basic | AOS-S 16.x |
+| MikroTik RouterOS 6.x / 7.x (CRS, RouterBOARD, CHR), preview | yes | yes | yes | no | RouterOS (CISA KEV + critical) |
 | SONiC (community builds), preview | yes | yes | yes | no | no |
 
 Cisco IOS and Cisco Small Business are validated on real switches; HPE Aruba AOS-S on the
-simulator and synthetic outputs so far (reports from real AOS-S switches are welcome). SONiC is
+simulator and synthetic outputs so far (reports from real AOS-S switches are welcome). MikroTik
+RouterOS is validated on CHR 7.25.1: LYSS reads `/export terse` (never `show-sensitive`, so no
+secret is collected) and `print terse` state, because RouterOS exports only non-default settings.
+Give the LYSS account a read-only group without the "sensitive" policy. SONiC is
 validated on the SONiC-VS 202505 virtual switch: LYSS reads its config_db JSON and `show`
 commands. Two SONiC controls stay "unknown" by design: the sudo account's password hash
 (in /etc/shadow, not readable by a read-only account) and firmware support (no published

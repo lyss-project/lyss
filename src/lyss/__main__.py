@@ -192,7 +192,7 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
 
     a = sub.add_parser("audit", help="assess saved configuration files")
-    a.add_argument("--vendor", required=True, help="adapter name, e.g. cisco_ios, cisco_sb, hp_procurve, sonic")
+    a.add_argument("--vendor", required=True, help="adapter name, e.g. cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic")
     a.add_argument("--level", type=int, default=1, help="highest level to assess (default 1)")
     a.add_argument("--json", action="store_true", help="output JSON instead of text")
     a.add_argument("path", type=Path)

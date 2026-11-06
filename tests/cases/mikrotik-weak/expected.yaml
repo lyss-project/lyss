@@ -1,0 +1,26 @@
+# MikroTik CRS switch on RouterOS 7.20.4 (before the CISA KEV fixes of 7.23.4 / 7.24.2) with the
+# factory weaknesses left open, SNMP enabled. Synthetic data (documentation addresses).
+vendor: mikrotik
+backup: {manual_days_ago: 0}
+level: 0
+verdicts:
+  LYSS-MGMT-001: fail
+  LYSS-MGMT-002: pass
+  LYSS-MGMT-003: fail
+  LYSS-MGMT-004: fail
+  LYSS-AUTH-001: fail
+  LYSS-AUTH-002: unknown
+  LYSS-AUTH-003: pass
+  LYSS-AUTH-004: pass
+  LYSS-VULN-001: fail
+  LYSS-BKP-001: fail
+  LYSS-AUTH-010: fail
+  LYSS-AUTH-011: fail
+  LYSS-MGMT-010: fail
+  LYSS-MGMT-011: fail
+  LYSS-MGMT-012: fail
+  LYSS-MGMT-013: fail
+  LYSS-LOG-010: fail
+  LYSS-LOG-011: fail
+  LYSS-ACC-010: fail
+  LYSS-ACC-011: fail

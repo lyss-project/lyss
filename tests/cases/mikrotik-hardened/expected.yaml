@@ -1,0 +1,27 @@
+# MikroTik CRS switch on RouterOS 7.25.1 hardened as far as the adapter can see. Synthetic data.
+# AUTH-004 stays unknown with a RADIUS server (its secret is hidden from a read-only collection),
+# which keeps the conformance level at 0.
+vendor: mikrotik
+backup: {automatic_days_ago: 1}
+level: 0
+verdicts:
+  LYSS-MGMT-001: pass
+  LYSS-MGMT-002: pass
+  LYSS-MGMT-003: pass
+  LYSS-MGMT-004: pass
+  LYSS-AUTH-001: pass
+  LYSS-AUTH-002: pass
+  LYSS-AUTH-003: pass
+  LYSS-AUTH-004: unknown
+  LYSS-VULN-001: pass
+  LYSS-BKP-001: pass
+  LYSS-AUTH-010: pass
+  LYSS-AUTH-011: pass
+  LYSS-MGMT-010: pass
+  LYSS-MGMT-011: pass
+  LYSS-MGMT-012: pass
+  LYSS-MGMT-013: pass
+  LYSS-LOG-010: pass
+  LYSS-LOG-011: pass
+  LYSS-ACC-010: pass
+  LYSS-ACC-011: pass

@@ -58,13 +58,17 @@ COMMUNITY_VALUE = re.compile(r'(?i)\b(community)\s+("?)[^\s"]+("?)')
 # JSON configurations flattened by config.flatten_json (SONiC): "passkey=...", "auth_password=...",
 # and SNMP community names used as table keys ("SNMP_COMMUNITY|<name>")
 # (also inside block evidence such as "TACPLUS|global / passkey=...")
-FIELD_SECRET = re.compile(r"(?i)\b([\w-]*(?:passkey|password|secret|key)[\w-]*=)(?!<redacted>)\S+")
+# "key_encrypt=true" is a flag, not a secret
+FIELD_SECRET = re.compile(r"(?i)\b(?!key_encrypt=)([\w-]*(?:passkey|password|secret|key)[\w-]*=)(?!<redacted>)\S+")
 JSON_COMMUNITY = re.compile(r"(?i)(SNMP_COMMUNITY\|)(?!(?:public|private)(?:[\s/]|$))(?!<redacted>)[^\s/]+")
+# RouterOS "/snmp community print terse": the community name is the v1/v2c secret
+ROS_COMMUNITY = re.compile(r"(?i)(\bname=)(?!(?:public|private)(?:\s|$))(?!<redacted>)\S+(?=.*\bsecurity=)")
 
 
 def redact(line: str) -> str:
     line = FIELD_SECRET.sub(r"\1<redacted>", line)
     line = JSON_COMMUNITY.sub(r"\1<redacted>", line)
+    line = ROS_COMMUNITY.sub(r"\1<redacted>", line)
     line = SECRET_VALUE.sub(r"\1\2 \3<redacted>\4", line)
     if re.search(r"(?i)^\s*(snmp-server user|snmpv3 user)\b", line):
         line = SNMP_SECRET.sub(r"\1 \2<redacted>\3", line)
@@ -233,6 +237,13 @@ def evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
 
 
 def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
+    if "all" in rule:
+        # every sub-rule must match, e.g. SNMP enabled AND a default community present
+        results = [evaluate_rule(cfg, r) for r in rule["all"]]
+        if all(matched for matched, _ in results):
+            return True, [e for _, ev in results for e in ev]
+        return False, []
+
     if "edge_ports_missing" in rule:
         matched, evidence = _edge_ports_missing(cfg, rule["edge_ports_missing"])
         if rule.get("absent"):
@@ -278,6 +289,10 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
         # only blocks that contain a given line, e.g. access ports ("switchport mode access")
         where = re.compile(rule["where"])
         blocks = [b for b in blocks if any(where.search(c) for c in b.children)]
+    if "where_not" in rule:
+        # only blocks WITHOUT a given line, e.g. a key in a block that does not mark it encrypted
+        where_not = re.compile(rule["where_not"])
+        blocks = [b for b in blocks if not any(where_not.search(c) for c in b.children)]
 
     if "every_contains" in rule:
         pattern = re.compile(rule["every_contains"])
@@ -388,6 +403,26 @@ def _version_tuple(version: str) -> tuple[int, ...]:
     return tuple(int(n) for n in re.findall(r"\d+", version))
 
 
+def _is_vulnerable(version: str, fixed, affected_from: str | None = None) -> bool:
+    """fixed: None (never fixed), one version, or a list with the first fixed version of each
+    release line (e.g. RouterOS 6.49.21 / 7.23.4 long-term / 7.24.2 stable). A version is fixed
+    when it reaches the fix of its own line (same major.minor); a line not listed is vulnerable
+    if older than the next listed line, fixed if newer than all of them."""
+    v = _version_tuple(str(version))
+    if affected_from and v < _version_tuple(str(affected_from)):
+        return False
+    if fixed is None:
+        return True
+    fixes = sorted(_version_tuple(str(f)) for f in (fixed if isinstance(fixed, list) else [fixed]))
+    if len(fixes) == 1:
+        return v < fixes[0]
+    same_line = [f for f in fixes if f[:2] == v[:2]]
+    if same_line:
+        return v < same_line[0]
+    newer_lines = [f for f in fixes if f[:2] > v[:2]]
+    return bool(newer_lines)
+
+
 def firmware_verdict(facts: dict) -> tuple[str | None, list[str]]:
     """Compare model/version facts with data/firmware.yaml. None verdict = no data, fall through."""
     model, version = facts.get("model"), facts.get("version")
@@ -403,10 +438,11 @@ def firmware_verdict(facts: dict) -> tuple[str | None, list[str]]:
             problems.append(f"vendor support ended {eos}")
         for adv in entry.get("advisories", []):
             fixed = adv.get("fixed_in")
-            if fixed is None or _version_tuple(version) < _version_tuple(fixed):
+            if _is_vulnerable(version, fixed, adv.get("affected_from")):
                 exploited = ", exploited in the wild (CISA KEV)" if adv.get("kev") else ""
+                shown = ", ".join(str(f) for f in fixed) if isinstance(fixed, list) else fixed
                 problems.append(f"{adv['id']} (CVSS {adv['cvss']}{exploited}): "
-                                + (f"fixed in {fixed}" if fixed else "no fix for this model"))
+                                + (f"fixed in {shown}" if fixed else "no fix for this model"))
         if problems:
             return "fail", evidence + problems
         return "pass", evidence + [f"no critical advisory in LYSS data ({entry['source']})"]

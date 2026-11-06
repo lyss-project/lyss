@@ -1,0 +1,60 @@
+collected: 2026-11-05 10:00
+===== ssh banner =====
+SSH-2.0-ROSSSH
+===== ssh negotiated =====
+kex: diffie-hellman-group14-sha1
+cipher: aes128-cbc
+mac: hmac-sha1
+hostkey: ssh-rsa
+===== /system resource print =====
+                   uptime: 3d2h10m
+                  version: 7.20.4 (stable)
+               build-time: 2026-01-10 08:00:00
+         architecture-name: arm
+               board-name: CRS326-24G-2S+
+                 platform: MikroTik
+===== /ip service print terse =====
+ 0     name=ftp port=21 proto=tcp available-from= vrf=main max-sessions=20
+ 1     name=ssh port=22 proto=tcp available-from= vrf=main max-sessions=20
+ 2     name=telnet port=23 proto=tcp available-from= vrf=main max-sessions=20
+ 3     name=www port=80 proto=tcp available-from= vrf=main max-sessions=20
+ 4  X  name=www-ssl port=443 proto=tcp available-from= certificate=none tls-version=any vrf=main max-sessions=20
+ 5     name=winbox port=8291 proto=tcp available-from= vrf=main max-sessions=20
+ 6     name=api port=8728 proto=tcp available-from= vrf=main max-sessions=20
+===== /ip ssh print =====
+                     strong-crypto: no
+                     host-key-type: rsa
+===== /snmp print =====
+           enabled: yes
+===== /snmp community print terse =====
+0 * name=public addresses=::/0 security=none read-access=yes write-access=no denied-oids= authentication-protocol=MD5 encryption-protocol=DES
+1   name=s3cretCommunity addresses=::/0 security=none read-access=yes write-access=yes denied-oids= authentication-protocol=MD5 encryption-protocol=DES
+===== /system ntp client print =====
+     enabled: no
+        mode: unicast
+      status: stopped
+===== /system logging action print terse =====
+0 * name=memory target=memory memory-lines=1000 memory-stop-on-full=no
+3 * name=remote target=remote remote=0.0.0.0 remote-port=514 src-address=0.0.0.0 remote-log-format=default remote-protocol=udp vrf=main
+===== /system logging print terse =====
+0 * topics=info prefix= regex= action=memory
+===== /user print terse =====
+0 comment=system default user name=admin group=full inactivity-timeout=0s inactivity-policy=none address=
+===== /user aaa print =====
+      use-radius: no
+===== /radius print terse =====
+===== /system note print =====
+      show-at-login: yes
+  show-at-cli-login: no
+               note:
+===== /interface ethernet print terse =====
+0 R name=ether1 default-name=ether1 mtu=1500
+1 R name=ether2 default-name=ether2 mtu=1500
+2   name=ether3 default-name=ether3 mtu=1500
+===== /interface bridge port print terse =====
+0 interface=ether1 bridge=bridge edge=auto pvid=1 frame-types=admit-all bpdu-guard=no
+1 interface=ether2 bridge=bridge edge=auto pvid=20 frame-types=admit-only-untagged-and-priority-tagged bpdu-guard=no
+2 interface=ether3 bridge=bridge edge=auto pvid=20 frame-types=admit-only-untagged-and-priority-tagged bpdu-guard=no
+===== /tool mac-server mac-winbox print =====
+  allowed-interface-list: all
+===== /ip neighbor print detail =====

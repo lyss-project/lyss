@@ -35,6 +35,7 @@ PLATFORMS = [
     (r"Cisco IOS|C1000|WS-C|C9[23]00|Catalyst|cisco\s+C\d", "cisco_ios", "Cisco IOS / IOS-XE"),
     (r"ProCurve|Aruba|HP J\d|HPE?\b", "hp_procurve", "HP ProCurve / ArubaOS-Switch"),
     (r"\bSONiC\b", "sonic", "SONiC"),   # LLDP system description "SONiC Software Version: ..."
+    (r"MikroTik|RouterOS|\bCRS\d{3}", "mikrotik", "MikroTik RouterOS"),
 ]
 # (pattern on the SSH identification string, adapter, label)
 SSH_FINGERPRINTS = [
@@ -43,7 +44,8 @@ SSH_FINGERPRINTS = [
     (r"^SSH-[\d.]+-Mocana", "hp_procurve", "HPE ArubaOS-Switch (probable)"),
     (r"^SSH-[\d.]+-RomSShell", None, "Embedded switch (RomSShell)"),
     # dropbear is left out on purpose: mostly access points and IoT devices (e.g. Grandstream GWN)
-    (r"Comware|HUAWEI|VRP|ROSSSH", None, "Network device"),
+    (r"^SSH-[\d.]+-ROSSSH", "mikrotik", "MikroTik RouterOS"),
+    (r"Comware|HUAWEI|VRP", None, "Network device"),
 ]
 NOT_SWITCH = re.compile(r"VMware|ESXi|GWN\d|AP\d|Phone|Linux|Windows", re.I)
 

@@ -6,6 +6,7 @@
 #   {block: H, line: R}             true if any block whose header matches H contains a line matching R
 #   {block: H, every_contains: R}   true if at least one H block exists and every one contains R
 #   add where: W to a block rule    only consider H blocks that contain a line matching W
+#   add where_not: W to a block rule  only consider H blocks with no line matching W
 #   add gt: N to a line rule        true only if the first regex group, as a number, is > N
 #   {state: R, section: S}          true if a line of collected state section S matches R
 #   add absent: true to a state rule  true if section S was collected and no line matches R

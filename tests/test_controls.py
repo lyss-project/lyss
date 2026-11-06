@@ -16,6 +16,11 @@ FULL_VENDORS = ["cisco_ios", "cisco_sb", "hp_procurve"]   # Level 1 + 2 checks a
 ALL_VENDORS = sorted(p.stem for p in (Path(__file__).parent.parent / "adapters").glob("*.yaml"))
 # preview adapters: controls the platform cannot show both ways, each with the reason
 PREVIEW_VENDORS = {
+    "mikrotik": {
+        "LYSS-MGMT-002": "RouterOS (ROSSSH) speaks SSH protocol version 2 only",
+        "LYSS-AUTH-002": "no enable password, and local password hashes are never exported",
+        "LYSS-AUTH-004": "RADIUS secrets are hidden from a read-only collection (no show-sensitive)",
+    },
     "sonic": {
         "LYSS-AUTH-002": "the sudo account's hash is in /etc/shadow, unreadable by a read-only account",
         "LYSS-AUTH-003": "local accounts are Linux accounts, never stored in the configuration",
@@ -23,7 +28,7 @@ PREVIEW_VENDORS = {
     },
 }
 SECRETS_IN_CASES = ["cisco123", "PlainSharedKey", "0822455D0A16", "$9$FAKE", "FAKEHASH", "FAKEAESKEY",
-                    "FAKEAUTHPW", "FAKEPRIVPW"]
+                    "FAKEAUTHPW", "FAKEPRIVPW", "s3cretCommunity", "lab-v3-ro"]
 
 
 def run(case: dict):
@@ -89,7 +94,7 @@ def test_adapter_regexes_compile():
     def walk(node):
         if isinstance(node, dict):
             for key, value in node.items():
-                if key in ("line", "block", "every_contains", "where", "state", "uplink_config", "require") and isinstance(value, str):
+                if key in ("line", "block", "every_contains", "where", "where_not", "state", "uplink_config", "require") and isinstance(value, str):
                     re.compile(value)
                 walk(value)
         elif isinstance(node, list):

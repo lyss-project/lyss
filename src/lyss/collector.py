@@ -47,6 +47,18 @@ COMMANDS = {
         "state": ["show version", "show interfaces status", "show ntp", "show ssh", "show feature status",
                   "show lldp table", "ss -tlnH"],
     },
+    "mikrotik": {
+        # RouterOS: "/export terse" never includes secrets without "show-sensitive" (not used);
+        # "print terse" = one item per line. All read-only.
+        "netmiko": "mikrotik_routeros",
+        "config": "/export terse",
+        "state": ["/system resource print", "/ip service print terse", "/ip ssh print", "/snmp print",
+                  "/snmp community print terse", "/system ntp client print",
+                  "/system logging action print terse", "/system logging print terse",
+                  "/user print terse", "/user aaa print", "/radius print terse", "/system note print",
+                  "/interface ethernet print terse", "/interface bridge port print terse",
+                  "/tool mac-server mac-winbox print", "/ip neighbor print detail"],
+    },
     "hp_procurve": {
         # netmiko answers "Press any key to continue" and disables paging ("no page")
         "netmiko": "hp_procurve",

@@ -44,6 +44,7 @@ def test_parse_keeps_invalid_json_as_text():
 def test_redact_json_fields_and_communities():
     assert redact("  passkey=FakeTacKey1") == "  passkey=<redacted>"
     assert redact("  SNMP_USER_AUTH_PASSWORD=FakeAuth9") == "  SNMP_USER_AUTH_PASSWORD=<redacted>"
+    assert redact("  key_encrypt=true") == "  key_encrypt=true"
     assert redact("SNMP_COMMUNITY|n0t-public") == "SNMP_COMMUNITY|<redacted>"
     # well-known communities are the finding itself: they stay visible
     assert redact("SNMP_COMMUNITY|public") == "SNMP_COMMUNITY|public"
@@ -56,6 +57,18 @@ def test_no_json_secret_in_any_evidence():
     for f in audit(json.dumps(config), "sonic", 2):
         for line in f.evidence:
             assert "FakeTacKey1" not in line and "s3cretCommunity" not in line, (f.control_id, line)
+
+
+def _auth_004(tacplus: dict) -> str:
+    config = {"TACPLUS": {"global": tacplus}, "TACPLUS_SERVER": {"192.0.2.49": {"priority": "1"}}}
+    return next(f for f in audit(json.dumps(config), "sonic", 1) if f.control_id == "LYSS-AUTH-004").verdict
+
+
+def test_global_tacacs_key_passes_only_when_encrypted():
+    assert _auth_004({"passkey": "FakeTacKey1"}) == "fail"
+    assert _auth_004({"passkey": "FakeTacKey1", "key_encrypt": "false"}) == "fail"
+    assert _auth_004({"passkey": "FAKE-ENCRYPTED-PASSKEY", "key_encrypt": "true"}) == "pass"
+    assert _auth_004({"auth_type": "pap"}) == "pass"
 
 
 def test_sonic_recognised_and_collected_read_only():

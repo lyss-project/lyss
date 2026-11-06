@@ -65,8 +65,9 @@ checks:
       - {line: '(?i)^SNMP_COMMUNITY\|(public|private)$'}
     otherwise: pass
     note: >-
-      SONiC puts "public" back when the SNMP service restarts while /etc/sonic/snmp.yml still holds
-      "snmp_rocommunity: public" (seen on 202505): remove that line before deleting the community.
+      SONiC re-imports /etc/sonic/snmp.yml at every SNMP restart: while it holds "snmp_rocommunity: public"
+      (images older than sonic-buildimage#26952, e.g. 202505), "public" comes back after
+      "config snmp community del public". Remove that line first (sonic-buildimage#18061).
     remediation: |
       sudo sed -i '/^snmp_rocommunity:/d' /etc/sonic/snmp.yml
       sudo config snmp community del public
@@ -90,13 +91,19 @@ checks:
 
   LYSS-AUTH-004:
     fail_if_any:
-      - {block: '^(TACPLUS|RADIUS)(_SERVER)?\|', line: '^passkey=\S'}
+      # per-server keys and RADIUS keys: not covered by SONiC passkey encryption
+      - {block: '^(TACPLUS_SERVER|RADIUS|RADIUS_SERVER)\|', line: '^passkey=\S'}
+      # global TACACS+ key, unless the block marks it encrypted (key_encrypt, "config tacacs passkey --encrypt")
+      - {block: '^TACPLUS\|global$', where_not: '^key_encrypt=true$', line: '^passkey=\S'}
     otherwise: pass
     note: >-
-      "config tacacs add --key" stores the key in cleartext in config_db (TACPLUS_SERVER passkey, seen
-      on 202505), readable by every account that can run "show runningconfiguration".
+      "config tacacs add --key" stores a per-server key in cleartext in config_db (TACPLUS_SERVER
+      passkey, seen on 202505), readable by every account that can run "show runningconfiguration".
+      SONiC can encrypt the global TACACS+ key only (TACPLUS|global key_encrypt=true).
     remediation: |
-      ! use SONiC key encryption where the image supports it, then rotate the key on the AAA server too
+      sudo config tacacs add <tacacs-ip>                ! re-add each server without --key
+      sudo config tacacs passkey <key> --encrypt        ! one global key, encrypted with a master password (images with passkey encryption)
+      ! then rotate the key on the TACACS+ server: the old one was readable in the configuration
 
   LYSS-VULN-001:
     firmware: true

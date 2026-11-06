@@ -103,3 +103,45 @@ platforms:
         note: Authentication bypass and unauthenticated RCE; only the 16.11 branch is fixed, older branches are presumed affected and not covered.
     source: https://csaf.arubanetworking.hpe.com/2026/hpe_networking_-_hpesbnw05156.txt
     verified: 2026-11-03
+
+  # ---------------- MikroTik RouterOS (all boards, CHR, CRS switches) ----------------
+
+  - vendor: mikrotik
+    models: '.'
+    family: MikroTik RouterOS 6.x / 7.x
+    # fixed_in lists the first fixed version of each release line (6.x, 7.x long-term, 7.x stable)
+    advisories:
+      - id: CVE-2026-86060 / CVE-2026-67277 / CVE-2026-67279
+        cvss: 9.8
+        kev: true
+        fixed_in: ['6.49.21', '7.23.4', '7.24.2']
+        note: >-
+          Three flaws fixed together; all three in CISA KEV (2026-09-10, 2026-09-10, 2026-09-25).
+          CVE-2026-86060 (CVSS 9.8) is in the SSH login path; MikroTik names CVE-2026-67279 as the one exploited in the wild.
+      - id: CVE-2026-84411 (web management, pre-authentication)
+        cvss: 9.8
+        fixed_in: ['6.49.23', '7.23.8', '7.24']
+        note: Integer underflow in HTTP request body handling of the web management service, reachable before authentication.
+      - id: CVE-2026-67278
+        cvss: 9.1
+        affected_from: '7.0'
+        fixed_in: ['7.23.6', '7.24.3']
+        note: RouterOS 7 only; the fix in 7.23.4 / 7.24.2 was incomplete.
+      - id: CVE-2023-30799 (admin to super-admin privilege escalation)
+        cvss: 9.1
+        fixed_in: ['6.48.7', '6.49.7']
+        note: 6.x only (long-term fixed in 6.48.7, stable in 6.49.7).
+      - id: CVE-2018-7445 (SMB stack buffer overflow)
+        cvss: 9.8
+        kev: true
+        fixed_in: 6.41.3
+      - id: CVE-2018-14847 (Winbox directory traversal, credential theft)
+        cvss: 9.1
+        kev: true
+        fixed_in: 6.42.1
+        note: Affects RouterOS through 6.42; massively exploited in 2018 (VPNFilter era).
+    source: >-
+      https://nvd.nist.gov/ (CVE API 2.0, ranges for CVE-2026-86060, CVE-2026-67278, CVE-2023-30799, CVE-2018-7445, CVE-2018-14847) ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.04: CVE-2026-67279, -86060, -67277, CVE-2018-7445, CVE-2018-14847) ;
+      https://mikrotik.com/supportsec (fixed versions of CVE-2026-84411, CVE-2026-67277/67279)
+    verified: 2026-11-06

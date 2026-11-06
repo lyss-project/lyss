@@ -1,0 +1,255 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+# LYSS adapter: MikroTik RouterOS 6.x / 7.x (CRS switches, RouterBOARD, CHR).
+# Rule forms: see adapters/cisco_ios.yaml; {all: [rule, ...]} matches when every sub-rule matches.
+# The configuration is "/export terse" (one command per line). RouterOS exports only what differs
+# from the factory defaults, and hides secrets unless "show-sensitive" is given (LYSS never asks for
+# it): most controls are read from "print terse" device state, one item per line, e.g.
+#     3     name=telnet port=23 proto=tcp available-from= vrf=main max-sessions=20
+#     5  X  name=www-ssl port=443 ...                 (flag X = disabled, R = running, D = dynamic)
+adapter: mikrotik
+spec_version: "0.5.0-draft"
+platform: MikroTik RouterOS
+status: preview, validated on CHR 7.25.1 (2026-11)
+
+facts:
+  model:
+    - {section: /system resource print, line: '^\s*board-name: (.+?)\s*$'}
+    - {section: config comments, line: 'by RouterOS', format: 'RouterOS'}
+  version:
+    - {section: /system resource print, line: '^\s*version: (\d[\w.]*)'}
+    - {section: config comments, line: 'by RouterOS (\d[\w.]*)'}
+
+checks:
+
+  # ---------------- Level 1 ----------------
+
+  LYSS-MGMT-001:
+    fail_if_any:
+      - {state: '^\s*\d+\s+(?![^=]*\bX\b)[^=]*?\bname=telnet\s', section: /ip service print terse}
+    pass_if_any:
+      - {state: '\bname=telnet\s', section: /ip service print terse}
+      - {line: '^/ip service set telnet\b.*\bdisabled=yes'}
+    otherwise: unknown
+    note: Telnet is enabled in the RouterOS factory settings; without device state only an explicit "disabled=yes" is visible.
+    remediation: |
+      /ip service disable telnet
+
+  LYSS-MGMT-002:
+    fail_if_any:
+      - {state: '^SSH-1\.', section: ssh banner}
+    pass_if_any:
+      - {state: '^SSH-2\.0-', section: ssh banner}
+    otherwise: pass
+    note: RouterOS (ROSSSH) speaks SSH protocol version 2 only.
+
+  LYSS-MGMT-003:
+    fail_if_any:
+      - {state: '^\s*\d+\s+(?![^=]*\bX\b)[^=]*?\bname=www\s', section: /ip service print terse}
+    pass_if_any:
+      - {state: '\bname=www\s', section: /ip service print terse}
+      - {line: '^/ip service set www\b.*\bdisabled=yes'}
+    otherwise: unknown
+    note: The "www" service (WebFig over HTTP, TCP 80) is enabled in the factory settings.
+    remediation: |
+      /ip service disable www
+      ! WebFig over HTTPS needs a certificate: /ip service set www-ssl certificate=<cert> disabled=no
+
+  LYSS-MGMT-004:
+    # per-user inactivity timeout (RouterOS 7: CLI, SSH, Winbox); factory value 10m
+    fail_if_any:
+      - {state: '\binactivity-timeout=0s\b', section: /user print terse}
+      - {state: '\binactivity-timeout=\d+[hdw]', section: /user print terse}
+      - {state: '\binactivity-timeout=(\d+)m', section: /user print terse, gt: 10}
+    pass_if_any:
+      - {state: '\binactivity-timeout=', section: /user print terse}
+    otherwise: unknown
+    note: RouterOS 7 sets an inactivity timeout per user (factory value 10 minutes); 0s disables it.
+    remediation: |
+      /user set [find] inactivity-timeout=10m
+
+  LYSS-AUTH-001:
+    fail_if_any:
+      - all:
+          - {state: '^\s*enabled: yes', section: /snmp print}
+          - {state: '\bname=(public|private)\s', section: /snmp community print terse}
+    pass_if_any:
+      - {state: '^\s*enabled: no', section: /snmp print, say: 'SNMP service disabled: the factory "public" entry is unreachable'}
+      - {state: '\bname=', section: /snmp community print terse}
+    otherwise: unknown
+    note: RouterOS ships a "public" community with SNMP disabled; it fails only once SNMP is enabled.
+    remediation: |
+      /snmp community set [find default=yes] name=<new-name> addresses=<monitoring-host>/32
+      ! or disable SNMP: /snmp set enabled=no
+
+  LYSS-AUTH-002:
+    pass_if_all:
+      - {state: '^\s*use-radius: yes', section: /user aaa print, say: 'logins are authenticated by RADIUS (central AAA)'}
+      - {state: '\bservice=\S*\blogin\b', section: /radius print terse}
+    otherwise: unknown
+    note: >-
+      RouterOS has no separate enable password: privilege comes from the user group (full/write/read).
+      Local password hashes are never exported, so their strength cannot be read; authenticate
+      administrators with RADIUS and keep one local emergency account with a long password.
+    remediation: |
+      /radius add address=<radius-ip> secret=<secret> service=login
+      /user aaa set use-radius=yes default-group=read
+
+  LYSS-AUTH-003:
+    # 6.43 started hashing passwords but kept plaintext copies; 6.45.1 removed insecure storage
+    fail_if_any:
+      - {state: '^\s*version: (?:[1-5]\.|6\.(?:\d|[1-3]\d|4[0-4])\b|6\.45(?:\s|$|rc|beta))', section: /system resource print}
+    pass_if_any:
+      - {state: '^\s*version: \d', section: /system resource print, say: 'RouterOS 6.45.1 or later: user passwords stored as one-way hashes only'}
+    otherwise: unknown
+    note: Before 6.45.1 RouterOS kept reversible copies of user passwords (stolen with CVE-2018-14847).
+    remediation: |
+      ! upgrade RouterOS (see LYSS-VULN-001), then change every user password
+
+  LYSS-AUTH-004:
+    pass_if_any:
+      - {state: '\baddress=', section: /radius print terse, absent: true, say: 'no RADIUS server configured (nothing to protect)'}
+    otherwise: unknown
+    note: >-
+      RouterOS hides RADIUS secrets from exports without "show-sensitive" and from accounts without
+      the "sensitive" policy, but a full administrator can read them back: their storage cannot be
+      verified from a read-only collection. Give the LYSS account a group without "sensitive".
+
+  LYSS-VULN-001:
+    firmware: true
+    otherwise: unknown
+    note: Compared with data/firmware.yaml (MikroTik advisories, CISA KEV), per release line (6.x, 7.x long-term, 7.x stable).
+    remediation: |
+      /system package update set channel=stable
+      /system package update install
+      ! RouterBOARD hardware: /system routerboard upgrade, then reboot
+
+  LYSS-BKP-001:
+    backup: true   # vendor-neutral: evaluated from the LYSS configuration archive / attestation
+    otherwise: unknown
+    note: No backup evidence yet. Enable scheduled scans, or attest the external backup system on the switch page.
+
+  # ---------------- Level 2 ----------------
+
+  LYSS-AUTH-010:
+    pass_if_all:
+      - {state: '^\s*use-radius: yes', section: /user aaa print}
+      - {state: '\bservice=\S*\blogin\b', section: /radius print terse}
+    otherwise: fail
+    note: RouterOS tries local users first, then RADIUS ("use-radius"); keep a single local emergency account.
+    remediation: |
+      /radius add address=<radius-ip> secret=<secret> service=login
+      /user aaa set use-radius=yes default-group=read
+
+  LYSS-AUTH-011:
+    fail_if_any:
+      - all:
+          - {state: '^\s*enabled: yes', section: /snmp print}
+          - {state: '\bsecurity=(none|authorized)\b', section: /snmp community print terse}
+    pass_if_any:
+      - {state: '^\s*enabled: no', section: /snmp print, say: SNMP service disabled}
+      - {state: '\bsecurity=private\b', section: /snmp community print terse}
+    otherwise: unknown
+    note: In RouterOS, an SNMPv3 community with security=private uses authentication and encryption (authPriv).
+    remediation: |
+      /snmp community set [find] security=private authentication-protocol=SHA1 encryption-protocol=AES
+      ! set authentication-password and encryption-password on each community
+
+  LYSS-MGMT-010:
+    fail_if_any:
+      # an enabled management service open to every address (empty available-from, "address" before 7.2x)
+      - {state: '^\s*\d+\s+(?![^=]*\b[XD]\b)[^=]*?\bname=(ssh|telnet|ftp|www|www-ssl|winbox|api|api-ssl|reverse-proxy)\s.*\b(available-from|address)=(\s|$)', section: /ip service print terse}
+      - {state: '^\s*allowed-interface-list: all\b', section: /tool mac-server mac-winbox print}
+    pass_if_any:
+      - {state: '\b(available-from|address)=\S', section: /ip service print terse}
+    otherwise: unknown
+    note: Every enabled service needs an "available-from" list; MAC-Winbox must not answer on every interface.
+    remediation: |
+      /ip service set [find disabled=no] available-from=<admin-subnet>
+      /interface list add name=MGMT
+      /interface list member add list=MGMT interface=<management-vlan>
+      /tool mac-server mac-winbox set allowed-interface-list=MGMT
+      /tool mac-server set allowed-interface-list=none
+
+  LYSS-MGMT-011:
+    fail_if_any:
+      # the management address on the bridge itself = untagged default VLAN of the switch
+      - {line: '^/ip (?:address|dhcp-client) add .*\binterface=bridge\S*(\s|$)'}
+    pass_if_any:
+      - captures_in_both:
+          - {line: '^/ip (?:address|dhcp-client) add .*\binterface=(\S+)'}
+          - {line: '^/interface vlan add .*\bname=(\S+)'}
+    otherwise: unknown
+    note: The management address should sit on a VLAN interface of the bridge (a dedicated management VLAN), not on the bridge itself.
+    remediation: |
+      /interface vlan add interface=bridge name=MGMT vlan-id=<mgmt-vlan>
+      /ip address add address=<ip/prefix> interface=MGMT
+      ! then remove the address from "bridge" and tag the management VLAN on the uplink
+
+  LYSS-MGMT-012:
+    pass_if_all:
+      - {state: '^\s*show-at-cli-login: yes', section: /system note print}
+      - {state: '^\s*show-at-login: yes', section: /system note print}
+      - {state: '(?i)^\s*note:.*authori[sz]ed', section: /system note print}
+    otherwise: fail
+    note: >-
+      RouterOS has no SSH pre-authentication banner (checked on 7.25.1): "show-at-cli-login" prints the
+      note before the console/Telnet login prompt, "show-at-login" right after an SSH, Winbox or
+      WebFig login, before any command. Both are needed.
+    remediation: |
+      /system note set note="Authorized access only. Activity is logged." show-at-cli-login=yes show-at-login=yes
+
+  LYSS-MGMT-013:
+    fail_if_any:
+      - {state: '^\s*strong-crypto: no\b', section: /ip ssh print}
+      - {state: '^kex: .*(sha1|group1\b)', section: ssh negotiated}
+      - {state: '^cipher: .*(cbc|3des|arcfour|blowfish)', section: ssh negotiated}
+      - {state: '^hostkey: (ssh-rsa|ssh-dss)\s*$', section: ssh negotiated}
+    pass_if_any:
+      - {state: '^kex: ', section: ssh negotiated}
+    otherwise: unknown
+    note: With strong-crypto=no RouterOS still offers SHA-1 key exchange and weak ciphers to clients that ask.
+    remediation: |
+      /ip ssh set strong-crypto=yes
+
+  LYSS-LOG-010:
+    pass_if_all:
+      - {state: '\btarget=remote\b.*\bremote=(?!0\.0\.0\.0\b)[\da-fA-F:]', section: /system logging action print terse}
+      - {state: '\baction=\S*remote', section: /system logging print terse}
+    otherwise: fail
+    note: Needs a "remote" logging action with a server address, used by at least one logging rule.
+    remediation: |
+      /system logging action set [find name=remote] remote=<siem-ip>
+      /system logging add topics=info action=remote
+      /system logging add topics=critical action=remote
+
+  LYSS-LOG-011:
+    fail_if_any:
+      - {state: '^\s*enabled: no\b', section: /system ntp client print}
+      - {state: '^\s*status: (?!synchronized)\S', section: /system ntp client print}
+    pass_if_any:
+      - {state: '^\s*status: synchronized\b', section: /system ntp client print}
+    otherwise: unknown
+    remediation: |
+      /system ntp client set enabled=yes servers=<ntp-ip>
+
+  LYSS-ACC-010:
+    fail_if_any:
+      # flags column: R = running, X = disabled; an Ethernet port with neither is up but unused
+      - {state: '^\s*\d+\s+(?![^=]*\b[RX]\b)[^=]*?\bname=\S+', section: /interface ethernet print terse}
+    pass_if_any:
+      - {state: '\bname=', section: /interface ethernet print terse}
+    otherwise: unknown
+    remediation: |
+      /interface ethernet disable <unused-ports>
+
+  LYSS-ACC-011:
+    # edge ports = bridge ports marked edge=yes or admitting untagged frames only (access ports)
+    fail_if_any:
+      - {state: '^(?=.*\b(?:edge=yes\b|frame-types=admit-only-untagged))(?=.*\bbpdu-guard=no\b)', section: /interface bridge port print terse}
+    pass_if_any:
+      - {state: '^(?=.*\b(?:edge=yes\b|frame-types=admit-only-untagged))(?=.*\bbpdu-guard=yes\b)', section: /interface bridge port print terse}
+    otherwise: unknown
+    note: Access ports are bridge ports with frame-types=admit-only-untagged-and-priority-tagged or edge=yes.
+    remediation: |
+      /interface bridge port set [find frame-types=admit-only-untagged-and-priority-tagged] bpdu-guard=yes edge=yes

@@ -4,6 +4,22 @@ Specification versions (`spec_version`) and tool versions are tracked together u
 
 ## Unreleased
 
+- MikroTik RouterOS adapter (preview), validated on CHR 7.25.1: configuration from
+  `/export terse` (secrets never collected), device state from `print terse` (services, SSH,
+  SNMP, NTP, logging, users, RADIUS, note, Ethernet ports, bridge ports, MAC-Winbox). Factory
+  defaults it reports: Telnet/FTP/HTTP/API open to every address, `strong-crypto=no`,
+  MAC-Winbox on every interface, no NTP, no remote syslog. Discovery recognises `SSH-2.0-ROSSSH`
+  and MikroTik LLDP descriptions. No automatic remediation.
+- RouterOS has no SSH pre-authentication banner (checked on 7.25.1): LYSS-MGMT-012 needs the note
+  both before the console/Telnet login (`show-at-cli-login`) and at SSH/Winbox login (`show-at-login`).
+- Firmware data: RouterOS advisories checked against NVD and the CISA KEV catalog (2026.11.04),
+  including CVE-2026-86060/67277/67279 (KEV), CVE-2026-84411 (9.8), CVE-2026-67278 (9.1),
+  CVE-2023-30799, CVE-2018-7445 and CVE-2018-14847. `fixed_in` can now list the first fixed
+  version of each release line (e.g. 6.49.21 / 7.23.4 long-term / 7.24.2 stable), with an optional
+  `affected_from`.
+- Engine: `{all: [rules]}` combinator; RouterOS SNMP community names are redacted from evidence
+  (`public`/`private` stay visible, being the finding).
+
 - SONiC adapter (preview), validated on SONiC-VS 202505: the config_db JSON
   (`show runningconfiguration all`) is flattened into one block per table entry
   (`TABLE|key` + `field=value` lines); device state from `show version`, `show interfaces status`,
@@ -13,6 +29,9 @@ Specification versions (`spec_version`) and tool versions are tracked together u
   (LYSS-AUTH-004 fails), and the SNMP community "public" comes back after
   `config snmp community del public` while /etc/sonic/snmp.yml still holds `snmp_rocommunity`
   (the remediation removes it first).
+- SONiC LYSS-AUTH-004: an encrypted global TACACS+ key (`TACPLUS|global` `key_encrypt=true`,
+  `config tacacs passkey <key> --encrypt`) passes; per-server and RADIUS keys stay cleartext and
+  fail. Engine: new block filter `where_not`. The SNMP note cites sonic-buildimage#18061 / #26952.
 - Redaction covers JSON fields (`passkey=`, `*password*=`, `*secret*=`, `*key*=`) and
   non-default SNMP community names in `SNMP_COMMUNITY|<name>` headers.
 - Tests: preview adapters must show each control both ways or give the reason why not.
