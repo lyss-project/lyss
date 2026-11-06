@@ -1,0 +1,54 @@
+name: release
+
+# Publishing a GitHub release (tag vX.Y.Z) builds LYSS and uploads it to PyPI with Trusted
+# Publishing: PyPI trusts this workflow through OpenID Connect, no password or API token is stored.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Version matches the release tag
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "pyproject version v$version != tag $GITHUB_REF_NAME"; exit 1; }
+      - name: Build
+        run: |
+          python -m pip install build twine
+          python -m build
+          python -m twine check dist/*
+      - name: Smoke test of the wheel, outside the repository
+        run: |
+          python -m venv /tmp/lyss-venv
+          /tmp/lyss-venv/bin/pip install dist/*.whl
+          cd /tmp
+          /tmp/lyss-venv/bin/lyss audit --vendor mikrotik --level 2 "$GITHUB_WORKSPACE/tests/cases/mikrotik-weak/config.cfg"
+          /tmp/lyss-venv/bin/python -c "from lyss import engine; assert engine.INSTALLED; from lyss.sim import load_lab; assert len(load_lab('demo').switches) == 8"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/lyss/
+    permissions:
+      id-token: write   # Trusted Publishing (OIDC), nothing else
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

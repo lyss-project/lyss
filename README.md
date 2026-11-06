@@ -33,19 +33,32 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
 ## Try it in two minutes (no switch needed)
 
 ```sh
+python -m venv lyss-env
+lyss-env/bin/pip install lyss           # Windows: lyss-env\Scripts\pip install lyss
+lyss-env/bin/lyss demo --open           # Windows: lyss-env\Scripts\lyss demo --open
+```
+
+Or from the source code (to contribute, or to read the adapters and the specification next to it):
+
+```sh
 git clone https://github.com/lyss-project/lyss.git && cd lyss
 python -m venv .venv
 .venv/bin/pip install -e .              # Windows: .venv\Scripts\pip install -e .
 .venv/bin/python -m lyss demo --open    # Windows: .venv\Scripts\python -m lyss demo --open
 ```
 
-This starts a simulated network of six fictitious switches (Cisco IOS, Cisco Small Business,
-HPE Aruba) on 127.0.0.1 and the LYSS web interface on a separate demo data folder. Everything
+An installed LYSS keeps its data (devices, encrypted credentials, results) in `%LOCALAPPDATA%\LYSS`
+on Windows and `~/.local/share/lyss` elsewhere; a source checkout in `private/`. `LYSS_DATA_DIR`
+overrides both.
+
+This starts a simulated network of eight fictitious switches (Cisco IOS, Cisco Small Business,
+HPE Aruba, MikroTik RouterOS, SONiC) on 127.0.0.1 and the LYSS web interface on a separate demo data folder. Everything
 you see is invented. See [docs/DEMO.md](docs/DEMO.md). On Windows, double-click
 `Start-LYSS-Demo.cmd` instead (the first start installs LYSS).
 
-**Testing LYSS on your switches?** Start with [docs/TESTERS.md](docs/TESTERS.md), and tell me what
-you found in the [issues](https://github.com/lyss-project/lyss/issues). Website: https://lyss.dev
+**Testing LYSS on your switches?** Start with [docs/TESTERS.md](docs/TESTERS.md), give LYSS a
+read-only account ([docs/ACCOUNTS.md](docs/ACCOUNTS.md)), and tell me what you found in the
+[issues](https://github.com/lyss-project/lyss/issues). Website: https://lyss.dev
 
 ## Platform support
 

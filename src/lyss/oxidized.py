@@ -23,7 +23,8 @@ from .engine import audit, conformance, extract_facts, load_adapter, load_spec
 from .config import parse
 
 # Oxidized model -> LYSS adapter
-MODELS = {"ios": "cisco_ios", "iosxe": "cisco_ios", "ciscosmb": "cisco_sb", "procurve": "hp_procurve"}
+MODELS = {"ios": "cisco_ios", "iosxe": "cisco_ios", "ciscosmb": "cisco_sb", "procurve": "hp_procurve",
+          "routeros": "mikrotik"}
 BACKUP_MAX_AGE_DAYS = 7
 HIDDEN = re.compile(r"<(secret hidden|secret removed|removed|configuration removed)>", re.I)
 _transport = None  # tests inject an httpx.MockTransport here

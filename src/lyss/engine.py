@@ -12,8 +12,23 @@ import yaml
 
 from .config import Config, parse
 
-# project home (spec/, adapters/, data/): LYSS_HOME if set, else the source checkout
-ROOT = Path(os.environ.get("LYSS_HOME") or Path(__file__).resolve().parents[2])
+PACKAGE_DIR = Path(__file__).resolve().parent
+_CHECKOUT = PACKAGE_DIR.parents[1]
+
+
+def _home() -> Path:
+    """Project home (spec/, adapters/, data/): LYSS_HOME if set; else the source checkout (git
+    clone, editable install); else the copy bundled in the installed package (pip install lyss)."""
+    if os.environ.get("LYSS_HOME"):
+        return Path(os.environ["LYSS_HOME"])
+    if (_CHECKOUT / "spec" / "lyss-spec.yaml").exists():
+        return _CHECKOUT
+    return PACKAGE_DIR / "_bundled"
+
+
+ROOT = _home()
+# a source checkout keeps its data in <checkout>/private; an installed package in the user's profile
+INSTALLED = ROOT == PACKAGE_DIR / "_bundled"
 SPEC_FILE = ROOT / "spec" / "lyss-spec.yaml"
 ADAPTER_DIR = ROOT / "adapters"
 
@@ -281,6 +296,10 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
 
     if "block" not in rule:
         hits = _line_hits(cfg.lines, rule)
+        if rule.get("absent"):
+            # e.g. RouterOS: an export lists every non-default setting, so a missing line means
+            # the factory default; never decisive on an empty configuration
+            return (bool(cfg.lines) and not hits), [f"configuration: no line matches {rule['line']}"] if not hits else []
         return bool(hits), hits
 
     header = re.compile(rule["block"])

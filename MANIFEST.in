@@ -1,0 +1,10 @@
+# source distribution: the package, the project files it bundles, licences and tests
+graft spec
+graft adapters
+graft data
+graft tests
+include LICENSE LICENSE-SPEC NOTICE TRADEMARKS.md CHANGELOG.md README.md setup.py
+prune private
+prune site
+prune integrations
+global-exclude __pycache__ *.pyc .actual.txt

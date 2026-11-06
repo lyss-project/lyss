@@ -4,12 +4,13 @@
 read-only collection. Synthetic data."""
 
 import re
+from datetime import datetime, timezone
 
 import pytest
 
-from lyss import discovery
+from lyss import discovery, oxidized
 from lyss.collector import COMMANDS
-from lyss.config import parse
+from lyss.config import parse, routeros_terse
 from lyss.engine import _is_vulnerable, evaluate_rule, firmware_verdict, redact
 
 KEV_FIX = ["6.49.21", "7.23.4", "7.24.2"]
@@ -67,6 +68,70 @@ def test_routeros_recognised():
     assert discovery.guess_platform("SSH-2.0-ROSSSH", discovery.SSH_FINGERPRINTS)[0] == "mikrotik"
     assert discovery.guess_platform("MikroTik RouterOS 7.25.1 (stable) CRS326-24G-2S+",
                                     discovery.PLATFORMS)[0] == "mikrotik"
+
+
+OXIDIZED_BACKUP = """\
+#                   version: 7.20.4 (stable)
+#          factory-software: 7.12
+#         architecture-name: arm
+#                board-name: CRS326-24G-2S+
+#                  platform: MikroTik
+# installed-version: 7.20.4
+# software id = FAKE-0009
+#
+# model = CRS326-24G-2S+
+/interface bridge
+add name=bridge
+/ip address
+add address=192.0.2.9/24 interface=bridge network=192.0.2.0
+/ip service
+set ftp disabled=yes
+set www disabled=yes
+/radius
+add address=192.0.2.49 secret=FakeOxidizedSecret1 service=login
+/snmp community
+set [ find default=yes ] authentication-password=FakeOxAuth1 name=ox-fake-community \\
+    security=private
+/system note
+set note="Authorized access only. Activity is logged." show-at-cli-login=yes
+/user aaa
+set use-radius=yes
+/user group
+add name=lyss-read policy="ssh,read,!local,!te\\
+    lnet,!write,!sensitive"
+"""
+
+
+def test_hierarchical_export_becomes_one_command_per_line():
+    text = routeros_terse(OXIDIZED_BACKUP)
+    assert "/ip service set www disabled=yes" in text
+    assert "/radius add address=192.0.2.49 secret=FakeOxidizedSecret1 service=login" in text
+    # a line wrapped in the middle of a word is joined exactly
+    assert '/user group add name=lyss-read policy="ssh,read,!local,!telnet,!write,!sensitive"' in text
+    assert "# model = CRS326-24G-2S+" in text            # comments kept
+    terse = "/ip service set telnet disabled=yes\n/interface bridge port remove 0\n"
+    assert routeros_terse(terse) == terse                 # already terse: unchanged
+
+
+def test_oxidized_routeros_backup_is_assessed_without_leaking_secrets():
+    node = {"name": "crs-09", "model": "RouterOS", "group": "", "ip": "192.0.2.9",
+            "last": {"status": "success", "end": "2026-11-05 03:00:00 UTC"}}
+    result = oxidized.assess(node, OXIDIZED_BACKUP, now=datetime(2026, 11, 6, tzinfo=timezone.utc))
+    verdicts = {f["control_id"]: f["verdict"] for f in result["findings"]}
+    assert result["vendor"] == "mikrotik" and result["model"] == "CRS326-24G-2S+" and result["firmware"] == "7.20.4"
+    assert verdicts["LYSS-MGMT-001"] == "fail"       # Telnet never disabled: on by factory default
+    assert verdicts["LYSS-MGMT-003"] == "pass"       # www disabled
+    assert verdicts["LYSS-MGMT-013"] == "fail"       # strong-crypto left at its default (no)
+    assert verdicts["LYSS-VULN-001"] == "fail"       # 7.20.4: before the CISA KEV fixes
+    assert verdicts["LYSS-AUTH-010"] == "pass"       # use-radius + a login RADIUS server
+    assert verdicts["LYSS-AUTH-001"] == "pass"       # SNMP never enabled
+    assert verdicts["LYSS-MGMT-011"] == "fail"       # address on the bridge itself
+    assert verdicts["LYSS-MGMT-012"] == "pass"
+    assert verdicts["LYSS-LOG-011"] == "fail"        # NTP client never enabled
+    assert verdicts["LYSS-BKP-001"] == "pass"        # recent Oxidized backup
+    dump = repr(result)
+    for secret in ("FakeOxidizedSecret1", "FakeOxAuth1", "ox-fake-community"):
+        assert secret not in dump
 
 
 def test_routeros_collection_is_read_only():

@@ -23,7 +23,14 @@ INVALID = {
     "cisco_ios": "                    ^\n% Invalid input detected at '^' marker.",
     "cisco_sb": "% Unrecognized command",
     "hp_procurve": "Invalid input: {word}",
+    "mikrotik": "bad command name {word} (line 1 column 1)",
+    "sonic": "-bash: {word}: command not found",
 }
+
+
+def login_name(sw: SimSwitch, username: str) -> str:
+    # RouterOS reads console options after "+" in the user name (netmiko sends "user+ct511w4098h")
+    return username.split("+", 1)[0] if sw.platform == "mikrotik" else username
 LEGACY = {  # what old switches still negotiate (and nothing better)
     "kex": ("diffie-hellman-group14-sha1",),
     "ciphers": ("aes128-cbc",),
@@ -48,7 +55,7 @@ class _Auth(paramiko.ServerInterface):
         return paramiko.AUTH_SUCCESSFUL if self.sw.platform == "cisco_sb" else paramiko.AUTH_FAILED
 
     def check_auth_password(self, username, password):
-        ok = username == self.creds["username"] and password == self.creds["password"]
+        ok = login_name(self.sw, username) == self.creds["username"] and password == self.creds["password"]
         return paramiko.AUTH_SUCCESSFUL if ok else paramiko.AUTH_FAILED
 
     def check_channel_pty_request(self, *args):
@@ -121,6 +128,10 @@ class Shell:
 
     def prompt(self) -> str:
         host = self.sw.hostname
+        if self.sw.platform == "mikrotik":
+            return f"[{self.creds['username']}@{host}] > "
+        if self.sw.platform == "sonic":
+            return f"{self.creds['username']}@{host}:~$ "
         if self.mode == "exec":
             return f"{host}# " if self.sw.platform == "hp_procurve" else f"{host}#"
         if self.mode == "config":
@@ -182,6 +193,12 @@ class Shell:
             return ""
         low = cmd.lower()
         sw = self.sw
+        if sw.static:
+            # read-only platforms: fixed outputs, nothing can be changed
+            if low in ("exit", "logout", "quit", "/quit"):
+                return False
+            out = sw.static_output(cmd)
+            return self._invalid(cmd) if out is None else out
         if self.mode == "exec":
             if low.startswith("terminal ") or low in ("no page", "enable"):
                 return ""

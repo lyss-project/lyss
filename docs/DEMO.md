@@ -12,11 +12,11 @@ documentation block `00:00:5e:00:53:xx` (RFC 7042), fake serial numbers and secr
 python -m lyss demo --open
 ```
 
-- Starts the six simulated switches on `127.0.0.1:2201-2206` (SSH).
+- Starts the eight simulated switches on `127.0.0.1:2201-2208` (SSH).
 - Uses its **own data directory** (`<temp>/lyss-demo`, or `--data-dir`); the demo refuses to run in,
   or inside, your real LYSS data directory (`private/` or `LYSS_DATA_DIR`).
 - At the first start it creates the organisation "Demo Corp", a credential profile for the
-  simulated switches, the six devices, and an **admin account whose random password is printed
+  simulated switches, the eight devices, and an **admin account whose random password is printed
   once** in the console. `--reset` starts again from an empty demo directory.
 - Runs a first scan, recorded as a *scheduled* scan (the simulated "nightly" scan), so the
   configuration-backup control has evidence; then opens the web interface on
@@ -36,9 +36,11 @@ Options: `--base-port 2301` if the SSH ports are busy, `--lab <name|folder>` for
 | demo-sb-01 | Cisco SB | CBS350-24P-4G, 3.3.0.16 | Level 1; Level 2 gaps (management ACL, banner, unused ports, BPDU guard) |
 | demo-sb-02 | Cisco SB | SG300-28P, 1.4.11.5 | Level 0: end of support, unpatchable web vulnerability, Telnet/HTTP on |
 | demo-hp-01 | HPE Aruba AOS-S | 2930F JL253A, WC.16.10.0012 | Level 0: firmware before HPESBNW05156 fix, Telnet/HTTP on |
+| demo-crs-01 | MikroTik RouterOS | CRS326-24G-2S+, 7.24.1 | Level 0: RouterOS factory defaults (Telnet/FTP/HTTP/API open to all, MAC-Winbox on every port, `strong-crypto=no`), one point release before the CISA KEV fixes of 7.24.2 |
+| demo-leaf-01 | SONiC | Accton AS4630-54PE, 202411.45 | Level 0: well run (TACACS+, control-plane ACL, banner, syslog, NTP), but SONiC's own `public` SNMP community and a TACACS+ key stored in cleartext |
 
 Cabling: the core switch connects the two Catalyst access switches, the CBS350 and the HPE
-switch; DEMO-SB-02 hangs off DEMO-ACC-01. Neighbour tables also show a wireless access point
+switch; DEMO-SB-02, DEMO-CRS-01 and demo-leaf-01 hang off DEMO-ACC-01. Neighbour tables also show a wireless access point
 (DEMO-AP-01) and an unmanaged Catalyst (DEMO-LAB-SW, 198.51.100.40), which the discovery page
 proposes to add.
 
@@ -55,5 +57,9 @@ closely enough for LYSS and netmiko (Cisco SB: "User Name:" prompt inside the sh
 any key to continue"; legacy switches only offer SHA-1 key exchange and CBC ciphers). It is not
 a full switch emulator.
 
+MikroTik and SONiC switches are read-only in the simulator (LYSS never changes them): they serve
+fixed outputs for the commands LYSS collects.
+
 Labs live in `src/lyss/sim/labs/<name>/`: `lab.yaml` (switches, cables, external neighbours) and
-one `<switch>.cfg` running configuration per switch.
+one `<switch>.cfg` running configuration per switch (RouterOS export, SONiC config_db JSON), plus
+a `<switch>.state` file with one `===== command =====` section per command for MikroTik and SONiC.

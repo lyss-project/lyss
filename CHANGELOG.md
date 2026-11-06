@@ -2,7 +2,31 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
-## Unreleased
+## 0.8.0 (2026-11-06)
+
+Two more platforms (MikroTik RouterOS and SONiC, preview), both in the demo; `pip install lyss`;
+Oxidized backups of MikroTik routers; a least-privilege account guide. Specification unchanged
+(0.5.0-draft).
+
+- `pip install lyss`: the wheel bundles the specification, the adapters and the firmware data
+  (copied by setup.py at build time from the top of the repository, where they stay). An installed
+  LYSS keeps its data in `%LOCALAPPDATA%\LYSS` (Windows) or `$XDG_DATA_HOME/lyss`
+  (`~/.local/share/lyss`), never next to its code. Releases are published to PyPI by
+  `.github/workflows/release.yml` with Trusted Publishing (no stored token), after a smoke test of
+  the wheel outside the repository.
+
+- Demo lab: two more simulated switches, DEMO-CRS-01 (MikroTik CRS326, RouterOS factory defaults,
+  7.24.1 = one point release before the CISA KEV fixes) and demo-leaf-01 (SONiC campus switch,
+  `public` SNMP community and cleartext TACACS+ key); read-only simulator platforms with fixed
+  outputs. Topology reads RouterOS and SONiC host names.
+- docs/ACCOUNTS.md: a least-privilege LYSS account per platform. Verified in the lab: a RouterOS
+  group with `ssh,read` only (no `sensitive`) and a SONiC user without sudo collect exactly what
+  `admin` collects, and cannot change anything. Finding: on SONiC every local account can read
+  the whole config_db, cleartext TACACS+/RADIUS keys included.
+- Oxidized: `routeros` nodes are assessed (MikroTik adapter). Hierarchical RouterOS exports are
+  rewritten one command per line; Oxidized's `# version:` / `# board-name:` comments give the
+  firmware facts; configuration-only rules use the fact that an export lists every non-default
+  setting (engine: `absent: true` on configuration line rules, never decisive on an empty file).
 
 - MikroTik RouterOS adapter (preview), validated on CHR 7.25.1: configuration from
   `/export terse` (secrets never collected), device state from `print terse` (services, SSH,

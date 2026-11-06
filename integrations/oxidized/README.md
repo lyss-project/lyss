@@ -18,8 +18,17 @@ LYSS reads the Oxidized REST API (oxidized-web), read-only: `GET /nodes.json` an
 | `ios`, `iosxe` | Cisco IOS / IOS-XE |
 | `ciscosmb` | Cisco Small Business / Business |
 | `procurve` | HPE Aruba AOS-S (ProCurve) |
+| `routeros` | MikroTik RouterOS |
 
 Other models are listed as skipped.
+
+**MikroTik.** The `routeros` model stores the hierarchical `/export` (LYSS rewrites it one command
+per line) plus `/system resource print` as comments, which give LYSS the model and RouterOS
+version for the firmware check. RouterOS exports every non-default setting, so a missing line means
+the factory default: no `set telnet disabled=yes` = Telnet still on. On RouterOS 7, Oxidized runs
+`/export show-sensitive` unless `remove_secret` is set: **your Oxidized backups then contain the
+RADIUS secrets and SNMP passwords in cleartext**. LYSS redacts them from its reports, but consider
+`remove_secret: true` (Oxidized then uses `/export hide-sensitive`) or protecting the backup store.
 
 ## What changes compared with a LYSS scan
 

@@ -169,7 +169,11 @@ def _identity(device: dict) -> dict:
     cfg_path, state_path = collector.config_paths(device)
     ident = {"hostname": "", "mac": None, "neighbors": []}
     if cfg_path.exists():
-        m = re.search(r'^hostname\s+"?([^"\s]+)"?\s*$', cfg_path.read_text(encoding="utf-8", errors="replace"), re.M)
+        text = cfg_path.read_text(encoding="utf-8", errors="replace")
+        # Cisco / HP "hostname", RouterOS "/system identity set name=", SONiC config_db "hostname"
+        m = (re.search(r'^hostname\s+"?([^"\s]+)"?\s*$', text, re.M)
+             or re.search(r'^/system identity set name="?([^"\s]+)"?', text, re.M)
+             or re.search(r'"hostname"\s*:\s*"([^"]+)"', text))
         ident["hostname"] = m.group(1) if m else ""
     if not state_path.exists():
         return ident

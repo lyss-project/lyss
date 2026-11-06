@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
 """Device inventory, settings and scan results, all stored in the data directory:
-LYSS_DATA_DIR if set (e.g. a Docker volume), else <project>/private (git-ignored)."""
+LYSS_DATA_DIR if set (e.g. a Docker volume), else <project>/private (git-ignored) for a source
+checkout, else a per-user folder for an installed package (%LOCALAPPDATA%\\LYSS on Windows,
+$XDG_DATA_HOME/lyss or ~/.local/share/lyss elsewhere)."""
 
 import hashlib
 import hmac
@@ -13,9 +15,19 @@ import threading
 from pathlib import Path
 
 from . import vault
-from .engine import ROOT
+from .engine import INSTALLED, ROOT
 
 PRIVATE = DEVICES_FILE = SETTINGS_FILE = RESULTS_DIR = Path()
+
+
+def default_data_dir() -> Path:
+    """Where LYSS keeps devices, credentials and results when LYSS_DATA_DIR is not set. An
+    installed package never writes next to its own code."""
+    if not INSTALLED:
+        return ROOT / "private"
+    if os.name == "nt":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "LYSS"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "lyss"
 
 
 def configure(data_dir: Path | str) -> None:
@@ -28,7 +40,7 @@ def configure(data_dir: Path | str) -> None:
     vault._key_file = PRIVATE / "master.key"
 
 
-configure(os.environ.get("LYSS_DATA_DIR") or ROOT / "private")
+configure(os.environ.get("LYSS_DATA_DIR") or default_data_dir())
 
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 HOST_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$")

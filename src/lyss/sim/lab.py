@@ -12,7 +12,25 @@ import yaml
 from .config import RunningConfig
 
 LABS = Path(__file__).parent / "labs"
-PLATFORMS = ("cisco_ios", "cisco_sb", "hp_procurve")
+PLATFORMS = ("cisco_ios", "cisco_sb", "hp_procurve", "mikrotik", "sonic")
+# read-only platforms (no LYSS remediation): fixed outputs from <switch>.cfg and <switch>.state,
+# a "===== command =====" section per command, as in a LYSS state file
+STATIC = ("mikrotik", "sonic")
+
+
+def parse_sections(text: str) -> dict[str, str]:
+    out, current, lines = {}, None, []
+    for line in text.splitlines():
+        m = re.match(r"^===== (.+) =====$", line)
+        if m:
+            if current is not None:
+                out[current] = "\n".join(lines).strip("\n")
+            current, lines = m.group(1), []
+        elif current is not None:
+            lines.append(line)
+    if current is not None:
+        out[current] = "\n".join(lines).strip("\n")
+    return out
 
 
 def expand(ranges) -> set[int]:
@@ -44,14 +62,21 @@ def port_name(platform: str, n: int | str, style: str = "short") -> str:
 
 
 class SimSwitch:
-    def __init__(self, switch_id: str, spec: dict, config_text: str):
+    def __init__(self, switch_id: str, spec: dict, config_text: str, state_text: str = ""):
         self.id = switch_id
         self.spec = spec
         self.platform = spec["platform"]
         if self.platform not in PLATFORMS:
             raise ValueError(f"{switch_id}: unknown platform {self.platform}")
-        self.running = RunningConfig(config_text, self.platform)
-        self.saved = self.running.text()
+        self.static = self.platform in STATIC
+        if self.static:
+            self.running = None
+            self.config_text = config_text
+            self.outputs = parse_sections(state_text)
+            self.saved = config_text
+        else:
+            self.running = RunningConfig(config_text, self.platform)
+            self.saved = self.running.text()
         self.lock = threading.RLock()
         self.port: int | None = None      # TCP port of its SSH server
         self.lab: "Lab | None" = None
@@ -61,6 +86,8 @@ class SimSwitch:
 
     @property
     def hostname(self) -> str:
+        if self.static:
+            return self.spec["hostname"]
         for line in self.running.top():
             m = re.match(r'^hostname\s+"?([^"\s]+)"?\s*$', line)
             if m:
@@ -101,9 +128,21 @@ class SimSwitch:
     # ---- configuration state used by the "show" outputs ----
 
     def has_line(self, pattern: str) -> bool:
+        if self.static:
+            return bool(re.search(pattern, self.config_text, re.M))
         return any(re.search(pattern, l) for l in self.running.top())
 
+    def static_output(self, command: str) -> str | None:
+        """Fixed output of a read-only platform; None for an unknown command."""
+        if command == {"mikrotik": "/export terse", "sonic": "show runningconfiguration all"}[self.platform]:
+            return self.config_text.rstrip("\n")
+        return self.outputs.get(command)
+
     def ssh_banner(self) -> str:
+        if self.platform == "mikrotik":
+            return "SSH-2.0-ROSSSH"
+        if self.platform == "sonic":
+            return "SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u5"
         if self.platform == "cisco_ios":
             return "SSH-2.0-Cisco-1.25" if self.has_line(r"^ip ssh version 2$") else "SSH-1.99-Cisco-1.25"
         if self.platform == "cisco_sb":
@@ -112,7 +151,7 @@ class SimSwitch:
 
     def save(self) -> None:
         with self.lock:
-            self.saved = self.running.text()
+            self.saved = self.config_text if self.static else self.running.text()
 
 
 class Lab:
@@ -126,7 +165,9 @@ class Lab:
         self.switches: dict[str, SimSwitch] = {}
         for switch_id, spec in data["switches"].items():
             text = (self.folder / f"{switch_id}.cfg").read_text(encoding="utf-8")
-            sw = SimSwitch(switch_id, spec, text)
+            state_file = self.folder / f"{switch_id}.state"
+            state = state_file.read_text(encoding="utf-8") if state_file.exists() else ""
+            sw = SimSwitch(switch_id, spec, text, state)
             sw.lab = self
             self.switches[switch_id] = sw
         self.links = [dict(zip(("a", "a_port", "b", "b_port"), link)) for link in data.get("links", [])]

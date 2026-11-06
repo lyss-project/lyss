@@ -66,12 +66,38 @@ def flatten_json(data: dict) -> str:
     return "\n".join(out) + "\n"
 
 
+ROUTEROS_PATH = re.compile(r"^/[a-z0-9][a-z0-9\-]*(?: [a-z0-9][a-z0-9\-]*)*$")
+ROUTEROS_VERB = re.compile(r"^(add|set|remove|unset|enable|disable|:\w+)\b")
+
+
+def routeros_terse(text: str) -> str:
+    """RouterOS hierarchical export ("/ip service" then "set telnet disabled=yes" lines, wrapped
+    lines ending in a backslash, e.g. an Oxidized backup) -> one full command per line, as
+    "/export terse" prints it. Text that is not such an export is returned unchanged."""
+    text = re.sub(r"\\\r?\n\s*", "", text)   # wrapped lines join exactly, even inside a word
+    lines = text.splitlines()
+    if not any(ROUTEROS_PATH.match(l.strip()) for l in lines):
+        return text
+    out, path = [], None
+    for raw in lines:
+        line = raw.strip()
+        if ROUTEROS_PATH.match(line) and not re.search(r"(?:^/|\s)(?:add|set|remove|unset|enable|disable)(?:\s|$)", line):
+            path = line
+        elif path and ROUTEROS_VERB.match(line):
+            out.append(f"{path} {line}")
+        else:
+            out.append(raw)
+    return "\n".join(out) + "\n"
+
+
 def parse(text: str, state_text: str = "") -> Config:
     if text.lstrip().startswith("{"):
         try:
             text = flatten_json(json.loads(text))
         except ValueError:
             pass  # not JSON after all: parsed as text
+    elif re.search(r"(?m)^/[a-z]", text):
+        text = routeros_terse(text)
     lines: list[str] = []
     blocks: list[Block] = []
     comments: list[str] = []

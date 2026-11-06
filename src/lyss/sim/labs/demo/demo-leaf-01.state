@@ -1,0 +1,53 @@
+===== show version =====
+
+SONiC Software Version: SONiC.202411.45
+SONiC OS Version: 12
+Distribution: Debian 12.11
+Kernel: 6.1.0-29-2-amd64
+Build commit: 0d3e5a1c
+Build date: Fri Sep 12 08:01:44 UTC 2026
+Built by: demo@build.example
+
+Platform: x86_64-accton_as4630_54pe-r0
+HwSKU: Accton-AS4630-54PE
+ASIC: broadcom
+ASIC Count: 1
+Serial Number: DEMO00000008
+Model Number: AS4630-54PE-O-AC-F
+Hardware Revision: R01
+Uptime: 09:12:44 up 21 days,  3:05,  1 user,  load average: 0.31, 0.27, 0.25
+===== show interfaces status =====
+  Interface    Lanes    Speed    MTU    FEC          Alias    Vlan    Oper    Admin    Type    Asym PFC
+-----------  -------  -------  -----  -----  -------------  ------  ------  -------  ------  ----------
+  Ethernet0        1       1G   9100    N/A     Eth1(Port1)  routed      up       up  RJ45         N/A
+  Ethernet1        2       1G   9100    N/A     Eth2(Port2)  routed    down       up  RJ45         N/A
+  Ethernet2        3       1G   9100    N/A     Eth3(Port3)  routed    down       up  RJ45         N/A
+ Ethernet48       49      25G   9100     rs  Eth49(Port49)  routed      up       up  SFP28        N/A
+===== show ntp =====
+MGMT_VRF_CONFIG is not present.
+Reference ID    : C000021F (192.0.2.31)
+Stratum         : 3
+Ref time (UTC)  : Thu Nov 05 09:10:02 2026
+System time     : 0.000012031 seconds fast of NTP time
+Leap status     : Normal
+===== show ssh =====
+  inactivity-timeout  max-sessions
+--------------------  --------------
+                 600  0 <default>
+===== show feature status =====
+Feature         State            AutoRestart     SetOwner
+--------------  ---------------  --------------  ----------
+bgp             enabled          enabled
+lldp            enabled          enabled
+snmp            enabled          enabled
+===== show lldp table =====
+Capability codes: (R) Router, (B) Bridge, (O) Other
+LocalPort    RemoteDevice    RemotePortID    Capability    RemotePortDescr
+-----------  --------------  --------------  ------------  -----------------
+Ethernet48   demo-acc-01     Gi1/0/28        BR            GigabitEthernet1/0/28
+--------------------------------------------------
+Total entries displayed:  1
+===== ss -tlnH =====
+LISTEN 0      128          0.0.0.0:22         0.0.0.0:*
+LISTEN 0      512                *:443              *:*
+LISTEN 0      512                *:8080             *:*

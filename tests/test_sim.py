@@ -41,6 +41,17 @@ EXPECTED_FAILS = {
     "demo-acc-01": {"LYSS-MGMT-004", "LYSS-AUTH-010", "LYSS-MGMT-010", "LYSS-MGMT-012", "LYSS-LOG-010",
                     "LYSS-ACC-010", "LYSS-ACC-011"},
     "demo-sb-01": {"LYSS-MGMT-010", "LYSS-MGMT-012", "LYSS-ACC-010", "LYSS-ACC-011"},
+    # RouterOS factory defaults, 7.24.1 = one point release before the CISA KEV fixes
+    "demo-crs-01": {"LYSS-MGMT-001", "LYSS-MGMT-003", "LYSS-VULN-001", "LYSS-AUTH-010", "LYSS-MGMT-010",
+                    "LYSS-MGMT-011", "LYSS-MGMT-012", "LYSS-MGMT-013", "LYSS-LOG-010", "LYSS-ACC-010",
+                    "LYSS-ACC-011"},
+    # well-run SONiC switch, except SONiC's own "public" community and cleartext TACACS+ key
+    "demo-leaf-01": {"LYSS-AUTH-001", "LYSS-AUTH-004", "LYSS-AUTH-011", "LYSS-ACC-010"},
+}
+# preview platforms: controls they cannot show both ways stay unknown (see tests/test_controls.py)
+EXPECTED_UNKNOWNS = {
+    "demo-crs-01": {"LYSS-AUTH-002"},
+    "demo-leaf-01": {"LYSS-VULN-001", "LYSS-ACC-011"},
 }
 
 
@@ -65,13 +76,15 @@ def test_whole_lab_is_collected_audited_and_mapped(data_dir, sim):
         if sw.id in EXPECTED_FAILS:
             fails = {f["control_id"] for f in result["findings"] if f["verdict"] == "fail"}
             assert fails == EXPECTED_FAILS[sw.id], sw.id
-        assert not [f for f in result["findings"] if f["verdict"] == "unknown"], sw.id
+        unknown = {f["control_id"] for f in result["findings"] if f["verdict"] == "unknown"}
+        assert unknown == EXPECTED_UNKNOWNS.get(sw.id, set()), sw.id
 
     graph = topology.build()
     managed = {frozenset((e["a"], e["b"])) for e in graph["edges"] if not (e["a"] + e["b"]).count("ext:")}
     assert managed == {frozenset(pair) for pair in [
         ("demo-core", "demo-acc-01"), ("demo-core", "demo-acc-02"), ("demo-core", "demo-sb-01"),
-        ("demo-core", "demo-hp-01"), ("demo-acc-01", "demo-sb-02")]}
+        ("demo-core", "demo-hp-01"), ("demo-acc-01", "demo-sb-02"),
+        ("demo-acc-01", "demo-crs-01"), ("demo-acc-01", "demo-leaf-01")]}
     core_acc = next(e for e in graph["edges"] if {e["a"], e["b"]} == {"demo-core", "demo-acc-01"})
     assert core_acc["ports"][0]["confirmed"]  # seen from both ends
     externals = {n["label"].split(".")[0]: n["kind"] for n in graph["nodes"] if not n["managed"]}

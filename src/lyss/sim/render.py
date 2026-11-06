@@ -21,7 +21,8 @@ def _peer(nb: dict) -> dict:
             "cdp_port": port_name(peer.platform, nb["remote"], "long"),
             "lldp_caps": "B", "cdp_caps": "S I", "cdp_caps_long": "Switch IGMP",
             "lldp": True, "cdp": cisco,
-            "platform": ("cisco " if peer.platform == "cisco_ios" else "Cisco " if cisco else "HPE ") + peer.model,
+            "platform": {"cisco_ios": "cisco ", "cisco_sb": "Cisco ", "mikrotik": "MikroTik ",
+                         "sonic": "SONiC "}.get(peer.platform, "HPE ") + peer.model,
         }
     return {
         "name": ext["name"], "mac": ext["mac"], "ip": ext.get("ip", ""), "model": ext.get("model", ""),
@@ -40,6 +41,10 @@ def _version_line(sw: SimSwitch) -> str:
                 "RELEASE SOFTWARE (fc1)")
     if sw.platform == "cisco_sb":
         return f"{sw.model} Managed Switch, firmware {sw.version}"
+    if sw.platform == "mikrotik":
+        return f"MikroTik RouterOS {sw.version} (stable) {sw.model}"
+    if sw.platform == "sonic":
+        return f"SONiC Software Version: SONiC.{sw.version} - HwSku: {sw.model}"
     return f"HPE {sw.model} Switch, revision {sw.version}"
 
 

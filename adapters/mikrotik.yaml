@@ -13,11 +13,18 @@ platform: MikroTik RouterOS
 status: preview, validated on CHR 7.25.1 (2026-11)
 
 facts:
+  # device state first; then the comments of a saved export: Oxidized's "routeros" model keeps
+  # "/system resource print" as "# version: ..." / "# board-name: ..." comments
   model:
     - {section: /system resource print, line: '^\s*board-name: (.+?)\s*$'}
+    - {section: config comments, line: '^#\s*board-name:\s*(.+?)\s*$'}
+    - {section: config comments, line: '^#\s*model\s*=\s*(\S+)'}
     - {section: config comments, line: 'by RouterOS', format: 'RouterOS'}
+    - {section: config comments, line: '^#\s*installed-version:', format: 'RouterOS'}
   version:
     - {section: /system resource print, line: '^\s*version: (\d[\w.]*)'}
+    - {section: config comments, line: '^#\s*version:\s*(\d[\w.]*)'}
+    - {section: config comments, line: '^#\s*installed-version:\s*(\d[\w.]*)'}
     - {section: config comments, line: 'by RouterOS (\d[\w.]*)'}
 
 checks:
@@ -27,11 +34,13 @@ checks:
   LYSS-MGMT-001:
     fail_if_any:
       - {state: '^\s*\d+\s+(?![^=]*\bX\b)[^=]*?\bname=telnet\s', section: /ip service print terse}
+      # configuration only (e.g. Oxidized): the export lists every non-default setting
+      - {line: '^/ip service set telnet\b.*\bdisabled=yes', absent: true, say: 'Telnet not disabled in the configuration (enabled by factory default)'}
     pass_if_any:
       - {state: '\bname=telnet\s', section: /ip service print terse}
       - {line: '^/ip service set telnet\b.*\bdisabled=yes'}
     otherwise: unknown
-    note: Telnet is enabled in the RouterOS factory settings; without device state only an explicit "disabled=yes" is visible.
+    note: Telnet is enabled in the RouterOS factory settings; an export without "set telnet disabled=yes" leaves it on.
     remediation: |
       /ip service disable telnet
 
@@ -46,6 +55,7 @@ checks:
   LYSS-MGMT-003:
     fail_if_any:
       - {state: '^\s*\d+\s+(?![^=]*\bX\b)[^=]*?\bname=www\s', section: /ip service print terse}
+      - {line: '^/ip service set www\b.*\bdisabled=yes', absent: true, say: 'HTTP (www) not disabled in the configuration (enabled by factory default)'}
     pass_if_any:
       - {state: '\bname=www\s', section: /ip service print terse}
       - {line: '^/ip service set www\b.*\bdisabled=yes'}
@@ -76,6 +86,10 @@ checks:
     pass_if_any:
       - {state: '^\s*enabled: no', section: /snmp print, say: 'SNMP service disabled: the factory "public" entry is unreachable'}
       - {state: '\bname=', section: /snmp community print terse}
+      - {line: '^/snmp set .*\benabled=yes', absent: true, say: 'SNMP not enabled in the configuration (disabled by factory default)'}
+      - all:   # configuration only: the factory community was renamed and none is added as public/private
+          - {line: '^/snmp community set \[ find default=yes \] .*\bname=(?!(?:public|private)\b)\S', say: 'the factory "public" SNMP entry was renamed'}
+          - {line: '(?i)^/snmp community add .*\bname=(public|private)\b', absent: true}
     otherwise: unknown
     note: RouterOS ships a "public" community with SNMP disabled; it fails only once SNMP is enabled.
     remediation: |
@@ -135,6 +149,10 @@ checks:
     pass_if_all:
       - {state: '^\s*use-radius: yes', section: /user aaa print}
       - {state: '\bservice=\S*\blogin\b', section: /radius print terse}
+    pass_if_any:
+      - all:
+          - {line: '^/user aaa set .*\buse-radius=yes'}
+          - {line: '^/radius add .*\bservice=\S*\blogin\b'}
     otherwise: fail
     note: RouterOS tries local users first, then RADIUS ("use-radius"); keep a single local emergency account.
     remediation: |
@@ -149,6 +167,10 @@ checks:
     pass_if_any:
       - {state: '^\s*enabled: no', section: /snmp print, say: SNMP service disabled}
       - {state: '\bsecurity=private\b', section: /snmp community print terse}
+      - {line: '^/snmp set .*\benabled=yes', absent: true, say: 'SNMP not enabled in the configuration (disabled by factory default)'}
+      - all:   # configuration only: the factory community uses authPriv and no other community is weaker
+          - {line: '^/snmp community set \[ find default=yes \] .*\bsecurity=private\b', say: 'the factory SNMP entry uses security=private (authPriv)'}
+          - {line: '^/snmp community add (?!.*\bsecurity=private\b)', absent: true}
     otherwise: unknown
     note: In RouterOS, an SNMPv3 community with security=private uses authentication and encryption (authPriv).
     remediation: |
@@ -191,6 +213,11 @@ checks:
       - {state: '^\s*show-at-cli-login: yes', section: /system note print}
       - {state: '^\s*show-at-login: yes', section: /system note print}
       - {state: '(?i)^\s*note:.*authori[sz]ed', section: /system note print}
+    pass_if_any:
+      - all:   # configuration only: show-at-login is on by default, so it must not be turned off
+          - {line: '(?i)^/system note set .*\bnote=.*authori[sz]ed'}
+          - {line: '^/system note set .*\bshow-at-cli-login=yes'}
+          - {line: '^/system note set .*\bshow-at-login=no', absent: true}
     otherwise: fail
     note: >-
       RouterOS has no SSH pre-authentication banner (checked on 7.25.1): "show-at-cli-login" prints the
@@ -202,11 +229,13 @@ checks:
   LYSS-MGMT-013:
     fail_if_any:
       - {state: '^\s*strong-crypto: no\b', section: /ip ssh print}
+      - {line: '^/ip ssh set .*\bstrong-crypto=yes', absent: true, say: 'strong-crypto not enabled in the configuration (off by factory default)'}
       - {state: '^kex: .*(sha1|group1\b)', section: ssh negotiated}
       - {state: '^cipher: .*(cbc|3des|arcfour|blowfish)', section: ssh negotiated}
       - {state: '^hostkey: (ssh-rsa|ssh-dss)\s*$', section: ssh negotiated}
     pass_if_any:
       - {state: '^kex: ', section: ssh negotiated}
+      - {line: '^/ip ssh set .*\bstrong-crypto=yes', say: 'strong-crypto=yes: only strong SSH algorithms are offered'}
     otherwise: unknown
     note: With strong-crypto=no RouterOS still offers SHA-1 key exchange and weak ciphers to clients that ask.
     remediation: |
@@ -216,6 +245,10 @@ checks:
     pass_if_all:
       - {state: '\btarget=remote\b.*\bremote=(?!0\.0\.0\.0\b)[\da-fA-F:]', section: /system logging action print terse}
       - {state: '\baction=\S*remote', section: /system logging print terse}
+    pass_if_any:
+      - all:
+          - {line: '^/system logging action (?:add|set) .*\bremote=(?!0\.0\.0\.0\b)[\da-fA-F:]'}
+          - {line: '^/system logging add .*\baction=\S*remote'}
     otherwise: fail
     note: Needs a "remote" logging action with a server address, used by at least one logging rule.
     remediation: |
@@ -227,8 +260,12 @@ checks:
     fail_if_any:
       - {state: '^\s*enabled: no\b', section: /system ntp client print}
       - {state: '^\s*status: (?!synchronized)\S', section: /system ntp client print}
+      - {line: '^/system ntp client set .*\benabled=yes', absent: true, say: 'NTP client not enabled in the configuration (off by factory default)'}
     pass_if_any:
       - {state: '^\s*status: synchronized\b', section: /system ntp client print}
+      - all:   # configuration only: a server is configured (synchronization needs device state)
+          - {line: '^/system ntp client set .*\benabled=yes'}
+          - {line: '^/system ntp client (?:servers add .*\baddress=|set .*\bservers=)\S'}
     otherwise: unknown
     remediation: |
       /system ntp client set enabled=yes servers=<ntp-ip>

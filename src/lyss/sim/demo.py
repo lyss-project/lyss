@@ -13,7 +13,6 @@ import time
 from pathlib import Path
 
 from .. import inventory
-from ..engine import ROOT
 from .lab import Lab, load_lab
 from .server import Simulator
 
@@ -26,7 +25,7 @@ def default_dir() -> Path:
 
 
 def _real_dirs() -> list[Path]:
-    dirs = [ROOT / "private", inventory.PRIVATE]
+    dirs = [inventory.default_data_dir(), inventory.PRIVATE]
     if os.environ.get("LYSS_DATA_DIR"):
         dirs.append(Path(os.environ["LYSS_DATA_DIR"]))
     return [d.resolve() for d in dirs]

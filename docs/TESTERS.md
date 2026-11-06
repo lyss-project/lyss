@@ -18,7 +18,7 @@ example to `C:\LYSS`. If you use git: `git clone https://github.com/lyss-project
 
 ## 3. Try the demo first
 
-The demo starts six simulated switches of a fictitious company ("Demo Corp") on your PC and the
+The demo starts eight simulated switches of a fictitious company ("Demo Corp") on your PC and the
 LYSS web interface on http://127.0.0.1:8766. It never touches your network.
 
 - **Windows**: double-click **`Start-LYSS-Demo.cmd`**. The first start installs LYSS into a
@@ -56,6 +56,10 @@ as soon as it logs in. Create a **dedicated account** for the test:
 - Cisco IOS / IOS-XE: `username lyss-audit privilege 15 algorithm-type scrypt secret <password>`
 - Cisco Business (SG/CBS): a local user with privilege level 15.
 - HPE Aruba AOS-S: a manager-level account.
+- MikroTik RouterOS: a group with `ssh,read` only (not the built-in `read` group, which can read secrets).
+- SONiC: a Linux user that is not in the `sudo` group.
+
+Details, commands and what was verified: [ACCOUNTS.md](ACCOUNTS.md).
 
 That account is an administrator account, so: keep Remediation disabled, allow SSH to the switch
 only from your admin network, and delete the account when you have finished testing.

@@ -1,0 +1,90 @@
+===== /system resource print =====
+                   uptime: 12d4h31m10s
+                  version: 7.24.1 (stable)
+               build-time: 2026-08-28 10:15:02
+         factory-software: 7.12
+              free-memory: 401.2MiB
+             total-memory: 512.0MiB
+                      cpu: ARMv7
+                cpu-count: 1
+            cpu-frequency: 800MHz
+                 cpu-load: 4%
+           free-hdd-space: 11.6MiB
+          total-hdd-space: 16.0MiB
+        architecture-name: arm
+               board-name: CRS326-24G-2S+
+                 platform: MikroTik
+===== /ip service print terse =====
+ 0     name=ftp port=21 proto=tcp available-from= vrf=main max-sessions=20
+ 1     name=ssh port=22 proto=tcp available-from= vrf=main max-sessions=20
+ 2 D c name=ssh port=22 proto=tcp local=192.0.2.40 remote=198.51.100.10:50122
+ 3     name=telnet port=23 proto=tcp available-from= vrf=main max-sessions=20
+ 4     name=www port=80 proto=tcp available-from= vrf=main max-sessions=20
+ 5  X  name=www-ssl port=443 proto=tcp available-from= certificate=none tls-version=any vrf=main max-sessions=20
+ 6 D   name=btest port=2000 proto=tcp
+ 7 D   name=discover port=5678 proto=udp
+ 8     name=winbox port=8291 proto=tcp available-from= vrf=main max-sessions=20
+ 9     name=api port=8728 proto=tcp available-from= vrf=main max-sessions=20
+10     name=api-ssl port=8729 proto=tcp available-from= certificate=none tls-version=any vrf=main max-sessions=20
+===== /ip ssh print =====
+                           ciphers: auto
+                forwarding-enabled: no
+           password-authentication: yes-if-no-key
+                     strong-crypto: no
+                     host-key-size: 2048
+                     host-key-type: ed25519
+===== /snmp print =====
+           enabled: no
+           contact:
+          location:
+    trap-community: public
+===== /snmp community print terse =====
+0 * name=public addresses=::/0 security=none read-access=yes write-access=no denied-oids= authentication-protocol=MD5 encryption-protocol=DES
+===== /system ntp client print =====
+     enabled: yes
+        mode: unicast
+           vrf: main
+    freq-drift: -3.218 PPM
+        status: synchronized
+ synced-server: 192.0.2.31
+===== /system logging action print terse =====
+0 * name=memory target=memory memory-lines=1000 memory-stop-on-full=no
+1 * name=disk target=disk disk-file-name=log disk-lines-per-file=1000 disk-file-count=2 disk-stop-on-full=no
+2 * name=echo target=echo remember=yes
+3 * name=remote target=remote remote=0.0.0.0 remote-port=514 src-address=0.0.0.0 remote-log-format=default remote-protocol=udp vrf=main
+===== /system logging print terse =====
+0 * topics=info prefix= regex= action=memory
+1 * topics=error prefix= regex= action=memory
+2 * topics=warning prefix= regex= action=memory
+3 * topics=critical prefix= regex= action=echo
+===== /user print terse =====
+0 comment=system default user name=admin group=full inactivity-timeout=10m inactivity-policy=none address=
+1 name=lyss-demo group=read inactivity-timeout=10m inactivity-policy=none address=
+===== /user aaa print =====
+      use-radius: no
+      accounting: yes
+  interim-update: 0s
+   default-group: read
+===== /radius print terse =====
+===== /system note print =====
+      show-at-login: yes
+  show-at-cli-login: no
+               note:
+===== /interface ethernet print terse =====
+ 0 R name=ether1 default-name=ether1 mtu=1500
+ 1 R name=ether2 default-name=ether2 mtu=1500
+ 2 R name=ether3 default-name=ether3 mtu=1500
+ 3   name=ether4 default-name=ether4 mtu=1500
+ 4   name=ether5 default-name=ether5 mtu=1500
+ 5   name=ether6 default-name=ether6 mtu=1500
+24 R name=sfp-sfpplus1 default-name=sfp-sfpplus1 mtu=1500
+25   name=sfp-sfpplus2 default-name=sfp-sfpplus2 mtu=1500
+===== /interface bridge port print terse =====
+0 interface=sfp-sfpplus1 bridge=bridge edge=auto pvid=1 frame-types=admit-all bpdu-guard=no
+1 interface=ether1 bridge=bridge edge=auto pvid=20 frame-types=admit-only-untagged-and-priority-tagged bpdu-guard=no
+2 interface=ether2 bridge=bridge edge=auto pvid=20 frame-types=admit-only-untagged-and-priority-tagged bpdu-guard=no
+3 interface=ether3 bridge=bridge edge=auto pvid=30 frame-types=admit-only-untagged-and-priority-tagged bpdu-guard=no
+===== /tool mac-server mac-winbox print =====
+  allowed-interface-list: all
+===== /ip neighbor print detail =====
+ 0 interface=sfp-sfpplus1,bridge address=192.0.2.11 mac-address=00:00:5E:00:53:02 identity="demo-acc-01" platform="Cisco" version="15.2(7)E14" interface-name="Gi1/0/27" system-description="Cisco IOS Software, C1000 Software (C1000-UNIVERSALK9-M), Version 15.2(7)E14, RELEASE SOFTWARE (fc1)" system-caps=bridge,router system-caps-enabled=bridge discovered-by=cdp,lldp

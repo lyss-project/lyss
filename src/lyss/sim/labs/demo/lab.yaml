@@ -5,8 +5,9 @@
 name: demo
 organization: Demo Corp
 description: >-
-  One core switch, two Cisco Catalyst access switches, two Cisco Small Business switches and one
-  HPE Aruba switch, with a realistic mix of good and bad security settings.
+  One core switch, two Cisco Catalyst access switches, two Cisco Small Business switches, one
+  HPE Aruba switch, one MikroTik CRS and one SONiC campus switch, with a realistic mix of good
+  and bad security settings.
 credentials: {username: lyss-demo, password: demo}
 
 switches:
@@ -88,6 +89,24 @@ switches:
     up: 1-10
     ssh: modern
     expected_level: 0        # firmware before the HPESBNW05156 fix, Telnet and HTTP on
+  demo-crs-01:
+    platform: mikrotik       # read-only platform: fixed outputs in demo-crs-01.cfg / .state
+    hostname: DEMO-CRS-01
+    model: CRS326-24G-2S+
+    version: 7.24.1
+    mac: 00:00:5e:00:53:07
+    mgmt_ip: 192.0.2.40
+    ports: 26
+    expected_level: 0        # RouterOS factory defaults, one point release before the CISA KEV fixes (7.24.2)
+  demo-leaf-01:
+    platform: sonic          # read-only platform: fixed outputs in demo-leaf-01.cfg / .state
+    hostname: demo-leaf-01
+    model: Accton-AS4630-54PE
+    version: '202411.45'
+    mac: 00:00:5e:00:53:08
+    mgmt_ip: 192.0.2.41
+    ports: 54
+    expected_level: 0        # well run, but SONiC's "public" SNMP community and a cleartext TACACS+ key
 
 # cables: [switch, port, switch, port] (port numbers; each platform names them its own way)
 links:
@@ -96,6 +115,8 @@ links:
   - [demo-core, 51, demo-sb-01, 25]
   - [demo-core, 52, demo-hp-01, 25]
   - [demo-acc-01, 26, demo-sb-02, 28]
+  - [demo-acc-01, 27, demo-crs-01, sfp-sfpplus1]
+  - [demo-acc-01, 28, demo-leaf-01, Ethernet48]
 
 # devices that are not simulated switches but appear in neighbour tables
 externals:
