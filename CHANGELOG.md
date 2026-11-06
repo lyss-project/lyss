@@ -2,6 +2,21 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## Unreleased
+
+- SONiC adapter (preview), validated on SONiC-VS 202505: the config_db JSON
+  (`show runningconfiguration all`) is flattened into one block per table entry
+  (`TABLE|key` + `field=value` lines); device state from `show version`, `show interfaces status`,
+  `show ntp`, `show ssh` and `ss -tlnH`. Collection is read-only (no sudo). Discovery recognises
+  SONiC from its LLDP description; it has no automatic remediation.
+- Findings from the lab: `config tacacs add --key` stores the key in cleartext in config_db
+  (LYSS-AUTH-004 fails), and the SNMP community "public" comes back after
+  `config snmp community del public` while /etc/sonic/snmp.yml still holds `snmp_rocommunity`
+  (the remediation removes it first).
+- Redaction covers JSON fields (`passkey=`, `*password*=`, `*secret*=`, `*key*=`) and
+  non-default SNMP community names in `SNMP_COMMUNITY|<name>` headers.
+- Tests: preview adapters must show each control both ways or give the reason why not.
+
 ## 0.7.0 (2026-11-05)
 
 Specification 0.5.0-draft

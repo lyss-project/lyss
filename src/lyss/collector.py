@@ -39,6 +39,14 @@ COMMANDS = {
                   "show lldp neighbors", "show cdp neighbors",
                   "show lldp neighbors detail", "show cdp neighbors detail", "show ntp status"],
     },
+    "sonic": {
+        # community SONiC: a Debian shell with "show" commands; "ss -tlnH" lists listening TCP
+        # ports (read-only, no sudo). The configuration is config_db JSON.
+        "netmiko": "linux",
+        "config": "show runningconfiguration all",
+        "state": ["show version", "show interfaces status", "show ntp", "show ssh", "show feature status",
+                  "show lldp table", "ss -tlnH"],
+    },
     "hp_procurve": {
         # netmiko answers "Press any key to continue" and disables paging ("no page")
         "netmiko": "hp_procurve",

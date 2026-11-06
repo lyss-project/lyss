@@ -1,0 +1,211 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+# LYSS adapter: SONiC (Software for Open Networking in the Cloud), community builds.
+# Rule forms: see adapters/cisco_ios.yaml. The configuration is SONiC's config_db JSON
+# ("show runningconfiguration all"), flattened by the engine into one block per table entry:
+#     SNMP_COMMUNITY|public          (block header "TABLE|key")
+#       TYPE=RO                      (one "field=value" line per field)
+# Device state: SONiC "show" commands, plus "ss -tlnH" (listening TCP ports; read-only, no sudo).
+# Local account password hashes live in /etc/shadow, which a read-only account cannot read.
+adapter: sonic
+spec_version: "0.5.0-draft"
+platform: SONiC (community)
+status: preview, validated on SONiC-VS 202505 (virtual switch, 2026-11)
+
+facts:
+  model: {section: show version, line: '^HwSKU:\s*(\S+)'}
+  version: {section: show version, line: '^SONiC Software Version:\s*SONiC\.(\S+)'}
+
+checks:
+
+  # ---------------- Level 1 ----------------
+
+  LYSS-MGMT-001:
+    fail_if_any:
+      - {state: ':23\s', section: ss -tlnH}
+    pass_if_any:
+      - {state: ':23\s', section: ss -tlnH, absent: true}
+    otherwise: pass
+    note: SONiC images ship no Telnet server; with device state, LYSS also checks that nothing listens on TCP 23.
+    remediation: |
+      ! remove whatever service listens on TCP 23 (SONiC itself provides none)
+
+  LYSS-MGMT-002:
+    fail_if_any:
+      - {state: '^SSH-1\.', section: ssh banner}
+    pass_if_any:
+      - {state: '^SSH-2\.0-', section: ssh banner}
+    otherwise: pass
+    note: SONiC uses OpenSSH, which only speaks SSH protocol version 2.
+
+  LYSS-MGMT-003:
+    fail_if_any:
+      - {state: ':80\s', section: ss -tlnH}
+    pass_if_any:
+      - {state: ':80\s', section: ss -tlnH, absent: true}
+    otherwise: unknown
+    note: Needs "ss -tlnH". SONiC's management APIs (REST, gNMI) use TLS; plain HTTP on TCP 80 fails.
+    remediation: |
+      ! stop the service listening on TCP 80, or move it to HTTPS
+
+  LYSS-MGMT-004:
+    # first column = inactivity timeout: "900 <default>" when unset, right-aligned "  600" once set
+    fail_if_any:
+      - {state: '^\s*0\s', section: show ssh}
+      - {state: '^\s*(\d+)\s', section: show ssh, gt: 600}
+    pass_if_any:
+      - {state: '^\s*\d+\s', section: show ssh}
+    otherwise: unknown
+    note: '"show ssh" gives the SSH inactivity timeout in seconds (SONiC default 900 s = 15 minutes).'
+    remediation: |
+      sudo config ssh inactivity-timeout 600    ! seconds (10 minutes)
+
+  LYSS-AUTH-001:
+    fail_if_any:
+      - {line: '(?i)^SNMP_COMMUNITY\|(public|private)$'}
+    otherwise: pass
+    note: >-
+      SONiC puts "public" back when the SNMP service restarts while /etc/sonic/snmp.yml still holds
+      "snmp_rocommunity: public" (seen on 202505): remove that line before deleting the community.
+    remediation: |
+      sudo sed -i '/^snmp_rocommunity:/d' /etc/sonic/snmp.yml
+      sudo config snmp community del public
+      sudo config snmp community del private
+
+  LYSS-AUTH-002:
+    pass_if_all:
+      - {block: '^AAA\|authentication$', line: '^login=(tacacs\+|radius)', say: 'logins (including privileged sudo users) are authenticated by TACACS+/RADIUS first'}
+    otherwise: unknown
+    note: >-
+      Privileged access on SONiC is a Linux account with sudo; its password hash is in /etc/shadow,
+      which a read-only account cannot read (Debian 12 default: yescrypt). Authenticate administrators
+      with TACACS+/RADIUS, and check the hash of the local emergency account on the device.
+    remediation: |
+      sudo config tacacs add <tacacs-ip> --key <key>
+      sudo config aaa authentication login tacacs+ local
+
+  LYSS-AUTH-003:
+    otherwise: pass
+    note: SONiC local accounts are Linux accounts stored as one-way hashes (crypt), never in the configuration.
+
+  LYSS-AUTH-004:
+    fail_if_any:
+      - {block: '^(TACPLUS|RADIUS)(_SERVER)?\|', line: '^passkey=\S'}
+    otherwise: pass
+    note: >-
+      "config tacacs add --key" stores the key in cleartext in config_db (TACPLUS_SERVER passkey, seen
+      on 202505), readable by every account that can run "show runningconfiguration".
+    remediation: |
+      ! use SONiC key encryption where the image supports it, then rotate the key on the AAA server too
+
+  LYSS-VULN-001:
+    firmware: true
+    otherwise: unknown
+    note: SONiC is not yet in data/firmware.yaml (community builds have no published end-of-support dates).
+
+  LYSS-BKP-001:
+    backup: true   # vendor-neutral: evaluated from the LYSS configuration archive / attestation
+    otherwise: unknown
+    note: No backup evidence yet. Enable scheduled scans, or attest the external backup system on the switch page.
+
+  # ---------------- Level 2 ----------------
+
+  LYSS-AUTH-010:
+    pass_if_all:
+      - {block: '^AAA\|authentication$', line: '^login=(tacacs\+|radius)'}
+      - {line: '^(TACPLUS_SERVER|RADIUS_SERVER)\|'}
+    otherwise: fail
+    note: SONiC defaults to "login local"; logins must try TACACS+/RADIUS first.
+    remediation: |
+      sudo config tacacs add <tacacs-ip> --key <key>
+      sudo config aaa authentication login tacacs+ local
+
+  LYSS-AUTH-011:
+    fail_if_any:
+      - {line: '^SNMP_COMMUNITY\|'}
+      - {block: '^SNMP_USER\|', line: '^SNMP_USER_TYPE=(?!Priv$)'}
+    otherwise: pass
+    remediation: |
+      sudo config snmp community del <community>
+      sudo config snmp user add <user> Priv RW SHA <auth-password> AES <priv-password>
+
+  LYSS-MGMT-010:
+    pass_if_any:
+      - {block: '^ACL_TABLE\|', where: '^type=CTRLPLANE$', line: '^services=.*\bSSH\b'}
+    otherwise: fail
+    note: Restrict SSH with a control-plane ACL (ACL_TABLE type CTRLPLANE, services SSH).
+    remediation: |
+      ! ACL_TABLE "SSH_ONLY": {"type": "CTRLPLANE", "services": ["SSH"], "stage": "ingress"}
+      ! ACL_RULE  "SSH_ONLY|RULE_1": {"PRIORITY": "9999", "SRC_IP": "<admin-subnet>", "PACKET_ACTION": "ACCEPT"}
+      sudo config load <acl.json>
+
+  LYSS-MGMT-011:
+    fail_if_any:
+      # an address on the default VLAN: the entry key is "Vlan1|<ip>/<prefix>"
+      - {line: '^VLAN_INTERFACE\|Vlan1\|\d'}
+    pass_if_any:
+      - {line: '^MGMT_INTERFACE\|eth0\|', say: 'management address on the out-of-band port eth0 (separate from the switched data plane)'}
+    otherwise: unknown
+    note: SONiC manages through the out-of-band port eth0; without MGMT_INTERFACE the address comes from DHCP and is not described by the configuration.
+    remediation: |
+      sudo config interface ip add eth0 <ip/prefix> <gateway>
+
+  LYSS-MGMT-012:
+    pass_if_all:
+      - {block: '^BANNER_MESSAGE\|global$', line: '(?i)^login=.*authori[sz]ed'}
+      - {block: '^BANNER_MESSAGE\|global$', line: '^state=enabled$'}
+    otherwise: fail
+    note: The "login" banner is shown before authentication; "motd" only after login.
+    remediation: |
+      sudo config banner login "Authorized access only. Activity is logged."
+      sudo config banner state enabled
+
+  LYSS-MGMT-013:
+    fail_if_any:
+      - {state: '^kex: .*(sha1|group1\b)', section: ssh negotiated}
+      - {state: '^cipher: .*(cbc|3des|arcfour|blowfish)', section: ssh negotiated}
+      - {state: '^hostkey: (ssh-rsa|ssh-dss)\s*$', section: ssh negotiated}
+    pass_if_any:
+      - {state: '^kex: ', section: ssh negotiated}
+    otherwise: unknown
+    note: Needs the negotiated SSH algorithms (collector).
+
+  LYSS-LOG-010:
+    pass_if_any:
+      - {line: '^SYSLOG_SERVER\|'}
+    otherwise: fail
+    remediation: |
+      sudo config syslog add <siem-ip>
+
+  LYSS-LOG-011:
+    fail_if_any:
+      - {state: '(?i)^Leap status\s*:\s*Not synchroni[sz]ed', section: show ntp}
+    pass_if_any:
+      - {line: '^NTP_SERVER\|'}
+    otherwise: fail
+    note: Synchronization is read from "show ntp" (chrony); without device state, a configured server passes.
+    remediation: |
+      sudo config ntp add <ntp-ip>
+
+  LYSS-ACC-010:
+    fail_if_any:
+      - {state: '^\s*Ethernet\d+\s.*\sdown\s+up\s', section: show interfaces status}
+    pass_if_any:
+      - {state: '^\s*Ethernet\d+\s', section: show interfaces status}
+    otherwise: unknown
+    note: Needs "show interfaces status" (Oper down while Admin up = enabled but unused).
+    remediation: |
+      sudo config interface shutdown <unused-ports>
+
+  LYSS-ACC-011:
+    # edge ports = spanning-tree ports marked portfast (PVST) or edge_port (MSTP)
+    fail_if_any:
+      - {block: '^STP_PORT\|', where: '^(portfast|edge_port)=true$', line: '^bpdu_guard=(?!true$)'}
+    pass_if_any:
+      - {block: '^STP_PORT\|', where: '^(portfast|edge_port)=true$', every_contains: '^bpdu_guard=true$'}
+    otherwise: unknown
+    note: >-
+      Edge ports are the spanning-tree ports marked portfast / edge_port. Routed-only SONiC switches
+      (the usual data-centre leaf) have no spanning tree and no edge ports: the verdict stays unknown.
+    remediation: |
+      sudo config spanning_tree interface bpdu_guard enable <edge-port>

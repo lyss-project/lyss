@@ -1,0 +1,48 @@
+collected: 2026-11-05 10:00
+===== ssh banner =====
+SSH-1.99-OpenSSH_7.4
+===== ssh negotiated =====
+kex: diffie-hellman-group1-sha1
+cipher: aes128-cbc
+mac: hmac-sha1
+hostkey: ssh-rsa
+===== show version =====
+
+SONiC Software Version: SONiC.202305.0-fictitious
+SONiC OS Version: 11
+Distribution: Debian 11.9
+Kernel: 5.10.0-23-2-amd64
+Platform: x86_64-kvm_x86_64-r0
+HwSKU: Force10-S6000
+ASIC: vs
+Serial Number: N/A
+Uptime: 10:00:00 up 3 days,  2:10,  1 user,  load average: 0.10, 0.12, 0.09
+===== show interfaces status =====
+  Interface            Lanes    Speed    MTU    FEC           Alias    Vlan    Oper    Admin    Type    Asym PFC
+-----------  ---------------  -------  -----  -----  --------------  ------  ------  -------  ------  ----------
+  Ethernet0      25,26,27,28      40G   9100    N/A    fortyGigE0/0  routed      up       up     N/A         N/A
+  Ethernet4      29,30,31,32      40G   9100    N/A    fortyGigE0/4  routed    down       up     N/A         N/A
+===== show ntp =====
+Reference ID    : 00000000 ()
+Stratum         : 0
+Leap status     : Not synchronised
+===== show ssh =====
+  inactivity-timeout  max-sessions
+--------------------  --------------
+                   0  0 <default>
+===== show feature status =====
+Feature         State            AutoRestart     SetOwner
+--------------  ---------------  --------------  ----------
+bgp             enabled          enabled
+snmp            enabled          enabled
+===== show lldp table =====
+Capability codes: (R) Router, (B) Bridge, (O) Other
+LocalPort    RemoteDevice    RemotePortID    Capability    RemotePortDescr
+-----------  --------------  --------------  ------------  -----------------
+--------------------------------------------------
+Total entries displayed:  0
+===== ss -tlnH =====
+LISTEN 0      128          0.0.0.0:22         0.0.0.0:*
+LISTEN 0      128          0.0.0.0:23         0.0.0.0:*
+LISTEN 0      511          0.0.0.0:80         0.0.0.0:*
+LISTEN 0      512                *:443              *:*

@@ -55,7 +55,16 @@ WEAK_COMMUNITY_OK = re.compile(r'(?i)\bcommunity\s+"?(public|private)"?(\s|$)')
 COMMUNITY_VALUE = re.compile(r'(?i)\b(community)\s+("?)[^\s"]+("?)')
 
 
+# JSON configurations flattened by config.flatten_json (SONiC): "passkey=...", "auth_password=...",
+# and SNMP community names used as table keys ("SNMP_COMMUNITY|<name>")
+# (also inside block evidence such as "TACPLUS|global / passkey=...")
+FIELD_SECRET = re.compile(r"(?i)\b([\w-]*(?:passkey|password|secret|key)[\w-]*=)(?!<redacted>)\S+")
+JSON_COMMUNITY = re.compile(r"(?i)(SNMP_COMMUNITY\|)(?!(?:public|private)(?:[\s/]|$))(?!<redacted>)[^\s/]+")
+
+
 def redact(line: str) -> str:
+    line = FIELD_SECRET.sub(r"\1<redacted>", line)
+    line = JSON_COMMUNITY.sub(r"\1<redacted>", line)
     line = SECRET_VALUE.sub(r"\1\2 \3<redacted>\4", line)
     if re.search(r"(?i)^\s*(snmp-server user|snmpv3 user)\b", line):
         line = SNMP_SECRET.sub(r"\1 \2<redacted>\3", line)

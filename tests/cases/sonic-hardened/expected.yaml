@@ -1,0 +1,26 @@
+# SONiC leaf hardened as far as the adapter can see. Synthetic data (documentation addresses).
+# VULN-001 stays unknown (no SONiC firmware data), which keeps the conformance level at 0.
+vendor: sonic
+backup: {automatic_days_ago: 1}
+level: 0
+verdicts:
+  LYSS-MGMT-001: pass
+  LYSS-MGMT-002: pass
+  LYSS-MGMT-003: pass
+  LYSS-MGMT-004: pass
+  LYSS-AUTH-001: pass
+  LYSS-AUTH-002: pass
+  LYSS-AUTH-003: pass
+  LYSS-AUTH-004: pass
+  LYSS-VULN-001: unknown
+  LYSS-BKP-001: pass
+  LYSS-AUTH-010: pass
+  LYSS-AUTH-011: pass
+  LYSS-MGMT-010: pass
+  LYSS-MGMT-011: pass
+  LYSS-MGMT-012: pass
+  LYSS-MGMT-013: pass
+  LYSS-LOG-010: pass
+  LYSS-LOG-011: pass
+  LYSS-ACC-010: pass
+  LYSS-ACC-011: pass

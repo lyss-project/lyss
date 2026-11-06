@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
-"""Parse switch CLI configurations into top-level lines and indented blocks."""
+"""Parse switch configurations into top-level lines and indented blocks: CLI text (Cisco, HPE), or
+JSON key/field tables (SONiC config_db) flattened into the same form."""
 
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -40,7 +42,36 @@ def parse_state(text: str) -> dict[str, list[str]]:
 COMMENT_PREFIXES = ("!", "#", ";")
 
 
+def flatten_json(data: dict) -> str:
+    """JSON configurations (SONiC config_db: {TABLE: {key: {field: value}}}) as an indented text
+    configuration, so the same line and block rules apply:
+        SNMP_COMMUNITY|public
+          TYPE=RO
+    Multi-line values keep their line breaks as "\\n"; lists are joined with ","; tables that are
+    not key/field maps (e.g. raw routing configuration text) are left out."""
+    out = []
+    for table in sorted(data):
+        entries = data[table]
+        if not isinstance(entries, dict):
+            continue
+        for key in sorted(entries):
+            fields = entries[key]
+            out.append(f"{table}|{key}")
+            if isinstance(fields, dict):
+                for name in sorted(fields):
+                    value = fields[name]
+                    if isinstance(value, list):
+                        value = ",".join(str(v) for v in value)
+                    out.append(f"  {name}={str(value).replace(chr(13), '').replace(chr(10), chr(92) + 'n')}")
+    return "\n".join(out) + "\n"
+
+
 def parse(text: str, state_text: str = "") -> Config:
+    if text.lstrip().startswith("{"):
+        try:
+            text = flatten_json(json.loads(text))
+        except ValueError:
+            pass  # not JSON after all: parsed as text
     lines: list[str] = []
     blocks: list[Block] = []
     comments: list[str] = []

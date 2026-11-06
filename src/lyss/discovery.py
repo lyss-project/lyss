@@ -34,6 +34,7 @@ PLATFORMS = [
     (r"\b(S[GF]\d{3}|SRW\d{4}|CBS\d{3}|SG\d{3}X?)", "cisco_sb", "Cisco Small Business"),
     (r"Cisco IOS|C1000|WS-C|C9[23]00|Catalyst|cisco\s+C\d", "cisco_ios", "Cisco IOS / IOS-XE"),
     (r"ProCurve|Aruba|HP J\d|HPE?\b", "hp_procurve", "HP ProCurve / ArubaOS-Switch"),
+    (r"\bSONiC\b", "sonic", "SONiC"),   # LLDP system description "SONiC Software Version: ..."
 ]
 # (pattern on the SSH identification string, adapter, label)
 SSH_FINGERPRINTS = [

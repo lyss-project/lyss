@@ -26,7 +26,7 @@
       <option value="auto" {% if not device.vendor or device.vendor == "auto" %}selected{% endif %}>Auto-detect (from the SSH banner)</option>
       {% for v in vendors %}<option value="{{ v }}" {% if v == device.vendor %}selected{% endif %}>{{ v }}</option>{% endfor %}
     </select>
-    <small>Auto-detect picks the adapter at the first scan. Device state collection: cisco_ios, cisco_sb, hp_procurve.</small>
+    <small>Auto-detect picks the adapter at the first scan. Device state collection: cisco_ios, cisco_sb, hp_procurve, sonic (choose sonic explicitly: its SSH banner is plain OpenSSH).</small>
   </label>
   <label>Address
     <input name="host" value="{{ device.host or '' }}" maxlength="253" placeholder="192.0.2.10" required>

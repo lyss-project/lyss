@@ -4,6 +4,7 @@
 fails, and each case's verdicts and conformance level are pinned in tests/cases/*/expected.yaml."""
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -12,7 +13,17 @@ from lyss.engine import audit, conformance, load_adapter, load_spec
 from conftest import case_names, load_case
 
 FULL_VENDORS = ["cisco_ios", "cisco_sb", "hp_procurve"]   # Level 1 + 2 checks and device state
-SECRETS_IN_CASES = ["cisco123", "PlainSharedKey", "0822455D0A16", "$9$FAKE", "FAKEHASH", "FAKEAESKEY"]
+ALL_VENDORS = sorted(p.stem for p in (Path(__file__).parent.parent / "adapters").glob("*.yaml"))
+# preview adapters: controls the platform cannot show both ways, each with the reason
+PREVIEW_VENDORS = {
+    "sonic": {
+        "LYSS-AUTH-002": "the sudo account's hash is in /etc/shadow, unreadable by a read-only account",
+        "LYSS-AUTH-003": "local accounts are Linux accounts, never stored in the configuration",
+        "LYSS-VULN-001": "no published end-of-support data for community SONiC builds",
+    },
+}
+SECRETS_IN_CASES = ["cisco123", "PlainSharedKey", "0822455D0A16", "$9$FAKE", "FAKEHASH", "FAKEAESKEY",
+                    "FAKEAUTHPW", "FAKEPRIVPW"]
 
 
 def run(case: dict):
@@ -50,9 +61,26 @@ def test_full_adapters_implement_every_level_1_and_2_control(vendor):
     assert not [c for c in controls if c not in checks]
 
 
+@pytest.mark.parametrize("vendor", sorted(PREVIEW_VENDORS))
+def test_preview_adapters_show_each_control_both_ways_or_say_why(vendor):
+    seen: dict[str, set] = {}
+    for name in case_names():
+        case = load_case(name)
+        if case["vendor"] == vendor:
+            for f in run(case):
+                seen.setdefault(f.control_id, set()).add(f.verdict)
+    checks = load_adapter(vendor)["checks"]
+    controls = [c["id"] for c in load_spec()["controls"] if c["level"] <= 2]
+    assert not [c for c in controls if c not in checks], f"{vendor}: Level 1/2 controls without a check"
+    missing = [c for c in controls
+               if not {"pass", "fail"} <= seen.get(c, set()) and c not in PREVIEW_VENDORS[vendor]]
+    assert not missing, f"{vendor}: controls without both a pass and a fail case: {missing}"
+
+
 def test_adapter_checks_reference_existing_controls():
     ids = {c["id"] for c in load_spec()["controls"]}
-    for vendor in ("cisco_ios", "cisco_sb", "hp_procurve"):
+    assert set(FULL_VENDORS) | set(PREVIEW_VENDORS) <= set(ALL_VENDORS)
+    for vendor in ALL_VENDORS:
         unknown = set(load_adapter(vendor)["checks"]) - ids
         assert not unknown, f"{vendor}: checks for unknown controls {unknown}"
 
@@ -67,7 +95,7 @@ def test_adapter_regexes_compile():
         elif isinstance(node, list):
             for item in node:
                 walk(item)
-    for vendor in ("cisco_ios", "cisco_sb", "hp_procurve"):
+    for vendor in ALL_VENDORS:
         walk(load_adapter(vendor))
 
 
