@@ -11,7 +11,7 @@ import pytest
 from lyss import discovery, oxidized
 from lyss.collector import COMMANDS
 from lyss.config import parse, routeros_terse
-from lyss.engine import _is_vulnerable, evaluate_rule, firmware_verdict, redact
+from lyss.engine import _is_vulnerable, audit, evaluate_rule, firmware_verdict, redact
 
 KEV_FIX = ["6.49.21", "7.23.4", "7.24.2"]
 
@@ -132,6 +132,19 @@ def test_oxidized_routeros_backup_is_assessed_without_leaking_secrets():
     dump = repr(result)
     for secret in ("FakeOxidizedSecret1", "FakeOxAuth1", "ox-fake-community"):
         assert secret not in dump
+
+
+def test_pasted_export_saved_by_notepad_is_audited_offline():
+    # a plain "/export" copied from a terminal into Windows Notepad: byte-order mark, wrapped lines
+    pasted = ("﻿# 2026-11-06 12:51:14 by RouterOS 6.44.6\n# software id = FAKE-0010\n#\n"
+              "/ip service\nset telnet disabled=yes\n/ip ssh\nset strong-crypto=\\\n    yes\n")
+    findings = {f.control_id: f for f in audit(pasted, "mikrotik", 2)}
+    assert findings["LYSS-MGMT-001"].verdict == "pass"
+    assert findings["LYSS-MGMT-013"].verdict == "pass"            # wrapped line joined
+    assert findings["LYSS-AUTH-003"].verdict == "fail"            # 6.44.6 < 6.45.1, from the header
+    assert findings["LYSS-VULN-001"].verdict == "fail"            # version read from the header
+    current = audit(pasted.replace("6.44.6", "7.25.1"), "mikrotik", 2)
+    assert {f.control_id: f.verdict for f in current}["LYSS-AUTH-003"] == "pass"
 
 
 def test_routeros_collection_is_read_only():

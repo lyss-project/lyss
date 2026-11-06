@@ -91,6 +91,8 @@ def routeros_terse(text: str) -> str:
 
 
 def parse(text: str, state_text: str = "") -> Config:
+    # a file saved by Windows Notepad starts with a byte-order mark: never part of the first line
+    text, state_text = text.lstrip("﻿"), state_text.lstrip("﻿")
     if text.lstrip().startswith("{"):
         try:
             text = flatten_json(json.loads(text))

@@ -47,6 +47,16 @@ python -m venv .venv
 .venv/bin/python -m lyss demo --open    # Windows: .venv\Scripts\python -m lyss demo --open
 ```
 
+**No connection to your devices at all?** Audit a configuration you saved yourself (a MikroTik
+`/export`, a Cisco or HPE `show running-config`, a SONiC config_db): nothing is sent anywhere.
+
+```sh
+lyss audit --vendor mikrotik --level 2 router.rsc      # or a folder of saved configurations
+```
+
+See [docs/OFFLINE.md](docs/OFFLINE.md): how to save the configuration on each platform, what a
+configuration alone can and cannot tell, and how to add device state by hand.
+
 An installed LYSS keeps its data (devices, encrypted credentials, results) in `%LOCALAPPDATA%\LYSS`
 on Windows and `~/.local/share/lyss` elsewhere; a source checkout in `private/`. `LYSS_DATA_DIR`
 overrides both.

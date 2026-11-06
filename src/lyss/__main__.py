@@ -2,7 +2,7 @@
 # Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
 """Command line.
 
-  python -m lyss audit --vendor <adapter> <file-or-folder>   assess saved configurations
+  python -m lyss audit --vendor <adapter> <file-or-folder>   assess saved configurations (offline)
   python -m lyss collect [--only id ...]                     collect + audit inventory devices
   python -m lyss oxidized --url http://oxidized:8888         assess the configs backed up by Oxidized
   python -m lyss import-legacy <inventory.csv> <cred-dir>    import devices + PowerShell cred files
@@ -39,9 +39,24 @@ def print_text(name: str, findings, summary) -> None:
                 print(f"           fix> {line}")
 
 
+CONFIG_SUFFIXES = (".cfg", ".conf", ".txt", ".rsc", ".json")
+
+
+def config_files(path: Path) -> list[Path]:
+    """A file, or the saved configurations in a folder (Cisco/HP .cfg/.txt, RouterOS .rsc exports,
+    SONiC .json); <name>.state.txt files hold optional device state, not configurations."""
+    if not path.is_dir():
+        return [path]
+    return sorted(p for p in path.iterdir()
+                  if p.is_file() and p.suffix.lower() in CONFIG_SUFFIXES and not p.name.endswith(".state.txt"))
+
+
 def cmd_audit(args) -> int:
-    # a device = <name>.cfg (configuration) + optional <name>.state.txt (collected device state)
-    files = sorted(args.path.glob("*.cfg")) if args.path.is_dir() else [args.path]
+    # offline: a device = a saved configuration + optional <name>.state.txt (device state sections)
+    if not args.path.exists():
+        print(f"{args.path}: no such file or folder", file=sys.stderr)
+        return 2
+    files = config_files(args.path)
     results = []
     for path in files:
         state_file = path.with_name(path.stem + ".state.txt")
@@ -191,7 +206,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="lyss", description=f"{PROJECT_LONG_NAME} {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    a = sub.add_parser("audit", help="assess saved configuration files")
+    a = sub.add_parser("audit", help="assess saved configuration files, offline (no connection to any device)")
     a.add_argument("--vendor", required=True, help="adapter name, e.g. cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic")
     a.add_argument("--level", type=int, default=1, help="highest level to assess (default 1)")
     a.add_argument("--json", action="store_true", help="output JSON instead of text")

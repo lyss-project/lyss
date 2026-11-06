@@ -2,6 +2,22 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.8.1 (2026-11-06)
+
+Offline audit made first-class, after a question from the MikroTik community ("why not analyse a
+copy of /export, with nothing touching the router?"): it already worked, now it is documented and
+works better.
+- docs/OFFLINE.md and a README section: how to save the configuration on each platform
+  (RouterOS 6: `/export hide-sensitive`), what a configuration alone can and cannot tell, and how
+  to add device state by hand in `<name>.state.txt` (a test keeps the documented command lists
+  identical to what a scan collects).
+- `lyss audit <folder>` reads `.cfg`, `.conf`, `.txt`, `.rsc` and `.json` files (was `.cfg`
+  only); a missing path is reported.
+- A configuration saved with Windows Notepad (byte-order mark) is read correctly: the RouterOS
+  version in the export header was lost.
+- New rule form `{comment: R}`: LYSS-AUTH-003 on RouterOS is decided from the export header
+  (`by RouterOS 7.x`). A pasted RouterOS export now settles 13 of the 20 Level 1 + 2 controls.
+- The website lists MikroTik RouterOS and SONiC.
 ## 0.8.0 (2026-11-06)
 
 Two more platforms (MikroTik RouterOS and SONiC, preview), both in the demo; `pip install lyss`;

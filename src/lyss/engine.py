@@ -259,6 +259,12 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
             return True, [e for _, ev in results for e in ev]
         return False, []
 
+    if "comment" in rule:
+        # comment lines of the configuration, e.g. RouterOS "# ... by RouterOS 7.25.1" header
+        pattern = re.compile(rule["comment"])
+        hits = [c for c in cfg.comments if pattern.search(c)]
+        return bool(hits), hits
+
     if "edge_ports_missing" in rule:
         matched, evidence = _edge_ports_missing(cfg, rule["edge_ports_missing"])
         if rule.get("absent"):
