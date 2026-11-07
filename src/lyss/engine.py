@@ -60,7 +60,8 @@ def load_adapter(vendor: str) -> dict:
 # Secret values never leave the engine: evidence keeps the keyword and type, not the value.
 SECRET_VALUE = re.compile(
     r'(?i)\b(secret|password|key-string|key|sha1|sha256|plaintext|encrypted)'
-    r'((?:\s+(?:\d{1,2}|level \d+))?)\s+("?)(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level)\b)(?![^\s"]+\s+<masked>)[^\s"]+("?)'
+    # optional type before the value: "7", "level 15", EOS "sha512" / "md5" / "8a"
+    r'((?:\s+(?:\d{1,2}|level \d+|sha512|md5|8a)(?=\s))?)\s+("?)(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level)\b)(?![^\s"]+\s+<masked>)[^\s"]+("?)'
 )
 # SNMPv3 users: "auth sha <pw> priv aes 128 <pw>" (Cisco), 'auth sha "<hash>" priv aes "<hash>"' (HP),
 # "auth-sha <pw>" / "priv-aes <pw>" variants
@@ -486,6 +487,7 @@ VENDOR_SIGNATURES = (
     ("mikrotik", re.compile(r"(?m)^#.*\bby RouterOS\b|^/(?:interface|ip|ipv6|system|user|snmp|tool|routing)\b")),
     ("cisco_sb", re.compile(r"(?m)^config-file-header\s*$|^v\d+\.\d+\.\d+\.\d+ / R\S+\s*$")),
     ("hp_procurve", re.compile(r'(?m)^; \S+ Configuration Editor; Created on release|^hostname "[^"]*"\s*$')),
+    ("arista_eos", re.compile(r"(?m)^! device: \S+ \(.*\bEOS-\d|^management (?:api http-commands|telnet|ssh|console)\s*$")),
     ("cisco_ios", re.compile(r"(?m)^version \d+\.\d+\s*$|^(?:no )?service (?:password-encryption|timestamps)\b"
                              r"|^line vty \d+")),
 )

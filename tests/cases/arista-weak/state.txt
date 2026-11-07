@@ -1,0 +1,31 @@
+collected: 2026-11-07 10:00
+===== ssh banner =====
+SSH-2.0-OpenSSH_7.8
+===== ssh negotiated =====
+kex: diffie-hellman-group14-sha1
+cipher: aes128-cbc
+mac: hmac-sha1
+hostkey: ssh-rsa
+===== show version =====
+Arista DCS-7050SX3-48YC8
+Hardware version: 11.00
+Serial number: FAKE0000020
+Hardware MAC address: 0200.0000.0020
+System MAC address: 0200.0000.0020
+
+Software image version: 4.30.1F-12345678.4301F (engineering build)
+Architecture: x86_64
+===== show management telnet =====
+Telnet status for Default VRF is enabled
+Telnet session limit is 20
+Telnet session limit per host is 20
+===== show interfaces status =====
+Port       Name     Status       Vlan     Duplex Speed  Type            Flags Encapsulation
+Et1        uplink   connected    trunk    full   10G    10GBASE-SR
+Et2                 connected    10       full   1G     1000BASE-T
+Et3                 notconnect   1        full   1G     1000BASE-T
+Ma1                 notconnect   routed   a-full a-1G   10/100/1000
+===== show ntp status =====
+unsynchronised
+  time server re-starting
+   polling server every 1024 s

@@ -32,6 +32,7 @@ Content-Security-Policy (`connect-src 'self'`) forbids it from contacting any ot
 | Cisco Small Business / Business | `show running-config` | |
 | HPE Aruba AOS-S | `show running-config` | |
 | SONiC | `show runningconfiguration all > switch.json` (or a copy of `/etc/sonic/config_db.json`) | |
+| Arista EOS | `show running-config` (or `copy running-config flash:switch.cfg`) | |
 
 A file copied from a terminal and saved with Notepad works (LYSS ignores the byte-order mark
 Notepad adds). Evidence in the LYSS report never shows passwords, keys or SNMP community names,
@@ -76,6 +77,7 @@ You can give only some of the commands; the others simply stay unknown.
 | Cisco Small Business / Business | `show version` · `show inventory` · `show system` · `show ip ssh` · `show services tcp-udp` · `show interfaces status` · `show interfaces configuration` · `show sntp status` · `show lldp neighbors` · `show cdp neighbors` · `show cdp neighbors detail` |
 | HPE Aruba AOS-S | `show version` · `show system` · `show modules` · `show ip ssh` · `show interfaces brief` · `show lldp info remote-device` · `show cdp neighbors` |
 | SONiC | `show version` · `show interfaces status` · `show ntp` · `show ssh` · `show feature status` · `show lldp table` · `ss -tlnH` |
+| Arista EOS | `show version` · `show management telnet` · `show management ssh` · `show interfaces status` · `show lldp neighbors detail` · `show ntp status` |
 
 The authoritative list is `COMMANDS` in `src/lyss/collector.py` (it is what a LYSS scan runs).
 The SSH banner and the negotiated SSH algorithms come from the connection itself, so they can only

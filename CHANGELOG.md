@@ -2,6 +2,25 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.9.0 (2026-11-07)
+
+Arista EOS (preview), validated on cEOS-lab 4.37.0F. Specification unchanged (0.5.0-draft).
+- New adapter `arista_eos`: every Level 1 and Level 2 control, from the configuration and
+  read-only `show` commands (`show version`, `show management telnet` / `ssh`,
+  `show interfaces status`, `show lldp neighbors detail`, `show ntp status`). Checked on two
+  cEOS containers with the factory configuration, an insecure one and a hardened one.
+- EOS defaults are taken into account: Telnet and eAPI off, SSH v2 only, no idle timeout
+  (`idle-timeout 0` is not shown), RADIUS / TACACS+ keys converted to type 7.
+- Topology: EOS LLDP neighbours (`show lldp neighbors detail`), also used by discovery.
+- `lyss audit` and the in-browser audit recognise an EOS `show running-config`; Oxidized model
+  `eos` is assessed; new-device discovery recognises Arista in LLDP descriptions.
+- docs/ACCOUNTS.md: read-only EOS account (role `network-operator`). EOS enforces roles only
+  with `aaa authorization commands all default local`, checked in the lab.
+- Evidence also hides EOS-style secrets (`secret sha512 …`, `password md5 …`, `key 8a …`).
+- Firmware: the one EOS flaw in the CISA KEV catalogue (CVE-2026-7473, Security Advisory 0137)
+  has no fixed release, so LYSS-VULN-001 stays "unknown" on EOS; the control's note gives the
+  mitigation.
+
 ## 0.8.2 (2026-11-07)
 
 Audit in the browser, nothing uploaded.

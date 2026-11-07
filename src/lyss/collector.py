@@ -39,6 +39,12 @@ COMMANDS = {
                   "show lldp neighbors", "show cdp neighbors",
                   "show lldp neighbors detail", "show cdp neighbors detail", "show ntp status"],
     },
+    "arista_eos": {
+        "netmiko": "arista_eos",
+        "config": "show running-config",
+        "state": ["show version", "show management telnet", "show management ssh",
+                  "show interfaces status", "show lldp neighbors detail", "show ntp status"],
+    },
     "sonic": {
         # community SONiC: a Debian shell with "show" commands; "ss -tlnH" lists listening TCP
         # ports (read-only, no sudo). The configuration is config_db JSON.

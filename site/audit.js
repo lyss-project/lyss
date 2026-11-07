@@ -7,10 +7,10 @@ const PY = new URL("py/", document.baseURI).href;
 const MAX_BYTES = 5 * 1024 * 1024;
 
 const PLATFORMS = {
-  cisco_ios: "Cisco IOS / IOS-XE", cisco_sb: "Cisco Small Business / Business",
+  arista_eos: "Arista EOS", cisco_ios: "Cisco IOS / IOS-XE", cisco_sb: "Cisco Small Business / Business",
   hp_procurve: "HPE Aruba AOS-S", mikrotik: "MikroTik RouterOS", sonic: "SONiC",
 };
-const EXAMPLES = ["mikrotik.rsc", "cisco_ios.cfg", "sonic.json", "hp_procurve.cfg", "cisco_sb.cfg"];
+const EXAMPLES = ["mikrotik.rsc", "cisco_ios.cfg", "arista_eos.cfg", "sonic.json", "hp_procurve.cfg", "cisco_sb.cfg"];
 const VERDICTS = {
   fail: ["Failed", "Non conforme"], unknown: ["Unknown", "Inconnu"],
   pass: ["Passed", "Conforme"], not_applicable: ["Not applicable", "Non applicable"],

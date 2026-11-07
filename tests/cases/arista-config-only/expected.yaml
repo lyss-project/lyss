@@ -1,0 +1,16 @@
+# The weak Arista configuration alone (offline audit, no device state): what needs the device
+# stays unknown, the rest is decided from the configuration. Synthetic data.
+vendor: arista_eos
+config_from: arista-weak
+verdicts:
+  LYSS-MGMT-001: fail
+  LYSS-MGMT-002: pass
+  LYSS-MGMT-003: fail
+  LYSS-MGMT-004: fail
+  LYSS-AUTH-001: fail
+  LYSS-AUTH-002: fail
+  LYSS-AUTH-004: fail
+  LYSS-VULN-001: unknown
+  LYSS-MGMT-013: unknown
+  LYSS-LOG-011: fail
+  LYSS-ACC-010: unknown

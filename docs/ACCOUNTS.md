@@ -17,6 +17,7 @@ General rules, whatever the platform:
 |---|---|---|
 | MikroTik RouterOS | group with `ssh,read` only (no `write`, no `sensitive`) | yes, CHR 7.25.1: same verdicts as `admin`, changes refused |
 | SONiC | plain Linux user, not in `sudo` | yes, SONiC-VS 202505: same data as `admin`, changes refused |
+| Arista EOS | privilege 15 with role `network-operator`, command authorization on | yes, cEOS-lab 4.37.0F: full collection, configuration mode refused |
 | Cisco IOS / IOS-XE | privilege 15 (`show running-config`), restricted by TACACS+ command authorization | privilege 15 tested; restriction recommended, not lab-tested |
 | Cisco Small Business / Business | privilege 15 | tested; lower levels not yet (reports welcome) |
 | HPE Aruba AOS-S | manager | simulator only (reports from real switches welcome) |
@@ -50,6 +51,22 @@ sudo passwd lyss-audit
   config_db**, including TACACS+/RADIUS keys stored in cleartext (LYSS-AUTH-004). Keep local
   accounts to a minimum and prefer TACACS+ for people.
 - Restrict SSH to the administration network with a control-plane ACL (LYSS-MGMT-010).
+
+## Arista EOS
+
+```
+username lyss-audit privilege 15 role network-operator secret <password>
+aaa authorization exec default local
+aaa authorization commands all default local
+```
+
+- `network-operator` is EOS's built-in read-only role. EOS **enforces roles only with command
+  authorization** (`aaa authorization commands all default ...`): without it, a privilege 15
+  account can configure the switch whatever its role.
+- With TACACS+, give the LYSS account a read-only role on the server instead, and keep command
+  authorization pointed at it.
+- Checked on cEOS-lab 4.37.0F: the `lyss-audit` account collects everything LYSS needs, and it
+  cannot even enter configuration mode.
 
 ## Cisco IOS / IOS-XE (Catalyst)
 

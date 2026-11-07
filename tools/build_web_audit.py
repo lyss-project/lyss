@@ -41,13 +41,15 @@ PYODIDE_FILES = {
 
 # only what audit() needs: no collector, web interface, vault, remediation in the browser
 MODULES = ("__init__.py", "engine.py", "config.py", "browser.py")
-# fictitious configurations from the demo lab, offered as "Try an example"
+# fictitious configurations (demo lab, test fixtures), offered as "Try an example"
+DEMO = SRC / "sim" / "labs" / "demo"
 EXAMPLES = {
-    "mikrotik.rsc": "demo-crs-01.cfg",
-    "cisco_ios.cfg": "demo-acc-02.cfg",
-    "cisco_sb.cfg": "demo-sb-02.cfg",
-    "hp_procurve.cfg": "demo-hp-01.cfg",
-    "sonic.json": "demo-leaf-01.cfg",
+    "mikrotik.rsc": DEMO / "demo-crs-01.cfg",
+    "cisco_ios.cfg": DEMO / "demo-acc-02.cfg",
+    "cisco_sb.cfg": DEMO / "demo-sb-02.cfg",
+    "hp_procurve.cfg": DEMO / "demo-hp-01.cfg",
+    "sonic.json": DEMO / "demo-leaf-01.cfg",
+    "arista_eos.cfg": ROOT / "tests" / "cases" / "arista-weak" / "config.cfg",
 }
 FIXED_TIME = (2026, 1, 1, 0, 0, 0)
 
@@ -60,7 +62,6 @@ def _add(zf: zipfile.ZipFile, name: str, data: bytes) -> None:
 
 def build_bundle(out: Path) -> Path:
     out.parent.mkdir(parents=True, exist_ok=True)
-    demo = SRC / "sim" / "labs" / "demo"
     with zipfile.ZipFile(out, "w") as zf:
         for name in MODULES:
             _add(zf, f"lyss/{name}", (SRC / name).read_bytes())
@@ -69,7 +70,7 @@ def build_bundle(out: Path) -> Path:
         for adapter in sorted((ROOT / "adapters").glob("*.yaml")):
             _add(zf, f"home/adapters/{adapter.name}", adapter.read_bytes())
         for name, source in EXAMPLES.items():
-            _add(zf, f"examples/{name}", (demo / source).read_bytes())
+            _add(zf, f"examples/{name}", source.read_bytes())
     return out
 
 

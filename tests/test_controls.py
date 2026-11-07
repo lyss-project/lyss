@@ -16,6 +16,11 @@ FULL_VENDORS = ["cisco_ios", "cisco_sb", "hp_procurve"]   # Level 1 + 2 checks a
 ALL_VENDORS = sorted(p.stem for p in (Path(__file__).parent.parent / "adapters").glob("*.yaml"))
 # preview adapters: controls the platform cannot show both ways, each with the reason
 PREVIEW_VENDORS = {
+    "arista_eos": {
+        "LYSS-MGMT-002": "EOS speaks SSH protocol version 2 only",
+        "LYSS-AUTH-003": "EOS stores local passwords as one-way hashes only (SHA-512 or MD5 crypt)",
+        "LYSS-VULN-001": "no EOS firmware data yet (the one CISA KEV flaw, SA-0137, has no fixed release)",
+    },
     "mikrotik": {
         "LYSS-MGMT-002": "RouterOS (ROSSSH) speaks SSH protocol version 2 only",
         "LYSS-AUTH-002": "no enable password, and local password hashes are never exported",
@@ -28,7 +33,7 @@ PREVIEW_VENDORS = {
     },
 }
 SECRETS_IN_CASES = ["cisco123", "PlainSharedKey", "0822455D0A16", "$9$FAKE", "FAKEHASH", "FAKEAESKEY",
-                    "FAKEAUTHPW", "FAKEPRIVPW", "s3cretCommunity", "lab-v3-ro"]
+                    "FAKEAUTHPW", "FAKEPRIVPW", "s3cretCommunity", "lab-v3-ro", "$1$FAKEHASH", "$6$FAKEHASH"]
 
 
 def run(case: dict):

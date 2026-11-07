@@ -29,7 +29,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   remote logging and time synchronization, access-port hygiene.
 - **Level 3, Advanced**: access-layer protections (draft).
 
-> Status: **0.8, draft specification 0.5, preview.** The specification and the tool may still change
+> Status: **0.9, draft specification 0.5, preview.** The specification and the tool may still change
 > before 1.0. Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
@@ -86,6 +86,7 @@ read-only account ([docs/ACCOUNTS.md](docs/ACCOUNTS.md)), and tell me what you f
 | HP ProCurve / HPE Aruba AOS-S | yes | yes | yes | basic | AOS-S 16.x |
 | MikroTik RouterOS 6.x / 7.x (CRS, RouterBOARD, CHR), preview | yes | yes | yes | no | RouterOS (CISA KEV + critical) |
 | SONiC (community builds), preview | yes | yes | yes | no | no |
+| Arista EOS (7000 series, cEOS / vEOS), preview | yes | yes | yes | no | no |
 
 Cisco IOS and Cisco Small Business are validated on real switches; HPE Aruba AOS-S on the
 simulator and synthetic outputs so far (reports from real AOS-S switches are welcome). MikroTik
@@ -95,7 +96,10 @@ Give the LYSS account a read-only group without the "sensitive" policy. SONiC is
 validated on the SONiC-VS 202505 virtual switch: LYSS reads its config_db JSON and `show`
 commands. Two SONiC controls stay "unknown" by design: the sudo account's password hash
 (in /etc/shadow, not readable by a read-only account) and firmware support (no published
-end-of-support data for community builds).
+end-of-support data for community builds). Arista EOS is validated on cEOS-lab 4.37.0F
+(default, insecure and hardened configurations, LLDP topology between two switches); its
+firmware check stays "unknown" for now: the one EOS flaw in the CISA KEV catalogue
+(CVE-2026-7473, Security Advisory 0137) has no fixed release, only a mitigation ACL.
 
 ## What the tool does
 

@@ -34,7 +34,7 @@ def test_export_with_state_file_next_to_it(tmp_path, capsys):
 def test_offline_doc_lists_exactly_the_collected_state_commands():
     from lyss.collector import COMMANDS
     doc = (Path(__file__).parent.parent / "docs" / "OFFLINE.md").read_text(encoding="utf-8")
-    labels = {"mikrotik": "MikroTik RouterOS", "cisco_ios": "Cisco IOS / IOS-XE", "sonic": "SONiC",
+    labels = {"arista_eos": "Arista EOS", "mikrotik": "MikroTik RouterOS", "cisco_ios": "Cisco IOS / IOS-XE", "sonic": "SONiC",
               "cisco_sb": "Cisco Small Business / Business", "hp_procurve": "HPE Aruba AOS-S"}
     assert set(labels) == set(COMMANDS)
     for vendor, label in labels.items():
@@ -43,7 +43,7 @@ def test_offline_doc_lists_exactly_the_collected_state_commands():
         assert documented == set(COMMANDS[vendor]["state"]), vendor
 
 
-CASE_VENDORS = {"ios": "cisco_ios", "sb": "cisco_sb", "hp": "hp_procurve", "mikrotik": "mikrotik", "sonic": "sonic"}
+CASE_VENDORS = {"arista": "arista_eos", "ios": "cisco_ios", "sb": "cisco_sb", "hp": "hp_procurve", "mikrotik": "mikrotik", "sonic": "sonic"}
 
 
 def test_platform_recognised_from_every_fixture_and_demo_configuration():

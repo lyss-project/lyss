@@ -35,6 +35,7 @@ PLATFORMS = [
     (r"Cisco IOS|C1000|WS-C|C9[23]00|Catalyst|cisco\s+C\d", "cisco_ios", "Cisco IOS / IOS-XE"),
     (r"ProCurve|Aruba|HP J\d|HPE?\b", "hp_procurve", "HP ProCurve / ArubaOS-Switch"),
     (r"\bSONiC\b", "sonic", "SONiC"),   # LLDP system description "SONiC Software Version: ..."
+    (r"Arista|\bcEOS|\bvEOS|\bEOS version", "arista_eos", "Arista EOS"),
     (r"MikroTik|RouterOS|\bCRS\d{3}", "mikrotik", "MikroTik RouterOS"),
 ]
 # (pattern on the SSH identification string, adapter, label)

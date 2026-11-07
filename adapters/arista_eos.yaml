@@ -1,0 +1,269 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+# LYSS adapter: Arista EOS (7000 series, cEOS / vEOS).
+# Rule forms: see adapters/cisco_ios.yaml. EOS "show running-config" lists non-default settings;
+# management services live in "management ssh | telnet | console | api http-commands" blocks.
+# Defaults this adapter relies on (Arista EOS manual, "Connection Management", checked on cEOS
+# 4.37): Telnet and eAPI are disabled, SSH (v2 only) is enabled, SSH / console sessions never time
+# out (idle-timeout 0), and default settings ("idle-timeout 0", "protocol https",
+# "aaa authentication login default local") are not shown in the running configuration.
+# A fresh EOS has no user account and no enable password. Read-only LYSS account:
+#   username lyss-audit privilege 15 role network-operator secret <password>
+#   aaa authorization commands all default local      ! roles are enforced only with this
+adapter: arista_eos
+spec_version: "0.5.0-draft"
+platform: Arista EOS
+status: preview, validated on cEOS-lab 4.37.0F (container, 2026-11)
+
+facts:
+  model:
+    - {section: show version, line: '^(?:Arista )?(DCS-\S+|CCS-\S+|cEOSLab|vEOS(?:-lab)?)\s*$'}
+    - {section: show version, line: '^Arista (\S+)'}
+    - {section: config comments, line: '^!\s*device:\s*\S+\s*\(([^,)]+),'}
+  version:
+    # "4.37.0F-51574443.4370F.1 (engineering build)" -> 4.37.0F
+    - {section: show version, line: '^Software image version:\s*(\d+\.\d+\.\d+\w*)'}
+    - {section: config comments, line: '^!\s*device:\s*\S+\s*\([^,)]*,\s*EOS-([\w.]+)'}
+
+checks:
+
+  # ---------------- Level 1 ----------------
+
+  LYSS-MGMT-001:
+    fail_if_any:
+      - {block: '^management telnet$', line: '^no shutdown\s*$'}
+      # EOS 4.37: "Telnet status for Default VRF is enabled"
+      - {state: '(?i)^telnet status\b.*\bis enabled\b', section: show management telnet}
+    otherwise: pass
+    note: Telnet is disabled by default on EOS; it runs only with "management telnet / no shutdown".
+    remediation: |
+      management telnet
+         shutdown
+
+  LYSS-MGMT-002:
+    fail_if_any:
+      - {state: '^SSH-1\.', section: ssh banner}
+    otherwise: pass
+    note: EOS supports SSH protocol version 2 only.
+    remediation: |
+      ! nothing to configure: EOS offers SSH version 2 only
+
+  LYSS-MGMT-003:
+    fail_if_any:
+      # eAPI enabled with plain HTTP (eAPI and HTTP are off by default)
+      - {block: '^management api http-commands$', where: '^no shutdown\s*$', line: '^protocol http(\s+port\s+\d+)?\s*$'}
+      - all:
+          - {block: '^management http-server$', line: '^protocol http(\s+port\s+\d+)?\s*$'}
+          - {block: '^management api http-commands$', line: '^no shutdown\s*$'}
+    otherwise: pass
+    note: '"protocol http localhost" (local access only) is accepted.'
+    remediation: |
+      management api http-commands
+         no protocol http
+         protocol https
+      ! or, if eAPI is not used:
+      management api http-commands
+         shutdown
+
+  LYSS-MGMT-004:
+    fail_if_any:
+      - {block: '^management (ssh|console)$', line: '^idle-timeout 0\s*$'}
+      - {block: '^management (ssh|console)$', line: '^idle-timeout (\d+)', gt: 10}
+    pass_if_all:
+      - {block: '^management ssh$', line: '^idle-timeout ([1-9]|10)\s*$'}
+      - {block: '^management console$', line: '^idle-timeout ([1-9]|10)\s*$'}
+    otherwise: fail
+    note: The EOS default is idle-timeout 0 (sessions never time out); SSH and console both need 1-10 minutes.
+    remediation: |
+      management ssh
+         idle-timeout 10
+      management console
+         idle-timeout 10
+
+  LYSS-AUTH-001:
+    fail_if_any:
+      - {line: '(?i)^snmp-server community (public|private)\b'}
+    otherwise: pass
+    remediation: |
+      no snmp-server community public
+      no snmp-server community private
+      ! then configure SNMPv3 (LYSS-AUTH-011)
+
+  LYSS-AUTH-002:
+    fail_if_any:
+      # 0 = cleartext, 5 / md5 = MD5-crypt (cracked quickly)
+      - {line: '^enable (password|secret) (0|5|md5) '}
+      - {line: '^username \S+ (.* )?privilege 15 (.* )?nopassword\b', say: 'a privilege-15 account is configured with "nopassword": no credential at all'}
+      - {line: '^username \S+ (.* )?privilege 15 (.* )?secret (0|5|md5) '}
+    pass_if_any:
+      - {line: '^enable (password|secret) sha512 '}
+      # no enable password: privilege 15 only through local accounts with a SHA-512 crypt hash
+      - {line: '^username \S+ (.* )?privilege 15 (.* )?secret sha512 ', say: 'no enable password; privileged access only through local accounts hashed with SHA-512 crypt'}
+    otherwise: unknown
+    note: EOS hashes new passwords with SHA-512 crypt ("sha512"); MD5-crypt ("5") and accounts without a password do not pass.
+    remediation: |
+      enable password <new-password>      ! stored as "sha512"
+      username <name> privilege 15 role network-admin secret <new-password>
+      ! remove "nopassword" accounts or give them a password
+
+  LYSS-AUTH-003:
+    fail_if_any:
+      - {line: '^username \S+ .*\bsecret (0|7) '}
+      - {line: '^enable (password|secret) 0 '}
+    otherwise: pass
+    note: EOS stores local passwords as one-way hashes (SHA-512 or MD5 crypt), never reversible.
+    remediation: |
+      username <name> secret <new-password>
+
+  LYSS-AUTH-004:
+    fail_if_any:
+      - {line: '^(radius|tacacs)-server (.* )?key (0 )?(?!(7|8a) )\S'}
+    otherwise: pass
+    note: EOS converts RADIUS / TACACS+ keys typed in clear to type 7 (reversible, not cleartext); checked on cEOS 4.37.
+    remediation: |
+      ! re-enter the key: EOS stores it as type 7
+      tacacs-server host <tacacs-ip> key <key>
+      ! type 7 is reversible: protect configuration backups like the switch itself
+
+  LYSS-VULN-001:
+    firmware: true
+    otherwise: unknown
+    note: >-
+      Arista EOS is not yet in data/firmware.yaml. The one EOS flaw in the CISA KEV catalogue
+      (CVE-2026-7473, Security Advisory 0137) has no fixed release: on 7020R / 7280R(2) / 7500R(2)
+      tunnel endpoints (VXLAN, GRE, decap-group) the mitigation is the ACL in the advisory.
+    remediation: |
+      ! compare the version with Arista's security advisories (arista.com > Support > Security Advisories)
+      ! VXLAN / GRE endpoints on 7020R, 7280R(2), 7500R(2): apply the ACL of Security Advisory 0137
+
+  LYSS-BKP-001:
+    backup: true
+    otherwise: unknown
+    note: No backup evidence yet. Enable scheduled scans, or attest the external backup system on the switch page.
+    remediation: |
+      ! Settings > Scheduled scans (LYSS keeps every configuration version), or
+      ! attest the external backup (Oxidized, CloudVision...) on the switch page.
+
+  # ---------------- Level 2 ----------------
+
+  LYSS-AUTH-010:
+    fail_if_any:
+      - {line: '^aaa authentication login default (?!group\b)\S'}
+    pass_if_all:
+      - {line: '^aaa authentication login default group \S+'}
+    otherwise: fail
+    note: Without "aaa authentication login default group ...", EOS authenticates with local accounts only.
+    remediation: |
+      tacacs-server host <tacacs-ip> key <key>
+      aaa group server tacacs+ TACACS
+         server <tacacs-ip>
+      aaa authentication login default group TACACS local
+      aaa authorization exec default group TACACS local
+
+  LYSS-AUTH-011:
+    fail_if_any:
+      - {line: '^snmp-server community '}
+      - {line: '^snmp-server group \S+ v(1|2c?)\b'}
+      - {line: '^snmp-server group \S+ v3 (noauth|auth)\b'}
+    otherwise: pass
+    remediation: |
+      no snmp-server community <name>
+      snmp-server group LYSS v3 priv
+      snmp-server user <user> LYSS v3 auth sha256 <pw> priv aes <pw>
+
+  LYSS-MGMT-010:
+    pass_if_any:
+      - {block: '^management ssh$', line: '^ip access-group \S+ (vrf \S+ )?in\s*$'}
+      - {block: '^system control-plane$', line: '^ip access-group \S+ (vrf \S+ )?in\s*$'}
+    otherwise: fail
+    note: 'The default control-plane ACL accepts SSH from any address: apply an ACL to "management ssh" or the control plane.'
+    remediation: |
+      ip access-list MGMT
+         10 permit tcp <admin-subnet> any eq ssh
+      management ssh
+         ip access-group MGMT in
+
+  LYSS-MGMT-011:
+    fail_if_any:
+      - {block: '^interface Vlan1$', line: '^ip address \d'}
+      - captures_in_both:
+          - {block: '^interface Vlan(\d+)$', where: '^ip address \d'}
+          # EOS switchports are access ports unless "switchport mode trunk" (mode access is not shown)
+          - {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport)\b', line: '^switchport access vlan (\d+)'}
+    pass_if_any:
+      - {block: '^interface Management\d', line: '^ip address \d', say: 'out-of-band management port (Management interface) addressed'}
+      - {block: '^interface Vlan(?!1$)\d+$', line: '^ip address \d'}
+    otherwise: unknown
+    remediation: |
+      interface Management1
+         ip address <ip>/<prefix>
+      ! or an in-band management VLAN that no access port uses
+      interface Vlan1
+         no ip address
+
+  LYSS-MGMT-012:
+    pass_if_all:
+      - {line: '^banner (login|motd)\s*$'}
+      - {line: '(?i)authori[sz]ed'}
+    otherwise: fail
+    note: The login banner is shown before authentication; it must state the authorized-use restriction.
+    remediation: |
+      banner login
+      Authorized access only. Activity is logged.
+      EOF
+
+  LYSS-MGMT-013:
+    fail_if_any:
+      - {state: '^kex: .*(sha1|group1\b)', section: ssh negotiated}
+      - {state: '^cipher: .*(cbc|3des|arcfour|blowfish)', section: ssh negotiated}
+      - {state: '^hostkey: (ssh-rsa|ssh-dss)\s*$', section: ssh negotiated}
+    pass_if_any:
+      - {state: '^kex: ', section: ssh negotiated}
+    otherwise: unknown
+    note: Needs the negotiated SSH algorithms (collector).
+    remediation: |
+      management ssh
+         cipher aes256-gcm@openssh.com aes256-ctr aes128-ctr
+         key-exchange curve25519-sha256 ecdh-sha2-nistp256 diffie-hellman-group16-sha512
+         mac hmac-sha2-512 hmac-sha2-256
+
+  LYSS-LOG-010:
+    fail_if_any:
+      - {line: '^no logging on\b', say: 'logging is disabled globally ("no logging on"): nothing reaches the syslog hosts'}
+    pass_if_any:
+      - {line: '^logging (vrf \S+ )?host \S+'}
+    otherwise: fail
+    remediation: |
+      logging host <siem-ip>
+      logging trap informational
+
+  LYSS-LOG-011:
+    fail_if_any:
+      - {state: '(?i)\bunsynchroni[sz]ed\b', section: show ntp status}
+    pass_if_any:
+      - {line: '^ntp server (vrf \S+ )?\S+'}
+    otherwise: fail
+    note: Synchronization is checked with "show ntp status"; without device state, a configured server passes.
+    remediation: |
+      ntp server <ntp-ip>
+
+  LYSS-ACC-010:
+    fail_if_any:
+      - {state: '\bnotconnect\b', section: show interfaces status}
+    pass_if_any:
+      - {state: '.', section: show interfaces status}
+    otherwise: unknown
+    note: Needs "show interfaces status" (notconnect = enabled but unused; disabled = shut).
+    remediation: |
+      interface <unused-ports>
+         shutdown
+
+  LYSS-ACC-011:
+    pass_if_any:
+      - {line: '^spanning-tree edge-port bpduguard default'}
+      - {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b', every_contains: '^spanning-tree bpduguard enable'}
+    otherwise: fail
+    remediation: |
+      spanning-tree edge-port bpduguard default
+      interface <access-ports>
+         spanning-tree portfast

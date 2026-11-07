@@ -71,6 +71,49 @@ def parse_hp_lldp(lines: list[str]) -> list[dict]:
     return rows
 
 
+EOS_INTERFACE = re.compile(r"^Interface (\S+) detected \d+ LLDP neighbors?:")
+EOS_NEIGHBOR = re.compile(r'^\s+Neighbor (\S+)/"?([^",]*)"?, age')
+EOS_FIELDS = {
+    "chassis": re.compile(r"^\s+Chassis ID\s*:\s*(\S+)"),
+    "remote_port": re.compile(r'^\s+Port ID\s*:\s*"?([^"]+?)"?\s*$'),
+    "name": re.compile(r'^\s+- System Name:\s*"?([^"]+?)"?\s*$'),
+    "platform": re.compile(r'^\s+- System Description:\s*"?([^"]+?)"?\s*$'),
+    "caps": re.compile(r"^\s+Enabled Capabilities:\s*(.+?)\s*$"),
+}
+
+
+def parse_eos_lldp(lines: list[str]) -> list[dict]:
+    """Arista EOS "show lldp neighbors detail": "Interface Ethernet1 detected 1 LLDP neighbors:",
+    then per neighbor "Neighbor <chassis>/"<port>", age ..." and "- Field: value" lines."""
+    rows: list[dict] = []
+    local = None
+    for line in lines:
+        if m := EOS_INTERFACE.match(line):
+            local = m.group(1)
+            continue
+        if (m := EOS_NEIGHBOR.match(line)) and local:
+            rows.append({"protocol": "lldp", "local_port": normalize_port(local), "chassis": m.group(1),
+                         "remote_port": m.group(2), "name": "", "platform": "", "caps": "", "ips": []})
+            continue
+        if not rows:
+            continue
+        for key, pattern in EOS_FIELDS.items():
+            # first value only: "Port ID : 0" also appears later, under IEEE802.3 Link Aggregation
+            if (m := pattern.match(line)) and not rows[-1].get(f"_{key}"):
+                rows[-1][key] = m.group(1).strip()
+                rows[-1][f"_{key}"] = True
+        if m := re.match(r"^\s+Management Address\s*:\s*(\d{1,3}(?:\.\d{1,3}){3})\s*$", line):
+            rows[-1]["ips"].append(m.group(1))
+    for row in rows:
+        for key in EOS_FIELDS:
+            row.pop(f"_{key}", None)
+        row["remote_port"] = normalize_port(row["remote_port"])
+        # LLDP capabilities as letters, as in the Cisco tables (switch / router / AP / phone)
+        names = {"Bridge": "B", "Router": "R", "WLAN": "W", "Telephone": "T"}
+        row["caps"] = ", ".join(v for k, v in names.items() if k in row["caps"])
+    return rows
+
+
 def _spans(lines: list[str], protocol: str) -> tuple[int, list[tuple[int, int]]] | None:
     """(index of first data line, column spans)."""
     for i, line in enumerate(lines):
@@ -179,13 +222,19 @@ def _identity(device: dict) -> dict:
         return ident
     state = parse_state(state_path.read_text(encoding="utf-8", errors="replace"))
     for line in state.get("show system", []) + state.get("show version", []):
-        m = re.search(r"(?:System MAC Address|Base [Ee]thernet MAC [Aa]ddress|Base MAC Addr)\s*:\s*(\S+)", line)
+        m = re.search(r"(?i)(?:System MAC Address|Base Ethernet MAC Address|Base MAC Addr)\s*:\s*(\S+)", line)
         if m:
             ident["mac"] = norm_mac(m.group(1))
             break
     for protocol in ("lldp", "cdp"):
         ident["neighbors"] += parse_neighbors(state.get(f"show {protocol} neighbors", []), device["vendor"], protocol)
     ident["neighbors"] += parse_hp_lldp(state.get("show lldp info remote-device", []))
+    if device.get("vendor") == "arista_eos":
+        # one EOS table gives both the links and the neighbour details used by discovery
+        rows = parse_eos_lldp(state.get("show lldp neighbors detail", []))
+        ident["neighbors"] += rows
+        ident["details"] = [dict(r, sysname=r["name"]) for r in rows]
+        return ident
     ident["details"] = []
     for protocol in ("lldp", "cdp"):
         for rec in parse_neighbor_details(state.get(f"show {protocol} neighbors detail", [])):
