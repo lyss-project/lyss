@@ -10,6 +10,11 @@
   <p class="muted">Choose the administrator password. It is stored as a scrypt hash on this PC only.</p>
   {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
   <form method="post" action="/setup" class="stack">
+    {% if setup_token_required %}
+    <label>Setup token (printed in the {{ project }} console or <code>docker logs</code> at start-up)
+      <input name="token" autocomplete="off" required>
+    </label>
+    {% endif %}
     <label>New password (12 characters minimum)
       <input type="password" name="password" minlength="12" autocomplete="new-password" required autofocus>
     </label>

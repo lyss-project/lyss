@@ -60,6 +60,9 @@ checks:
     fail_if_any:
       - {line: '^console idle-timeout 0\s*$'}
       - {line: '^console idle-timeout (\d+)\s*$', gt: 600}
+      # the serial / USB console has its own value: 0 (never) or too long fails too
+      - {line: '^console idle-timeout serial-usb 0\s*$'}
+      - {line: '^console idle-timeout serial-usb (\d+)\s*$', gt: 600}
     pass_if_all:
       - {line: '^console idle-timeout \d+\s*$'}
     otherwise: fail

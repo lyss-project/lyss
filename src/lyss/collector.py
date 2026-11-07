@@ -10,6 +10,7 @@ import base64
 import hashlib
 import os
 import re
+import secrets
 import tempfile
 import threading
 import time
@@ -19,7 +20,7 @@ from pathlib import Path
 
 import paramiko
 
-from . import inventory, legacy_ssh  # legacy_ssh: SHA-1 algorithms for old switches, opt-in per connection
+from . import inventory, legacy_ssh, locks, sealed  # legacy_ssh: SHA-1 algorithms for old switches, opt-in per connection
 
 # Read-only commands per adapter. Nothing here may change configuration.
 COMMANDS = {
@@ -77,6 +78,19 @@ COMMANDS = {
 
 # a configuration command was rejected (Cisco IOS "% Invalid input", Cisco SB "% Unrecognized command")
 CLI_ERROR = re.compile(r"(?m)^\s*%|Invalid input|Unrecognized command|Incomplete command|Wrong number of parameters|bad parameter")
+# the only multi-line command LYSS sends: the Cisco SB login banner (delimiter line, text, delimiter)
+BANNER_BLOCK = re.compile(r"banner (?:login|motd) #\n[^\n#]{1,200}\n#")
+
+
+def check_commands(commands: list[str], banner_block: bool = False) -> None:
+    """Last line of defence before configuration commands reach a switch: one command per string,
+    no control characters (a new line, Ctrl-Z or Ctrl-C would start another command or leave
+    configuration mode). Raises ValueError: nothing is sent."""
+    for command in commands:
+        if banner_block and BANNER_BLOCK.fullmatch(command):
+            continue
+        if not command or any(ord(c) < 0x20 or ord(c) == 0x7F for c in command):
+            raise ValueError(f"refused: command with control characters {command[:60]!r}")
 
 # paramiko forgets the negotiated key exchange once the handshake is done; keep its name on the
 # transport so it can be reported as evidence (the switch's strongest supported algorithm).
@@ -112,13 +126,28 @@ def fingerprint(key) -> str:
     return "SHA256:" + base64.b64encode(hashlib.sha256(key.asbytes()).digest()).decode().rstrip("=")
 
 
+def _save_keys(keys: "paramiko.HostKeys", path) -> None:
+    """Atomic rewrite: a reader (another process) never sees a truncated file, which would look
+    like "no key known" and silently re-pin a switch on first use."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix="known_hosts.", suffix=".tmp")
+    os.close(fd)
+    try:
+        keys.save(tmp)
+        locks.replace(Path(tmp), path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
 def verify_host_key(host: str, port: int, key) -> str:
     """Record the key on first contact; refuse a different key afterwards (before any password
-    is sent). Returns the fingerprint."""
+    is sent). Returns the fingerprint. Locked across processes (web interface and scheduled
+    "lyss collect")."""
     name = _key_name(host, port)
-    with _keys_lock:
+    path = known_hosts_file()
+    with _keys_lock, locks.file_lock(path):
         keys = paramiko.HostKeys()
-        path = known_hosts_file()
         if path.exists():
             keys.load(str(path))
         known = keys.lookup(name)
@@ -131,8 +160,7 @@ def verify_host_key(host: str, port: int, key) -> str:
                     "forget the old key on its page in LYSS.")
         else:
             keys.add(name, key.get_name(), key)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            keys.save(str(path))
+            _save_keys(keys, path)
     return fingerprint(key)
 
 
@@ -146,15 +174,15 @@ def known_fingerprint(host: str, port: int) -> str | None:
 
 
 def forget_host_key(host: str, port: int) -> None:
-    with _keys_lock:
-        path = known_hosts_file()
+    path = known_hosts_file()
+    with _keys_lock, locks.file_lock(path):
         if not path.exists():
             return
         keys = paramiko.HostKeys(str(path))
         name = _key_name(host, port)
         if name in keys:
             del keys[name]
-            keys.save(str(path))
+            _save_keys(keys, path)
 
 
 class _PinningPolicy(paramiko.MissingHostKeyPolicy):
@@ -207,11 +235,10 @@ class JumpHost:
 
     def _nc_channel(self, transport, host: str, port: int, timeout: float, connect_timeout: int | None = None):
         """A channel whose data is a TCP connection made by nc on the jump host, from self.source."""
-        import ipaddress
-        try:  # never pass raw text to a shell
-            src, dst = ipaddress.ip_address(self.source), ipaddress.ip_address(host)
-        except ValueError:
-            raise ValueError("with a jump host source address, switches must be given by IP address") from None
+        # never pass raw text to a shell: exact IP addresses only (no IPv6 scope id, no spaces)
+        src, dst = inventory.strict_ip(self.source), inventory.strict_ip(host)
+        if src is None or dst is None:
+            raise ValueError("with a jump host source address, switches must be given by IP address")
         chan = transport.open_session(timeout=timeout)
         wait = f"-w {int(connect_timeout)} " if connect_timeout else ""
         chan.exec_command(f"nc {wait}-s {src} {dst} {int(port)}")
@@ -283,6 +310,7 @@ class NetmikoSession:
     def configure(self, commands: list[str]) -> list[tuple[str, str]]:
         """Send configuration commands one by one; returns (command, output) pairs, stopping at
         the first rejected command (its output starts with "%" or contains "Invalid input")."""
+        check_commands(commands)
         done = []
         self.conn.config_mode()
         try:
@@ -330,15 +358,29 @@ class ShellSession:
             self.chan.send(username + "\n")
             self._read_until(re.compile(r"Password:"), 15)
             self.chan.send(password + "\n")
-            self._read_until(self.PROMPT, 30)
+            after = self._read_until(re.compile(self.PROMPT.pattern + r"|User Name:|Password:"), 30)
+            if re.search(r"User Name:|Password:\s*$", after):
+                # the switch asks again: wrong credentials. Never retried (account lockout)
+                raise paramiko.AuthenticationException("the switch refused the user name or password")
+            last = after.rstrip().rsplit("\n", 1)[-1]
+            # the switch's own prompt name: output lines that merely look like a prompt (text set
+            # by a neighbour over CDP/LLDP, a banner) do not end a command's output
+            name = re.match(r"([^\s#>(]+)", last)
+            if name:
+                self.prompt = re.compile(rf"(?:^|\n)(?:{re.escape(name.group(1))}(?:\([^)\n]*\))?[#>])+ ?$")
         self.run("terminal datadump", 10)
+
+    MAX_OUTPUT = 20 * 1024 * 1024   # characters kept per command: a switch cannot fill the memory
 
     def _read_until(self, pattern: re.Pattern, timeout: float) -> str:
         buf, deadline = "", time.monotonic() + timeout
         while time.monotonic() < deadline:
             if self.chan.recv_ready():
-                buf += self.ANSI.sub("", self.chan.recv(65535).decode("utf-8", errors="replace").replace("\r", ""))
-                if pattern.search(buf):
+                chunk = self.ANSI.sub("", self.chan.recv(65535).decode("utf-8", errors="replace").replace("\r", ""))
+                buf += chunk
+                if len(buf) > self.MAX_OUTPUT:
+                    raise RuntimeError("output larger than 20 MB: stopped")
+                if pattern.search(buf[-(len(chunk) + 4096):]):   # only the end can hold the prompt
                     return buf
             else:
                 time.sleep(0.05)
@@ -346,13 +388,14 @@ class ShellSession:
 
     def run(self, command: str, timeout: int) -> str:
         self.chan.send(command + "\n")
-        out = self._read_until(self.PROMPT, timeout)
+        out = self._read_until(getattr(self, "prompt", None) or self.PROMPT, timeout)
         lines = out.split("\n")
         return "\n".join(lines[1:-1]).strip("\n")  # drop the echoed command and the prompt
 
     # ---- remediation only (never used by collection) ----
 
     def configure(self, commands: list[str]) -> list[tuple[str, str]]:
+        check_commands(commands, banner_block=True)
         done = []
         self.run("configure terminal", 15)
         try:
@@ -393,9 +436,10 @@ class ShellSession:
             part = self._drain(1.0)
             self.transcript.append((line, part))
             out += part
-        if not self.PROMPT.search(out):
+        prompt = getattr(self, "prompt", None) or self.PROMPT
+        if not prompt.search(out):
             try:
-                out += self._read_until(self.PROMPT, 20)
+                out += self._read_until(prompt, 20)
             except TimeoutError:
                 said = " | ".join(f"{sent!r} -> {got[-80:]!r}" for sent, got in self.transcript)
                 raise TimeoutError(f"no prompt after the multi-line input; switch said: {said}"[:400])
@@ -450,17 +494,20 @@ def collect_device(device: dict, jump: JumpHost | None) -> str:
             # the switch had no modern key exchange / host key algorithm: SHA-1 had to be allowed
             negotiated += "\nlegacy: required (no modern key exchange or host key algorithm offered)"
         config = session.run(cmds["config"], 90)
-        sections = [f"===== ssh banner =====\n{banner}", f"===== ssh negotiated =====\n{negotiated}"]
+        # section headers carry a random value the switch cannot know: text sent by a neighbour
+        # (CDP/LLDP fields) that looks like a header stays plain output (config.parse_state)
+        nonce = secrets.token_hex(8)
+        sections = [f"===== ssh banner ===== #{nonce}\n{banner}",
+                    f"===== ssh negotiated ===== #{nonce}\n{negotiated}"]
         for command in cmds["state"]:
-            sections.append(f"===== {command} =====\n" + session.run(command, 45))
+            sections.append(f"===== {command} ===== #{nonce}\n" + session.run(command, 45))
     finally:
         session.close()
 
-    out_dir = inventory.PRIVATE / device["vendor"]
-    out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    (out_dir / f"{device['id']}.cfg").write_text(config, encoding="utf-8")
-    (out_dir / f"{device['id']}.state.txt").write_text(f"collected: {stamp}\n" + "\n".join(sections), encoding="utf-8")
+    cfg_path, state_path = config_paths(device)
+    sealed.write_text(cfg_path, config)          # encrypted at rest unless turned off in Settings
+    sealed.write_text(state_path, f"collected: {stamp}\nsections: #{nonce}\n" + "\n".join(sections))
     return f"{time.monotonic() - started:.0f}s"
 
 
@@ -468,7 +515,8 @@ def detect_platform(device: dict, jump: JumpHost | None) -> dict:
     """Platform "auto": recognise the adapter from the SSH banner and store it in the inventory."""
     from . import discovery
 
-    banner = discovery._banner(device["host"], jump if device.get("via_jump") else None) or ""
+    banner = discovery._banner(device["host"], jump if device.get("via_jump") else None,
+                               int(device.get("port") or 22)) or ""
     adapter, label = discovery.guess_platform(banner, discovery.SSH_FINGERPRINTS)
     if adapter is None:
         raise ValueError(f"platform not recognised from SSH banner '{banner or 'none'}': choose it manually")

@@ -69,6 +69,9 @@ checks:
     fail_if_any:
       - {block: '^line (con|vty)', line: '^exec-timeout 0( 0)?\s*$'}
       - {block: '^line (con|vty)', line: '^exec-timeout (\d+)', gt: 10}
+      # "exec-timeout <minutes> <seconds>": the seconds count too ("exec-timeout 0 86400" is 24 h)
+      - {block: '^line (con|vty)', line: '^exec-timeout \d+ (\d+)', gt: 600}
+      - {block: '^line (con|vty)', line: '^exec-timeout 10 [1-9]'}
     otherwise: pass
     note: IOS default is 10 minutes when exec-timeout is not set.
     remediation: |
@@ -89,6 +92,8 @@ checks:
   LYSS-AUTH-002:
     fail_if_any:
       - {line: '^enable password\b'}
+      # a privileged local account without any password
+      - {line: '^username \S+ (.* )?nopassword\b'}
       # type 5 = MD5-crypt, type 4 = flawed unsalted SHA-256: not accepted (cracked quickly)
       - {line: '^enable (algorithm-type md5 )?secret [45] '}
       - {line: '^username \S+ (.* )?privilege 15 (.* )?(secret [45]|password) '}
@@ -105,6 +110,7 @@ checks:
   LYSS-AUTH-003:
     fail_if_any:
       - {line: '^username \S+ .*\bpassword\b'}
+      - {line: '^username \S+ (.* )?nopassword\b', say: 'a local account has no password at all (nopassword)'}
     otherwise: pass
     note: 'A "username ... password" line is stored cleartext (type 0) or reversible (type 7); use "secret".'
     remediation: |
@@ -114,7 +120,10 @@ checks:
   LYSS-AUTH-004:
     fail_if_any:
       - {block: '^(radius|tacacs) server', line: '^key (0 )?(?!(6|7) )\S'}
+      - {block: '^radius server', line: '^pac key (0 )?(?!(6|7) )\S'}
       - {line: '^(radius|tacacs)-server (.* )?key (0 )?(?!(6|7) )\S'}
+      # servers defined inside "aaa group server radius|tacacs+"
+      - {line: '^server-private \S+ (.* )?key (0 )?(?!(6|7) )\S'}
     otherwise: pass
     note: Type 7 is not cleartext but is reversible; prefer type 6 (AES with a device master key).
     remediation: |
@@ -151,7 +160,11 @@ checks:
           - {line: '^aaa authentication login (\S+) (?!group\b)\S'}
     pass_if_all:
       - {line: '^aaa new-model'}
-      - {line: '^aaa authentication login \S+ group \S+'}
+      # the list the vty lines really use: the default one, or a named list on every vty line
+      # (a named list that does not start with "group" already failed above)
+      - any:
+          - {line: '^aaa authentication login default group \S+'}
+          - {block: '^line vty', every_contains: '^login authentication \S+'}
     otherwise: fail
     note: Every login list used for remote access must start with "group <radius/tacacs>"; local only after it.
     remediation: |
@@ -187,7 +200,8 @@ checks:
       # an access port in the management VLAN puts user traffic next to the management address
       - captures_in_both:
           - {block: '^interface Vlan(\d+)$', where: '^ip address \d'}
-          - {block: '^interface \S*Ethernet', where: '^switchport mode access', line: '^switchport access vlan (\d+)'}
+          # also ports without "switchport mode access" (IOS default "dynamic" acts as access towards a host)
+          - {block: '^interface \S*Ethernet', where_not: '^switchport mode trunk', line: '^switchport access vlan (\d+)'}
     pass_if_any:
       - {block: '^interface Vlan(?!1$)\d+$', line: '^ip address \d'}
     otherwise: unknown

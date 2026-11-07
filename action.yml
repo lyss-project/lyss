@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+name: LYSS switch configuration audit
+description: Assess saved switch configurations against the LYSS open standard, offline. No connection to any device.
+author: Mouad Lyaazale
+branding:
+  icon: shield
+  color: red
+
+inputs:
+  path:
+    description: Configuration file or folder, relative to the workspace.
+    default: "."
+  vendor:
+    description: "Adapter name (cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic, arista_eos, zyxel_gs1900) or auto."
+    default: auto
+  level:
+    description: Highest level to assess (1, 2 or 3).
+    default: "2"
+  require-level:
+    description: Fail the job if any control of level 1..N fails (1, 2 or 3). Unknown verdicts, such as automatic backups that a saved file cannot show, never fail. Empty = report only.
+    default: ""
+  pattern:
+    description: 'File name pattern, e.g. "*" for Oxidized git output (files without a suffix). Empty = .cfg .conf .txt .rsc .json.'
+    default: ""
+  recursive:
+    description: Also look in subfolders (hidden folders such as .git are skipped).
+    default: "true"
+  skip-unrecognised:
+    description: Skip files whose platform is not recognised instead of failing.
+    default: "false"
+
+outputs:
+  lowest-level:
+    description: Lowest conformance level achieved by the assessed configurations.
+    value: ${{ steps.audit.outputs.lowest-level }}
+  switches:
+    description: Number of configurations assessed.
+    value: ${{ steps.audit.outputs.switches }}
+  failing:
+    description: Number of configurations with a failed control up to require-level (0 when require-level is empty).
+    value: ${{ steps.audit.outputs.failing }}
+  results:
+    description: Path of the JSON results file (findings with redacted evidence).
+    value: ${{ steps.audit.outputs.results }}
+
+runs:
+  using: composite
+  steps:
+    # LYSS runs from this action's own files: the version is exactly the ref you pinned (tag or
+    # commit SHA), and the only package installed is PyYAML, pinned by hash.
+    # The audited repository is untrusted (a pull request can add any file): every Python call
+    # runs with -I (isolated: no module is ever imported from the current folder or from PYTHON*
+    # variables) and from the runner's temporary folder, never from the checked-out repository.
+    # Inputs reach the scripts only as environment variables, never pasted into the script text.
+    - name: Install LYSS
+      id: install
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      env:
+        LYSS_ACTION_PATH: ${{ github.action_path }}
+      run: |
+        set -euo pipefail
+        py="$(command -v python3 || command -v python)"
+        "$py" -I -m venv "$RUNNER_TEMP/lyss-venv"
+        if [ -x "$RUNNER_TEMP/lyss-venv/bin/python" ]; then lp="$RUNNER_TEMP/lyss-venv/bin/python"
+        else lp="$RUNNER_TEMP/lyss-venv/Scripts/python.exe"; fi
+        "$lp" -I -m pip install --quiet --disable-pip-version-check --require-hashes --only-binary :all: \
+          -r "$LYSS_ACTION_PATH/.github/action-requirements.txt"
+        "$lp" -I -c "import yaml; print('PyYAML', yaml.__version__)"
+        echo "python=$lp" >> "$GITHUB_OUTPUT"
+
+    - name: Audit configurations
+      id: audit
+      shell: bash
+      working-directory: ${{ runner.temp }}
+      env:
+        LYSS_ACTION_PATH: ${{ github.action_path }}
+        LYSS_PY: ${{ steps.install.outputs.python }}
+        LYSS_PATH: ${{ inputs.path }}
+        LYSS_VENDOR: ${{ inputs.vendor }}
+        LYSS_LEVEL: ${{ inputs.level }}
+        LYSS_REQUIRE_LEVEL: ${{ inputs.require-level }}
+        LYSS_PATTERN: ${{ inputs.pattern }}
+        LYSS_RECURSIVE: ${{ inputs.recursive }}
+        LYSS_SKIP: ${{ inputs.skip-unrecognised }}
+      run: |
+        set -uo pipefail
+        # one results file per step, removed first: a failed run never reports an earlier run's results
+        step="$(printf '%s' "${GITHUB_ACTION:-run}" | tr -cd 'A-Za-z0-9_-')"
+        results="$RUNNER_TEMP/lyss-results-${step}.json"
+        rm -f "$results"
+        args=(audit --vendor "$LYSS_VENDOR" --level "$LYSS_LEVEL" --json-file "$results" --summary "$GITHUB_STEP_SUMMARY")
+        [ -n "$LYSS_REQUIRE_LEVEL" ] && args+=(--require-level "$LYSS_REQUIRE_LEVEL")
+        [ -n "$LYSS_PATTERN" ] && args+=(--pattern "$LYSS_PATTERN")
+        [ "$LYSS_RECURSIVE" = "true" ] && args+=(--recursive)
+        [ "$LYSS_SKIP" = "true" ] && args+=(--skip-unrecognised)
+        # the path input is relative to the workspace (the steps run in the runner's temp folder)
+        case "$LYSS_PATH" in
+          /*|[A-Za-z]:*) target="$LYSS_PATH" ;;
+          *) target="$GITHUB_WORKSPACE/$LYSS_PATH" ;;
+        esac
+        args+=(-- "$target")
+        # configurations are untrusted (a pull request can change them): no line they contain may
+        # be read by the runner as a workflow command while the report is printed
+        token="$("$LYSS_PY" -I -c 'import secrets; print(secrets.token_hex(16))')"
+        echo "::stop-commands::$token"
+        "$LYSS_PY" -I "$LYSS_ACTION_PATH/tools/action_run.py" "${args[@]}"
+        rc=$?
+        echo "::$token::"
+        "$LYSS_PY" -I "$LYSS_ACTION_PATH/tools/action_run.py" outputs "$results" "$LYSS_REQUIRE_LEVEL" >> "$GITHUB_OUTPUT"
+        exit $rc

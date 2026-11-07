@@ -13,8 +13,8 @@ deploy it.
 | Asset | Where | Why it matters |
 |---|---|---|
 | Switch credentials (read-only account) | data directory, `devices.json` / profiles | Read access to every switch |
-| Configurations and device state | data directory, history | Network layout; may contain hashes or reversible type 7 keys |
-| Assessment results and reports | data directory, exports | A list of the weaknesses of each switch |
+| Configurations and device state | data directory, history (encrypted by default) | Network layout; may contain hashes or reversible type 7 keys |
+| Assessment results and reports | data directory (encrypted by default), exports | A list of the weaknesses of each switch |
 | Jump host key | path in Settings | Access to the jump host |
 | SMTP, CISO Assistant, SIEM credentials | settings (encrypted) | Access to those services |
 | Administrator password | settings (scrypt hash) | Control of LYSS, including remediation if enabled |
@@ -26,6 +26,11 @@ deploy it.
 - **Threat:** someone impersonates a switch (man in the middle) to capture the credentials.
   **Mitigation:** SSH host keys are trusted on first use and then pinned. A changed key stops the
   connection before any credential is sent. Verify the first key out of band when it matters.
+- **Threat:** a device announces itself as a switch (LLDP/CDP, SSH banner) to receive the shared
+  credentials at its first scan. **Mitigation:** discovered devices are never added or scanned
+  without the administrator's confirmation. "Scan right away" is off by default, and candidates
+  outside the configured sites are flagged. **Residual risk:** first contact trusts the key; check
+  the addresses before adding devices with a shared credential profile.
 - **Threat:** a downgrade to weak SSH algorithms. **Mitigation:** modern algorithms only. SHA-1 is
   used only for a switch that offers nothing else, after a modern-only attempt fails; the scan
   records it, and LYSS-MGMT-013 reports it (see SECURITY.md).
@@ -40,6 +45,13 @@ deploy it.
   - neighbour names and every switch output are rendered as text only (Jinja2 autoescaping,
     `textContent` in scripts);
   - the strict Content-Security-Policy forbids inline scripts.
+- **Threat:** crafted text makes a failing switch look compliant. **Mitigation:**
+  - text a neighbour sends (CDP/LLDP fields) cannot imitate a device-state section: collected
+    section headers carry a random value per collection;
+  - a configuration matching two platforms is not guessed;
+  - banner text is never read as configuration;
+  - a failed state command never counts as evidence of absence;
+  - long lines are capped and every pattern is linear, so a crafted line cannot stall an assessment.
 - **Threat:** secrets end up in reports. **Mitigation:** passwords, keys, SNMP communities and hashes
   are redacted from all evidence before it is stored or shown; only well-known defaults (such as
   the community `public`) stay visible, so that they can be reported. Tests check every test case
@@ -48,10 +60,16 @@ deploy it.
 ### 3. The web interface
 - **Threat:** access from the network. **Mitigation:**
   - it listens on 127.0.0.1 only; listening elsewhere requires `LYSS_ALLOW_REMOTE=1`;
+  - in that remote mode, creating the administrator needs a one-time token printed on the
+    console, so whoever reaches the port first cannot claim the instance;
   - it speaks plain HTTP, so remote use belongs behind an HTTPS reverse proxy.
+- **Threat:** a web page visited by the administrator reaches LYSS through DNS rebinding (its own
+  name resolving to 127.0.0.1). **Mitigation:** requests for any host name other than 127.0.0.1,
+  localhost, [::1] and the names in `LYSS_ALLOWED_HOSTS` are refused.
 - **Threat:** password guessing, session theft, cross-site requests. **Mitigation:**
   - administrator password hashed with scrypt;
-  - 5 failed logins lock the login for 5 minutes;
+  - 5 failed logins lock the login for 5 minutes, attempts in progress included. **Residual
+    risk:** the lock is global, so a local process can keep the administrator locked out;
   - sessions are server-side, cookies HttpOnly and SameSite=Strict, with a 30-minute idle timeout;
   - every state-changing request needs a CSRF token and a same-origin check.
 - **Threat:** secrets leak through the interface. **Mitigation:** stored secrets are never sent back
@@ -65,14 +83,26 @@ deploy it.
     master key from `LYSS_MASTER_KEY` or a `master.key` file created with mode 0600;
   - **residual risk:** malware running as the same user can decrypt them. Run LYSS on an
     administration machine, not a shared desktop.
-- **Threat:** configurations and results are read. They are **not** encrypted at rest. Protect
-  the data directory like the switch configurations themselves (disk encryption, access rights).
+- **Threat:** configurations and results are read from the disk or from a copy of the data
+  directory. **Mitigation:**
+  - collected configurations, device state, archived configuration versions and results are
+    encrypted at rest by default, with the same key as the credentials (Settings > Data
+    protection). Files are written with owner-only permissions where the system supports it;
+  - an optional retention period removes old configuration versions and scan history; the current
+    configuration is always kept.
+  - **Residual risk:** the same as for credentials. With AES-GCM, keep the master key outside the
+    data directory (`LYSS_MASTER_KEY`), or a copy of the directory includes its own key. The
+    inventory, settings, topology data and scan history (verdicts only) stay in plain JSON. Disk
+    encryption is still recommended.
 
-### 5. Remediation (the only feature that writes to switches)
-- It is **off by default**, and enabled only in Settings.
-- It offers low-risk fixes only, previewed, applied one switch at a time, verified over a new
-  connection, rolled back automatically on error, and logged.
-- Its parameters (syslog and NTP addresses, banner) are validated.
+### 5. Remediation and firmware upgrades (the only features that write to switches)
+- Both are **off by default**, each with its own setting.
+- Remediation offers low-risk fixes only, previewed, applied one switch at a time, verified over a
+  new connection, rolled back automatically on error, and logged. A rejected rollback is reported
+  as such and nothing is saved; the switch is then refused for further changes until a new scan.
+- Its parameters (syslog and NTP addresses, banner) are validated when saved and again when fixes
+  are built, and the collector refuses any command containing control characters (no line can
+  be injected).
 - **It needs a write-capable account**, which LYSS otherwise never needs. In production, keep it
   off, or put it under your change management with a separate account.
 

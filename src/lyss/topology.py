@@ -11,7 +11,7 @@ then by unique hostname, and both ends of a link are merged into one edge.
 import re
 from collections import defaultdict
 
-from . import collector, inventory
+from . import collector, inventory, sealed
 from .config import parse_state
 from .engine import normalize_port
 
@@ -212,7 +212,7 @@ def _identity(device: dict) -> dict:
     cfg_path, state_path = collector.config_paths(device)
     ident = {"hostname": "", "mac": None, "neighbors": []}
     if cfg_path.exists():
-        text = cfg_path.read_text(encoding="utf-8", errors="replace")
+        text = sealed.read_text(cfg_path, errors="replace")
         # Cisco / HP "hostname", RouterOS "/system identity set name=", SONiC config_db "hostname"
         m = (re.search(r'^hostname\s+"?([^"\s]+)"?\s*$', text, re.M)
              or re.search(r'^/system identity set name="?([^"\s]+)"?', text, re.M)
@@ -220,7 +220,7 @@ def _identity(device: dict) -> dict:
         ident["hostname"] = m.group(1) if m else ""
     if not state_path.exists():
         return ident
-    state = parse_state(state_path.read_text(encoding="utf-8", errors="replace"))
+    state = parse_state(sealed.read_text(state_path, errors="replace"))
     for line in state.get("show system", []) + state.get("show version", []):
         m = re.search(r"(?i)(?:System MAC Address|Base Ethernet MAC Address|Base MAC Addr)\s*:\s*(\S+)", line)
         if m:

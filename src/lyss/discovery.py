@@ -164,23 +164,24 @@ def expand(nets: list[str]) -> list[str]:
     return list(dict.fromkeys(out))[:MAX_HOSTS]
 
 
-def _banner(ip: str, jump) -> str | None:
-    """SSH identification string of ip:22, directly or through the jump host. None if closed."""
+def _banner(ip: str, jump, port: int = 22) -> str | None:
+    """SSH identification string of ip:port, directly or through the jump host. None if closed."""
     chan = None
     try:
         if jump:
             # connect_timeout: with a source address, nc on the jump host gives up after 4 s
             # instead of waiting for the system TCP timeout (no process left behind)
-            chan = jump.channel(ip, 22, timeout=4, connect_timeout=4)
+            chan = jump.channel(ip, port, timeout=4, connect_timeout=4)
             chan.settimeout(5)
-            data = b""
-            while b"\n" not in data and len(data) < 256:
+            data, deadline = b"", time.monotonic() + 8
+            # one overall deadline: a host sending a byte every few seconds cannot hold a worker
+            while b"\n" not in data and len(data) < 256 and time.monotonic() < deadline:
                 chunk = chan.recv(256)
                 if not chunk:
                     break
                 data += chunk
         else:
-            with socket.create_connection((ip, 22), timeout=2) as s:
+            with socket.create_connection((ip, port), timeout=2) as s:
                 s.settimeout(4)
                 data = s.recv(256)
         line = data.split(b"\n", 1)[0].decode("ascii", errors="replace").strip()

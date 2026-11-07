@@ -29,6 +29,24 @@ def test_level_1_and_2_controls_are_fully_specified():
             assert ref in c.get("mappings", {}), f"{c['id']} lacks the {ref} mapping"
 
 
+def test_every_control_has_a_nis2_mapping_with_valid_points():
+    for c in load_spec()["controls"]:
+        points = c.get("mappings", {}).get("nis2_art21")
+        assert points is not None, f"{c['id']} lacks the nis2_art21 mapping (an empty list is allowed)"
+        assert set(points) <= set("abcdefghij"), c["id"]
+
+
+def test_crosswalk_lists_every_mapping_and_is_informative():
+    text = (ROOT / "docs" / "MAPPINGS.md").read_text(encoding="utf-8")
+    assert "Informative only" in text and "not legal advice" in text
+    for c in load_spec()["controls"]:
+        for key, refs in c.get("mappings", {}).items():
+            for ref in refs or []:
+                shown = f"21(2)({ref})" if key == "nis2_art21" else str(ref)
+                row = next((l for l in text.splitlines() if l.startswith(f"| {shown} |")), "")
+                assert c["id"] in row, (c["id"], key, ref)
+
+
 def test_spec_version_is_semver():
     assert re.match(r"^\d+\.\d+\.\d+(-[a-z0-9.]+)?$", load_spec()["spec_version"])
 

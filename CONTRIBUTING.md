@@ -11,7 +11,8 @@ the **tool and adapters** (how it is checked on each platform). Both are welcome
 - **Read-only collection only.** A collector command must never change the device.
 - **Unknown, never guess.** When evidence is missing, a check yields `unknown`.
 - **Every fact in `data/firmware.yaml` cites its source** (vendor advisory, end-of-life bulletin,
-  CISA KEV) and the date it was verified.
+  CISA KEV) and the date it was verified. `python tools/kev_watch.py` lists the CISA KEV entries
+  for LYSS platforms that `firmware.yaml` does not cover yet: a good place to start.
 
 ## Proposing a change to the specification
 

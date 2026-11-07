@@ -8,7 +8,7 @@ import socket
 import paramiko
 import pytest
 
-from lyss import collector, inventory, legacy_ssh
+from lyss import collector, inventory, legacy_ssh, sealed
 from lyss.sim import Simulator, load_lab
 
 
@@ -72,7 +72,7 @@ def test_fallback_is_per_switch_and_recorded(data_dir, sim):
                   "username": creds["username"], "via_jump": False}
         inventory.save_device(device, creds["password"])
         collector.collect_device(inventory.get_device(sw.id), None)
-        state = collector.config_paths(inventory.get_device(sw.id))[1].read_text(encoding="utf-8")
+        state = sealed.read_text(collector.config_paths(inventory.get_device(sw.id))[1])
         results[switch_id] = state.split("===== ssh negotiated =====", 1)[1].split("=====", 1)[0]
     assert "legacy: required" not in results["demo-core"]
     assert "sha1" not in results["demo-core"] and "hostkey: ssh-rsa" not in results["demo-core"]

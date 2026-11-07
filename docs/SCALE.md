@@ -30,10 +30,10 @@ own overhead, not a promise for a real network.
 
 ## A real network
 
-On 9 real switches (Cisco Catalyst 1000, SG300, SG350), reached through an SSH jump host, a full
-scan takes about 26 seconds. Real switches are much slower than the simulator. An old SG300 needs
-several seconds to answer a `show running-config`, and it refuses SSH sessions opened in quick
-succession, so LYSS waits and retries.
+On a small production network of older Cisco switches, a full scan takes a few seconds per
+switch. Real switches are much slower than the simulator. An old switch can need several seconds
+to answer a `show running-config`, and some refuse SSH sessions opened in quick succession, so
+LYSS waits and retries.
 
 **Rough estimate for a large real fleet:** about 15–20 seconds per legacy switch, divided by the
 number of parallel collections.

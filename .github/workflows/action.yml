@@ -1,0 +1,50 @@
+name: action
+
+# Self-test of the LYSS GitHub Action (action.yml at the repository root) on the fictitious test
+# cases: a report-only run, then a gate that must fail on the deliberately weak configurations.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - name: Report only
+        id: report
+        uses: ./
+        with:
+          path: tests/cases
+          pattern: config.cfg
+          level: "2"
+      - name: Gate on the weak fictitious configurations (must fail)
+        id: gate
+        continue-on-error: true
+        uses: ./
+        with:
+          path: tests/cases
+          pattern: config.cfg
+          level: "2"
+          require-level: "1"
+      - name: Gate on a hardened fictitious configuration (must pass)
+        id: hardened
+        uses: ./
+        with:
+          path: tests/cases/ios-hardened
+          pattern: config.cfg
+          level: "2"
+          require-level: "2"
+      - name: Check the outcomes
+        env:
+          SWITCHES: ${{ steps.report.outputs.switches }}
+          GATE: ${{ steps.gate.outcome }}
+          HARDENED: ${{ steps.hardened.outputs.failing }}
+        run: |
+          echo "switches=$SWITCHES gate=$GATE hardened-failing=$HARDENED"
+          test "$SWITCHES" -ge 13
+          test "$GATE" = failure
+          test "$HARDENED" = 0

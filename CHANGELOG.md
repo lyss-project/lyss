@@ -2,6 +2,152 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.14.0 (2026-11-07)
+
+Switch configurations checked in CI, encryption at rest of configurations and results, NIS2
+mapping and crosswalk, watch of exploited vulnerabilities, supply-chain hardening. Specification
+0.6.0-draft: requirements unchanged, informative references added.
+
+- **Security review** of the whole tool before this release (SSH collection, storage, web
+  interface, assessment engine, remediation and firmware, CI). Fixed:
+  - **Command injection through IPv6 scope ids.** Python accepts `fe80::1%<anything>` as an
+    address, so a switch address or the jump host source could carry shell characters into the
+    `nc` command on the jump host, and the syslog setting could carry new lines into the
+    configuration sent to switches. Addresses are now checked exactly (no scope id, no spaces or
+    control characters), remediation servers must be IPv4, settings are re-checked when fixes are
+    built, and the collector refuses any configuration command that contains control characters.
+  - **GitHub Action:** every Python call runs isolated (`-I`), from the runner's temporary
+    folder, so files of the audited repository (a pull request) can never be imported. LYSS runs
+    from the action's own files and only PyYAML is installed, pinned by hash. Symbolic links and
+    special files are never followed, very large files are skipped, and the job summary stays
+    under GitHub's limit.
+  - **Web interface:**
+    - requests for an unknown host name are refused (DNS rebinding); `LYSS_ALLOWED_HOSTS` adds names;
+    - in remote mode, creating the administrator needs a token printed on the console;
+    - parallel password guesses can no longer exceed the limit;
+    - POSTs without a session are refused before their body is read, and bodies are size-capped;
+    - deleting a device never builds a path from the name in the URL;
+    - network (UNC) paths are refused;
+    - sessions have a 12-hour maximum, and cookies are Secure over HTTPS.
+  - **Remediation:**
+    - a rejected rollback is no longer reported as done, and nothing is saved after it;
+    - any error while sending or verifying triggers the rollback;
+    - a syslog or NTP server already on the switch is never re-sent, so never removed by a rollback;
+    - NTP fixes are verified on the configuration (synchronisation takes minutes);
+    - the suggested servers need a majority of switches, and are no longer pre-filled;
+    - a switch whose last change may be incomplete is refused until it has been scanned again.
+  - **Assessment engine.** Several inputs could make a failing switch look compliant:
+    - **Forged device state.** Text a neighbour sends over CDP/LLDP and the switch prints could
+      imitate a section header and replace `show version` or the SSH evidence. Collected
+      headers now carry a random value per collection; in hand-made state files, a duplicated
+      section is dropped.
+    - **Platform auto-detection** could be steered: an IOS banner quoting a Zyxel line made
+      every control "unknown". Text matching two platforms is no longer guessed. The CI gate
+      also fails a file whose controls are mostly undecided.
+    - **Banner text** counted as configuration: a multi-line banner containing
+      `logging host ...` passed LYSS-LOG-010. Banner lines are now kept apart. The RouterOS
+      rewrite runs only for MikroTik, and SONiC JSON names can no longer inject lines.
+    - **A state command that failed** (`% Unrecognized command`) no longer passes an "absent" check.
+    - **Cisco IOS:**
+      - `username ... nopassword`, `server-private ... key`, `pac key` and `exec-timeout 0 86400` now fail;
+      - AAA must cover the login list the vty lines really use.
+    - **MikroTik:** a later `/ip service enable telnet`, a `comment="disabled=yes"`, or a quoted
+      `name="public"` no longer fool the configuration checks.
+  - **Redaction** now also covers:
+    - SNMPv3 keys in configuration differences and in Cisco SB `encrypted` lines;
+    - `snmp-server host ... <community>`;
+    - RouterOS community names;
+    - `md5` keys (NTP, OSPF);
+    - quoted multi-word secrets;
+    - pre-shared keys and passphrases;
+    - `Password:` in state output;
+    - private-key blocks in differences.
+  - **Denial of service:** the regular expressions that could take minutes on a crafted long line
+    are linear now, lines are capped, and huge port ranges are not expanded.
+  - **Collection:**
+    - `known_hosts` is locked across processes and rewritten atomically;
+    - a wrong Cisco SB password is tried once, never retried (account lockout);
+    - the shell session caps its output and recognises the switch's own prompt only;
+    - discovery probes have an overall deadline;
+    - platform auto-detection probes the device's own SSH port.
+  - **Firmware upgrades** have their own setting, off by default. Activation checks that the new
+    image is in flash and keeps the previous image as a fallback in the boot path. If the switch
+    does not confirm the reload, LYSS restores the previous boot variable instead of leaving it
+    armed for the next reboot.
+  - **Remediation never guesses the previous state.** The Cisco SB web mitigation needs the
+    collected list of services. A fix that would delete an existing (non-compliant) login banner
+    is left to the administrator, because LYSS could not put the original text back.
+  - **Discovery:** "Scan them right away" is off by default, with a warning. A discovered device
+    is not verified, and the first scan sends the profile's password to it. Candidates outside
+    your sites are flagged.
+  - **Settings** saved at the same time by two writers (two tabs, the web interface and the
+    command line) keep both changes.
+  - **Hand-made files:** the offline audit refuses a Cisco IOS, Cisco SB or Arista file whose
+    block commands are not indented as the switch prints them, because such a line could escape
+    its block (CI).
+  - **HPE AOS-S:** `console idle-timeout serial-usb 0` now fails LYSS-MGMT-004.
+  - **Storage:**
+    - configuration archive updates are locked across processes;
+    - every write uses its own temporary file;
+    - retention always keeps the last 3 distinct versions;
+    - a missing master key with existing encrypted data stops LYSS instead of silently creating a new one;
+    - DPAPI file encryption is separated from credentials;
+    - data files are owner-only on Linux.
+  - **Releases:** build tools are pinned (`.github/build-constraints.txt`).
+- **Encryption at rest, on by default.** Collected configurations, device state, archived
+  configuration versions and results are encrypted with the same key as the credentials:
+  Windows DPAPI (current user) or AES-256-GCM (master key). Plain files of earlier versions stay
+  readable and are encrypted at the next scan; tampered files are refused.
+  - Settings > Data protection shows the state, can turn encryption off for new files, and sets a
+    **retention period** for configuration versions and scan history. The current configuration
+    is always kept.
+  - `lyss data status | seal | unseal --yes | config <switch> [--list | --version FILE]`. `config`
+    prints a stored configuration to restore it on a switch; the web interface keeps showing
+    redacted differences only.
+  - Data files are written with owner-only permissions where the system supports it.
+- **Supply chain.** Every third-party GitHub Action is pinned to a commit SHA, and a test refuses
+  unpinned ones. Each release gets a CycloneDX SBOM of the installed wheel and its dependencies,
+  next to the signed provenance PyPI already records (this repository, this workflow). The
+  release jobs keep least privilege, also checked by a test.
+- **Validation matrix** [docs/VALIDATION.md](docs/VALIDATION.md): for each platform, whether it was
+  validated on real hardware, a virtual switch, the simulator or synthetic data, per level, and
+  what is not validated yet.
+- **Version consistency.** A test checks that the package, pyproject, README status, site
+  metadata, changelog and every adapter state the same versions. The README still said 0.12.
+
+- **GitHub Action** (`uses: lyss-project/lyss@<tag>`): runs the offline audit on the
+  configurations of a repository and writes a job summary. With `require-level: N`, the job fails
+  when a control of level 1..N fails. Unknown verdicts, such as automatic backups that a saved file
+  cannot show, never fail the job. See [docs/CI.md](docs/CI.md).
+  - Configurations and inputs are treated as untrusted:
+    - inputs reach the scripts only as environment variables;
+    - workflow commands are disabled while the report is printed;
+    - every value from a configuration is escaped in the summary (no link, image or HTML).
+  - The action installs LYSS from its own files at the pinned ref.
+- **`lyss audit` for any CI:**
+  - `--require-level N` (exit code 1 on a failed control);
+  - `--summary FILE` (markdown, appended);
+  - `--json-file FILE`;
+  - `--pattern` (e.g. `"*"` for Oxidized git output, whose files have no suffix);
+  - `--recursive` (hidden folders such as `.git` skipped);
+  - `--skip-unrecognised`.
+  - `--vendor` and `--level` now refuse unknown values. Arista EOS and Zyxel GS1900 are listed in
+    the help.
+- **NIS2 mapping.** Every control now also refers to the points of Article 21(2) of Directive (EU)
+  2022/2555 that it supports, next to ISO/IEC 27001:2022, NIST SP 800-53 r5 and CIS Controls v8.
+  The new [docs/MAPPINGS.md](docs/MAPPINGS.md) reads the same mappings from each framework (for
+  example: which LYSS controls support NIS2 21(2)(h), cryptography). These references are
+  informative: the author's interpretation, not legal advice. The requirements and verdicts of
+  0.6.0-draft are unchanged.
+- The specification document no longer calls the Level 3 controls "to be written": their
+  requirements and test procedures have been complete since 0.10.0.
+- **Exploited vulnerabilities watch.** `tools/kev_watch.py` compares the CISA Known Exploited
+  Vulnerabilities catalog with `data/firmware.yaml`, for the platforms LYSS knows. A weekly
+  read-only workflow fails when a new entry concerns one of them, and the maintainer then updates
+  `firmware.yaml` from the vendor advisory. The firmware data stays curated by a person; the watch
+  only says what to look at. Older entries not yet reviewed are listed too: 43 at the first run,
+  almost all Cisco IOS / IOS XE.
+
 ## 0.13.0 (2026-11-07)
 
 Production readiness. Specification unchanged (0.6.0-draft).

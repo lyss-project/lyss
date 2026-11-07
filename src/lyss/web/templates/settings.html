@@ -54,6 +54,28 @@
   <div class="form-actions span-2"><button class="btn btn-primary" type="submit">Save</button></div>
 </form>
 
+<form method="post" action="/settings/data" class="card form-grid" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="span-2">
+    <h2>Data protection</h2>
+    <p class="muted">Collected configurations contain password hashes, keys and the layout of your network; results
+      list each switch's weaknesses. {{ project }} encrypts them at rest with
+      {% if data_protection.backend == "dpapi" %}Windows DPAPI (readable only by this Windows user){% else %}AES-256-GCM
+      (master key: <code>LYSS_MASTER_KEY</code> or <code>master.key</code> in the data directory: keep it elsewhere
+      and back it up){% endif %}.
+      Now: {{ data_protection.sealed }} encrypted file(s), {{ data_protection.plain }} plain.
+      To restore a configuration on a switch, print a stored version with
+      <code>python -m lyss data config &lt;switch&gt;</code>.</p>
+  </div>
+  <label class="check span-2"><input type="checkbox" name="encrypt" value="1" {% if data_protection.enabled %}checked{% endif %}>
+    Encrypt configurations, device state and results (recommended)</label>
+  <label>Keep configuration versions and scan history for (days)
+    <input name="retention_days" type="number" min="0" max="36500" value="{{ data_protection.retention_days }}">
+    <small class="muted">0 = no time limit. The current configuration is always kept.</small>
+  </label>
+  <div class="form-actions span-2"><button class="btn btn-primary" type="submit">Save</button></div>
+</form>
+
 <form method="post" action="/settings/schedule" class="card form-grid" autocomplete="off">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="span-2">
@@ -79,13 +101,15 @@
       (preview, backup, automatic rollback, verification, then save; every change logged). Off by default. Never automatic.</p>
   </div>
   <label class="check span-2"><input type="checkbox" name="enabled" {% if remediation.enabled %}checked{% endif %}> Enable remediation</label>
-  <label>Syslog server
-    <input name="syslog" value="{{ remediation.syslog or suggested.syslog }}" placeholder="192.0.2.10">
-    {% if suggested.syslog %}<small>Most used on your switches: {{ suggested.syslog }}</small>{% endif %}
+  <label class="check span-2"><input type="checkbox" name="firmware" {% if remediation.firmware %}checked{% endif %}>
+    Allow firmware upgrades (Cisco Catalyst 1000: upload, staging, activation with a reload). Off by default.</label>
+  <label>Syslog server (IPv4)
+    <input name="syslog" value="{{ remediation.syslog }}" placeholder="{{ suggested.syslog or '192.0.2.10' }}">
+    {% if suggested.syslog %}<small>Configured on most of your switches: {{ suggested.syslog }}. Check it, then type it to use it.</small>{% endif %}
   </label>
-  <label>NTP servers (comma separated)
-    <input name="ntp" value="{{ (remediation.ntp or suggested.ntp)|join(', ') }}" placeholder="192.0.2.1, 192.0.2.2">
-    {% if suggested.ntp %}<small>Most used on your switches: {{ suggested.ntp|join(", ") }}</small>{% endif %}
+  <label>NTP servers (IPv4, comma separated)
+    <input name="ntp" value="{{ remediation.ntp|join(', ') }}" placeholder="{{ suggested.ntp|join(', ') or '192.0.2.1, 192.0.2.2' }}">
+    {% if suggested.ntp %}<small>Configured on most of your switches: {{ suggested.ntp|join(", ") }}. Check them, then type them to use them.</small>{% endif %}
   </label>
   <label class="span-2">Login banner text
     <input name="banner" value="{{ remediation.banner }}" maxlength="200">

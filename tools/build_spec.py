@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
-"""Generate docs/LYSS-Specification.md from spec/lyss-spec.yaml (the normative source).
+"""Generate docs/LYSS-Specification.md and docs/MAPPINGS.md (crosswalk) from spec/lyss-spec.yaml
+(the normative source).
 
-    python tools/build_spec.py          write the document
-    python tools/build_spec.py --check  exit 1 if the document is out of date (CI, tests)
+    python tools/build_spec.py          write the documents
+    python tools/build_spec.py --check  exit 1 if a document is out of date (CI, tests)
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -14,6 +16,29 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "spec" / "lyss-spec.yaml"
 OUT = ROOT / "docs" / "LYSS-Specification.md"
+CROSSWALK = ROOT / "docs" / "MAPPINGS.md"
+# NIS2 = Directive (EU) 2022/2555, Article 21(2): short labels of points (a)-(j), Official Journal
+# L 333, 27.12.2022 (EUR-Lex CELEX:32022L2555)
+NIS2_POINTS = {
+    "a": "Policies on risk analysis and information system security",
+    "b": "Incident handling",
+    "c": "Business continuity, such as backup management and disaster recovery, and crisis management",
+    "d": "Supply chain security",
+    "e": "Security in network and information systems acquisition, development and maintenance, "
+         "including vulnerability handling and disclosure",
+    "f": "Policies and procedures to assess the effectiveness of cybersecurity risk-management measures",
+    "g": "Basic cyber hygiene practices and cybersecurity training",
+    "h": "Policies and procedures regarding the use of cryptography and, where appropriate, encryption",
+    "i": "Human resources security, access control policies and asset management",
+    "j": "Multi-factor or continuous authentication, secured voice, video and text communications "
+         "and secured emergency communication systems",
+}
+FRAMEWORKS = (  # key in the specification, title, how a reference is shown
+    ("nis2_art21", "NIS2 Directive, Article 21(2)", lambda v: f"21(2)({v})"),
+    ("iso27001_2022", "ISO/IEC 27001:2022, Annex A", str),
+    ("nist_800_53r5", "NIST SP 800-53 revision 5", str),
+    ("cis_v8", "CIS Controls v8 (safeguards)", str),
+)
 LEVEL_PROSE = {
     1: "the minimum every managed switch must meet: no cleartext management, no default or recoverable credentials, supported firmware, automatic backups.",
     2: "a hardened management plane: central authentication, restricted and modern management access, remote logging and time, basic access-port hygiene.",
@@ -107,8 +132,9 @@ def build() -> str:
             out += [f"- **Evidence.** {', '.join(c.get('evidence', []))}",
                     f"- **References (informative).** ISO/IEC 27001:2022 {mapping(m.get('iso27001_2022'))}"
                     f" · NIST SP 800-53 r5 {mapping(m.get('nist_800_53r5'))}"
-                    f" · CIS Controls v8 {mapping(m.get('cis_v8'))}", ""]
-            if c["level"] == 3:
+                    f" · CIS Controls v8 {mapping(m.get('cis_v8'))}"
+                    f" · NIS2 Art. {mapping([f'21(2)({p})' for p in m.get('nis2_art21') or []])}", ""]
+            if not c.get("test_procedure"):
                 out += ["*Draft: requirement text and checks to be written.*", ""]
     out += [
         "## 6. Requirements for adapters",
@@ -156,24 +182,78 @@ def build() -> str:
         "",
         "## 9. References (informative)",
         "",
-        "Mappings to ISO/IEC 27001:2022 Annex A, NIST SP 800-53 revision 5 and CIS Controls v8 are",
-        "informative: they help reuse LYSS results as audit evidence and do not change the requirements.",
+        "Mappings to ISO/IEC 27001:2022 Annex A, NIST SP 800-53 revision 5, CIS Controls v8 and",
+        "Article 21(2) of the NIS2 Directive (EU) 2022/2555 are informative: they help reuse LYSS",
+        "results as audit evidence and do not change the requirements. The same mappings, read from each",
+        "framework, are in [MAPPINGS.md](MAPPINGS.md).",
         "",
     ]
     return "\n".join(out)
 
 
+def _natural(ref: str) -> list:
+    return [int(t) if t.isdigit() else t for t in re.split(r"(\d+)", ref)]
+
+
+def build_crosswalk() -> str:
+    spec = yaml.safe_load(SPEC.read_text(encoding="utf-8"))
+    controls = spec["controls"]
+    out = [
+        "<!-- Generated from spec/lyss-spec.yaml by tools/build_spec.py. Do not edit by hand. -->",
+        "",
+        "# Crosswalk: frameworks to LYSS controls",
+        "",
+        f"Specification {spec['spec_version']}. For each requirement of a framework, the LYSS controls",
+        "whose results can serve as **part** of the evidence for it.",
+        "",
+        "**Informative only.**",
+        "- These mappings are the author's interpretation. They are not endorsed by ISO, NIST, CIS or",
+        "  the European Union, and they are not legal advice.",
+        "- A LYSS pass covers the configuration of switches only. It never satisfies a framework",
+        "  requirement on its own: policies, people, processes and every other kind of system remain",
+        "  in scope.",
+        "- For NIS2, the obligations that apply to an entity come from the national law transposing the",
+        "  Directive.",
+        "",
+    ]
+    for key, title, show in FRAMEWORKS:
+        refs: dict[str, list[dict]] = {}
+        for c in controls:
+            for ref in c.get("mappings", {}).get(key) or []:
+                refs.setdefault(str(ref), []).append(c)
+        out += [f"## {title}", ""]
+        if key == "nis2_art21":
+            out += ["Directive (EU) 2022/2555, Article 21(2): the measures shall include at least points",
+                    "(a) to (j). Points without a LYSS control are outside what a switch configuration shows.", "",
+                    "| Point | Measure | LYSS controls |", "|---|---|---|"]
+            for point, label in NIS2_POINTS.items():
+                linked = ", ".join(f"{c['id']} (L{c['level']})" for c in refs.get(point, [])) or "—"
+                out.append(f"| {show(point)} | {label} | {linked} |")
+        else:
+            out += ["| Reference | LYSS controls |", "|---|---|"]
+            for ref in sorted(refs, key=_natural):
+                out.append(f"| {show(ref)} | " + ", ".join(f"{c['id']} (L{c['level']})" for c in refs[ref]) + " |")
+        unmapped = [c["id"] for c in controls if not c.get("mappings", {}).get(key)]
+        if unmapped:
+            out += ["", "No direct reference: " + ", ".join(unmapped) + "."]
+        out.append("")
+    return "\n".join(out)
+
+
 def main() -> int:
-    content = build()
+    documents = {OUT: build(), CROSSWALK: build_crosswalk()}
     if "--check" in sys.argv:
-        if not OUT.exists() or OUT.read_text(encoding="utf-8") != content:
-            print("docs/LYSS-Specification.md is out of date: run python tools/build_spec.py")
-            return 1
-        print("specification document up to date")
-        return 0
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(content, encoding="utf-8", newline="\n")
-    print(f"written {OUT.relative_to(ROOT)}")
+        stale = [p for p, content in documents.items()
+                 if not p.exists() or p.read_text(encoding="utf-8") != content]
+        for p in stale:
+            print(f"{p.relative_to(ROOT).as_posix()} is out of date: run python tools/build_spec.py")
+        if not stale:
+            print("specification documents up to date")
+        return 1 if stale else 0
+    for path, content in documents.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8", newline="\n")
+        print(f"written {path.relative_to(ROOT).as_posix()}")
     return 0
 
 

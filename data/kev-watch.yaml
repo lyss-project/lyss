@@ -1,0 +1,38 @@
+# Watch of the CISA Known Exploited Vulnerabilities catalog (tools/kev_watch.py).
+# A KEV entry for a platform LYSS knows, added after reviewed_until and not yet mentioned in
+# data/firmware.yaml, is reported as NEW. The tool never changes firmware.yaml: a person checks
+# the vendor advisory (affected models and fixed releases), updates firmware.yaml with its source,
+# then moves reviewed_until forward. Licensed CC BY 4.0, like firmware.yaml.
+source: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
+reviewed_until: 2026-11-07
+
+# KEV entries matched by a filter below but checked and found not to concern a switch platform
+# LYSS assesses, e.g. a "Multiple Products" entry for firewalls only. Each with its reason:
+#   - cve: CVE-YYYY-NNNNN
+#     reason: what the vendor advisory says is affected
+#     checked: YYYY-MM-DD
+not_applicable: []
+
+# Which KEV entries concern a platform LYSS knows. Regular expressions, case-insensitive, on the
+# KEV "vendorProject" and "product" fields; "exclude" removes products that are not switches.
+filters:
+  - platform: cisco_ios
+    vendor: '^cisco$'
+    product: '\bIOS\b|catalyst .*switch|^multiple products$'
+    exclude: '^IOS XR$|SD-WAN'          # IOS XR runs on routers; SD-WAN products are not switches
+  - platform: cisco_sb
+    vendor: '^cisco$'
+    product: 'small business .*switch|business \d{3} .*switch|\bS[GF]\d{3}\b|\bCBS\d{3}\b'
+  - platform: hp_procurve
+    vendor: 'hewlett packard|^hpe?\b|aruba'
+    product: 'procurve|arubaos-switch|\baos-s\b|aruba .*switch'
+    exclude: 'manager|identity driven'   # ProCurve Manager and IDM are management software
+  - platform: mikrotik
+    vendor: '^mikrotik$'
+    product: 'routeros|switchos'
+  - platform: arista_eos
+    vendor: '^arista$'
+    product: 'extensible operating system|\bEOS\b'
+  - platform: zyxel_gs1900
+    vendor: '^zyxel$'
+    product: 'GS1900|switch|^multiple products$'

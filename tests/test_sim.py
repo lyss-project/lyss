@@ -6,7 +6,7 @@ Cisco SB and HPE Aruba switches, without any hardware."""
 
 import pytest
 
-from lyss import collector, discovery, inventory, remediate, scan, topology
+from lyss import collector, discovery, inventory, remediate, scan, sealed, topology
 from lyss.sim import Simulator, load_lab
 from lyss.sim.config import RunningConfig
 from lyss.sim.render import show
@@ -68,9 +68,9 @@ def test_whole_lab_is_collected_audited_and_mapped(data_dir, sim):
     for sw in sim.lab.switches.values():
         result = results[sw.id]
         cfg, state = collector.config_paths(inventory.get_device(sw.id))
-        assert sw.hostname in cfg.read_text(encoding="utf-8")
+        assert sw.hostname in sealed.read_text(cfg)
         for command in collector.COMMANDS[sw.platform]["state"]:
-            assert f"===== {command} =====" in state.read_text(encoding="utf-8")
+            assert f"===== {command} =====" in sealed.read_text(state)
         if sw.platform == "hp_procurve":
             # HP verdicts belong to the HP adapter tests; here: collection and facts only
             assert "JL253A" in result["model"] and result["firmware"] == "WC.16.10.0012"

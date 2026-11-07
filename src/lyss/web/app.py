@@ -13,8 +13,10 @@ Security model (local, single administrator):
 
 import hmac
 import ipaddress
+import os
 import re
 import secrets
+import threading
 import time
 from pathlib import Path
 
@@ -24,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import (PROJECT_LONG_NAME, PROJECT_NAME, __version__, changes, collector, discovery, events, firmware, health,
-                history, inventory, notify, remediate, report, scan, sites, topology, vault)
+                history, inventory, notify, remediate, report, scan, sealed, sites, topology, vault)
 from ..engine import ADAPTER_DIR, load_spec
 
 HERE = Path(__file__).parent
@@ -40,7 +42,33 @@ templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.globals.update(project=PROJECT_NAME, project_long=PROJECT_LONG_NAME, version=__version__)
 
 _sessions: dict[str, dict] = {}
-_failures = {"count": 0, "locked_until": 0.0}
+_failures = {"count": 0, "locked_until": 0.0, "inflight": 0}
+_login_lock = threading.Lock()
+_setup_lock = threading.Lock()
+SESSION_MAX = 12 * 3600                 # absolute session lifetime, whatever the activity
+MAX_BODY = 1024 * 1024                  # form posts; firmware images have their own limit
+PUBLIC_POSTS = ("/login", "/setup")     # the only POSTs accepted without a session
+# printed on the console at start-up; required to create the administrator when the interface
+# listens beyond this PC (LYSS_ALLOW_REMOTE=1): whoever reaches the port first cannot claim it
+SETUP_TOKEN = secrets.token_urlsafe(12)
+
+
+def remote_mode() -> bool:
+    return os.environ.get("LYSS_ALLOW_REMOTE") == "1"
+
+
+def allowed_hosts() -> set[str]:
+    """Host names the interface answers to. A request for any other name is refused, which
+    stops DNS rebinding (a web page whose own name resolves to 127.0.0.1)."""
+    extra = {h.strip().lower() for h in os.environ.get("LYSS_ALLOWED_HOSTS", "").split(",") if h.strip()}
+    return {"127.0.0.1", "localhost", "[::1]"} | extra
+
+
+def _host_name(host: str) -> str:
+    host = host.strip().lower()
+    if host.startswith("["):
+        return host[:host.find("]") + 1] if "]" in host else host
+    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
 
 SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
@@ -68,7 +96,18 @@ async def _to_login(request: Request, exc: LoginRequired):
 
 @app.middleware("http")
 async def _security(request: Request, call_next):
+    if _host_name(request.headers.get("host", "")) not in allowed_hosts():
+        return PlainTextResponse("Unknown host name (set LYSS_ALLOWED_HOSTS to allow it)", status_code=421)
     if request.method == "POST":
+        size = request.headers.get("content-length", "")
+        limit = firmware.MAX_IMAGE + MAX_BODY if request.url.path == "/firmware/upload" else MAX_BODY
+        if size and (not size.isdigit() or int(size) > limit):
+            return PlainTextResponse("Request too large", status_code=413)
+        if request.url.path not in PUBLIC_POSTS and not _valid_session(request.cookies.get(SESSION_COOKIE, "")):
+            # refused before the body is read: no upload is spooled to disk without a session
+            if request.url.path.startswith("/api/"):
+                return JSONResponse({"error": "login required"}, status_code=401)
+            return RedirectResponse("/login", status_code=303)
         # Browsers send Sec-Fetch-Site; fall back to the Origin header for clients that do not
         site = request.headers.get("sec-fetch-site")
         origin = request.headers.get("origin")
@@ -85,11 +124,18 @@ async def _security(request: Request, call_next):
 
 # ---------------- sessions ----------------
 
-def _session(request: Request) -> dict:
-    token = request.cookies.get(SESSION_COOKIE, "")
+def _valid_session(token: str) -> dict | None:
     session = _sessions.get(token)
-    if not session or session["expires"] < time.time():
+    now = time.time()
+    if not session or session["expires"] < now or now - session.get("created", now) > SESSION_MAX:
         _sessions.pop(token, None)
+        return None
+    return session
+
+
+def _session(request: Request) -> dict:
+    session = _valid_session(request.cookies.get(SESSION_COOKIE, ""))
+    if session is None:
         raise LoginRequired()
     session["expires"] = time.time() + SESSION_IDLE
     return session
@@ -100,10 +146,13 @@ def _check_csrf(session: dict, token: str) -> None:
         raise LoginRequired()
 
 
-def _new_session(response) -> None:
+def _new_session(response, request: Request | None = None) -> None:
     token = secrets.token_urlsafe(32)
-    _sessions[token] = {"csrf": secrets.token_urlsafe(32), "expires": time.time() + SESSION_IDLE}
-    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="strict", max_age=SESSION_IDLE)
+    now = time.time()
+    _sessions[token] = {"csrf": secrets.token_urlsafe(32), "expires": now + SESSION_IDLE, "created": now}
+    https = request is not None and (request.url.scheme == "https"
+                                     or request.headers.get("x-forwarded-proto", "").lower() == "https")
+    response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="strict", max_age=SESSION_IDLE, secure=https)
 
 
 def _render(request: Request, name: str, session: dict | None = None, status: int = 200, **ctx):
@@ -116,43 +165,65 @@ def _vendors() -> list[str]:
     return sorted(p.stem for p in ADAPTER_DIR.glob("*.yaml"))
 
 
+def _unc(path: str) -> bool:
+    """A Windows network path: merely checking it would open an SMB connection (and send NTLM)."""
+    p = (path or "").strip()
+    return p.startswith("\\\\") or p.startswith("//")
+
+
 # ---------------- login ----------------
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     first_run = inventory.load_settings().get("admin") is None
-    return _render(request, "setup.html" if first_run else "login.html")
+    return _render(request, "setup.html" if first_run else "login.html", setup_token_required=remote_mode())
 
 
 @app.post("/setup")
-def setup(request: Request, password: str = Form(...), confirm: str = Form(...)):
-    settings = inventory.load_settings()
-    if settings.get("admin") is not None:
-        return RedirectResponse("/login", status_code=303)
+def setup(request: Request, password: str = Form(...), confirm: str = Form(...), token: str = Form("")):
+    if remote_mode() and not hmac.compare_digest(token.strip(), SETUP_TOKEN):
+        return _render(request, "setup.html", status=403, setup_token_required=True,
+                       error="Enter the setup token shown in the LYSS console (docker logs) at start-up.")
     if len(password) < 12 or password != confirm:
-        return _render(request, "setup.html", status=400,
+        return _render(request, "setup.html", status=400, setup_token_required=remote_mode(),
                        error="Use at least 12 characters, typed twice identically.")
-    settings["admin"] = inventory.hash_password(password)
-    inventory.save_settings(settings)
+    with _setup_lock:   # two simultaneous first-run requests: only the first one creates the administrator
+        settings = inventory.load_settings()
+        if settings.get("admin") is not None:
+            return RedirectResponse("/login", status_code=303)
+        settings["admin"] = inventory.hash_password(password)
+        inventory.save_settings(settings)
     response = RedirectResponse("/", status_code=303)
-    _new_session(response)
+    _new_session(response, request)
     return response
 
 
 @app.post("/login")
 def login(request: Request, password: str = Form(...)):
     now = time.time()
-    if _failures["locked_until"] > now:
-        wait = int(_failures["locked_until"] - now) // 60 + 1
-        return _render(request, "login.html", status=429, error=f"Too many attempts. Try again in {wait} min.")
-    if not inventory.check_password(password, inventory.load_settings().get("admin")):
-        _failures["count"] += 1
-        if _failures["count"] >= MAX_FAILURES:
-            _failures.update(count=0, locked_until=now + LOCKOUT)
+    with _login_lock:   # attempts in progress count too: parallel guesses cannot exceed the limit
+        if _failures["locked_until"] > now:
+            wait = int(_failures["locked_until"] - now) // 60 + 1
+            return _render(request, "login.html", status=429, error=f"Too many attempts. Try again in {wait} min.")
+        if _failures["count"] + _failures.get("inflight", 0) >= MAX_FAILURES:
+            return _render(request, "login.html", status=429, error="Too many attempts in progress. Try again.")
+        _failures["inflight"] = _failures.get("inflight", 0) + 1
+    ok = False
+    try:
+        ok = inventory.check_password(password, inventory.load_settings().get("admin"))
+    finally:
+        with _login_lock:
+            _failures["inflight"] -= 1
+            if ok:
+                _failures["count"] = 0
+            else:
+                _failures["count"] += 1
+                if _failures["count"] >= MAX_FAILURES:
+                    _failures.update(count=0, locked_until=now + LOCKOUT)
+    if not ok:
         return _render(request, "login.html", status=401, error="Wrong password.")
-    _failures["count"] = 0
     response = RedirectResponse("/", status_code=303)
-    _new_session(response)
+    _new_session(response, request)
     return response
 
 
@@ -362,7 +433,8 @@ def update_device(request: Request, device_id: str, csrf: str = Form(""), host: 
 def remove_device(request: Request, device_id: str, csrf: str = Form("")):
     session = _session(request)
     _check_csrf(session, csrf)
-    inventory.delete_device(device_id)
+    if inventory.get_device(device_id):        # only a device of the inventory, never a path
+        inventory.delete_device(device_id)
     return RedirectResponse("/", status_code=303)
 
 
@@ -459,6 +531,7 @@ def _settings_page(request: Request, session: dict, status: int = 200, **ctx):
                    unsited=sum(1 for d in devices if not sites.of(d, all_sites)),
                    organization=settings.get("organization", ""), level3=bool(settings.get("level3")),
                    heartbeat_set=bool((settings.get("heartbeat") or {}).get("url")),
+                   data_protection={**sealed.status(), "retention_days": history.retention_days()},
                    schedule=settings.get("schedule", {"time": "02:30", "days": list(range(7))}),
                    smtp=_public(settings.get("smtp", {})), ciso=_public(settings.get("ciso", {})),
                    siem=settings.get("siem", {}), siem_default_file=str(inventory.PRIVATE / "lyss-events.jsonl"),
@@ -596,8 +669,8 @@ def save_siem(request: Request, csrf: str = Form(""), enabled: str | None = Form
         errors.append("SIEM: port must be a number between 1 and 65535.")
     if protocol not in ("udp", "tcp") or findings not in ("all", "changes"):
         errors.append("SIEM: invalid option.")
-    if file and not (Path(file).is_absolute() and Path(file).suffix.lower() in (".jsonl", ".json", ".log")):
-        errors.append("SIEM: the events file must be an absolute path ending in .jsonl, .json or .log.")
+    if file and (_unc(file) or not (Path(file).is_absolute() and Path(file).suffix.lower() in (".jsonl", ".json", ".log"))):
+        errors.append("SIEM: the events file must be a local absolute path ending in .jsonl, .json or .log.")
     if enabled == "on" and not (host or file):
         errors.append("SIEM: give a syslog server, an events file, or both.")
     if errors:
@@ -702,7 +775,8 @@ def remove_profile(request: Request, profile_id: str, csrf: str = Form("")):
 
 @app.post("/settings/remediation")
 def save_remediation(request: Request, csrf: str = Form(""), enabled: str | None = Form(None),
-                     syslog: str = Form(""), ntp: str = Form(""), banner: str = Form("")):
+                     syslog: str = Form(""), ntp: str = Form(""), banner: str = Form(""),
+                     firmware_upgrades: str | None = Form(None, alias="firmware")):
     session = _session(request)
     _check_csrf(session, csrf)
     ntp_list = [n for n in re.split(r"[\s,;]+", ntp) if n][:4]
@@ -711,9 +785,10 @@ def save_remediation(request: Request, csrf: str = Form(""), enabled: str | None
         return _settings_page(request, session, status=400, errors=errors)
     settings = inventory.load_settings()
     settings["remediation"] = {"enabled": enabled == "on", "syslog": syslog.strip(), "ntp": ntp_list,
-                               "banner": banner.strip()}
+                               "banner": banner.strip(), "firmware": firmware_upgrades == "on"}
     inventory.save_settings(settings)
-    return _settings_page(request, session, saved="Remediation " + ("enabled." if enabled == "on" else "disabled."))
+    return _settings_page(request, session, saved="Remediation " + ("enabled" if enabled == "on" else "disabled")
+                          + ", firmware upgrades " + ("allowed." if firmware_upgrades == "on" else "not allowed."))
 
 
 @app.get("/remediation", response_class=HTMLResponse)
@@ -793,6 +868,11 @@ def firmware_page(request: Request):
 @app.post("/firmware/upload")
 async def firmware_upload(request: Request):
     session = _session(request)
+    if not remediate.settings().get("firmware"):
+        return _firmware_page(request, session, status=403,
+                              errors=["Firmware upgrades are not allowed: turn them on in Settings > Remediation."])
+    if int(request.headers.get("content-length") or 0) > firmware.MAX_IMAGE + 1024 * 1024:
+        return _firmware_page(request, session, status=413, errors=["The image is too large."])
     form = await request.form()
     _check_csrf(session, str(form.get("csrf", "")))
     upload = form.get("image")
@@ -986,6 +1066,31 @@ def save_heartbeat(request: Request, csrf: str = Form(""), url: str = Form(""), 
     return _settings_page(request, session, saved=saved)
 
 
+@app.post("/settings/data")
+def save_data_protection(request: Request, csrf: str = Form(""), encrypt: str = Form(""),
+                         retention_days: str = Form("0")):
+    """Encryption at rest of configurations and results, and retention of the history. Turning
+    encryption off only affects new files: decrypting existing ones is a command-line action."""
+    session = _session(request)
+    _check_csrf(session, csrf)
+    try:
+        days = int(retention_days or 0)
+    except ValueError:
+        days = -1
+    if not 0 <= days <= 36500:
+        return _settings_page(request, session, status=400,
+                              errors=["Retention: a number of days between 0 (no limit) and 36500."])
+    settings = inventory.load_settings()
+    settings["encrypt_data"] = encrypt == "1"
+    settings["retention_days"] = days
+    inventory.save_settings(settings)
+    sealed_now = sealed.seal_existing() if settings["encrypt_data"] else 0
+    return _settings_page(request, session, saved=(
+        f"Data protection saved: encryption {'on' if settings['encrypt_data'] else 'off for new files'}"
+        + (f", {sealed_now} existing file(s) encrypted" if sealed_now else "")
+        + f"; retention {f'{days} days' if days else 'without time limit'}."))
+
+
 @app.post("/settings/assessment")
 def save_assessment(request: Request, csrf: str = Form(""), level3: str = Form("")):
     session = _session(request)
@@ -1010,13 +1115,12 @@ def save_jump(request: Request, csrf: str = Form(""), host: str = Form(""), port
     errors = []
     if host and not inventory.HOST_PATTERN.match(host.strip()):
         errors.append("Jump host: not a valid address.")
-    if host and not Path(key_file.strip()).is_file():
+    if host and not _unc(key_file) and not Path(key_file.strip()).is_file():
         errors.append("Private key file: not found on this PC.")
-    if source.strip():
-        try:
-            ipaddress.ip_address(source.strip())
-        except ValueError:
-            errors.append("Source address: must be an IP address of the jump host.")
+    if source.strip() and inventory.strict_ip(source.strip()) is None:
+        errors.append("Source address: must be an IP address of the jump host.")
+    if _unc(key_file):
+        errors.append("Private key file: network paths (\\\\server\\share) are not accepted.")
     jump = {"host": host.strip(), "port": int(port) if port.isdigit() else 22,
             "user": user.strip(), "key_file": key_file.strip(), "source": source.strip()}
     if errors:

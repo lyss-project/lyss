@@ -31,7 +31,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   ARP inspection, 802.1X / MAC authentication, storm control, no CDP/LLDP towards users
   (opt-in: `lyss audit --level 3`, or Settings > Assessment).
 
-> Status: **0.12, draft specification 0.6, preview.** The specification and the tool may still change
+> Status: **0.14, draft specification 0.6, preview.** The specification and the tool may still change
 > before 1.0. Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
@@ -96,6 +96,9 @@ no CDP/LLDP towards users) is opt-in: `lyss audit --level 3`, or Settings > Asse
 interface. It is not applicable on SONiC (data-centre fabric, no user ports) nor on any switch
 without access ports.
 
+Where each platform has been validated, and what is not validated yet, is in
+[docs/VALIDATION.md](docs/VALIDATION.md).
+
 Cisco IOS and Cisco Small Business are validated on real switches; HPE Aruba AOS-S on the
 simulator and synthetic outputs so far (reports from real AOS-S switches are welcome). MikroTik
 RouterOS is validated on CHR 7.25.1: LYSS reads `/export terse` (never `show-sensitive`, so no
@@ -135,6 +138,9 @@ verified on a real switch: if you own a GS1900, a sanitized configuration export
 - **CISO Assistant library**: the LYSS framework and its ISO 27001:2022 mapping, ready to import
   ([integrations/ciso-assistant](integrations/ciso-assistant/README.md)).
 - **Reports**: standalone HTML (printable to PDF) and JSON, with ISO 27001 / NIST / CIS mappings.
+- **Framework crosswalk** ([docs/MAPPINGS.md](docs/MAPPINGS.md)): which LYSS controls support
+  each point of NIS2 Article 21(2), each ISO/IEC 27001:2022 Annex A control, NIST SP 800-53 and
+  CIS Controls v8 (informative).
 - **Optional remediation** (off by default): low-risk fixes only, previewed, applied one switch at
   a time, verified over a new connection, rolled back automatically, saved only after
   verification, and logged.
@@ -155,7 +161,8 @@ python -m venv .venv
 ```
 
 Docker (Linux): `docker compose up -d`, then http://127.0.0.1:8765. Data lives in the `lyss-data`
-volume; back up `/data/master.key`, which encrypts the stored credentials.
+volume; back up `/data/master.key`, which encrypts the stored credentials and configurations
+(better: pass the key in `LYSS_MASTER_KEY` and keep it outside the volume).
 
 Command line:
 
@@ -164,6 +171,9 @@ python -m lyss collect                 # collect and assess every switch (read-o
 python -m lyss collect --scheduled     # same, from cron / Task Scheduler (automatic backup)
 python -m lyss audit --vendor cisco_sb --level 2 path/to/configs/
 ```
+
+Configurations in Git (Oxidized, or kept by hand)? The **GitHub Action** checks them at every push
+or pull request and fails the job on a weakening change: see [docs/CI.md](docs/CI.md).
 
 Before production use, read the [threat model](docs/THREAT-MODEL.md), the
 [scale figures](docs/SCALE.md) (1,008 simulated switches collected and assessed by one instance)

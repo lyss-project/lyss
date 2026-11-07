@@ -1,0 +1,6 @@
+# Exact versions of the tools that build and check the release files (release.yml), including the
+# setuptools used by the isolated build (read through PIP_CONSTRAINT). A new release of any of
+# them cannot change what is published until this file is updated on purpose.
+build==1.6.1
+twine==7.0.0
+setuptools==84.2.1

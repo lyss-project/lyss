@@ -58,40 +58,93 @@ def load_adapter(vendor: str) -> dict:
 
 
 # Secret values never leave the engine: evidence keeps the keyword and type, not the value.
+# Every pattern is linear on long lines (configurations are untrusted input), and lines are
+# capped before matching.
+MAX_EVIDENCE_LINE = 2000
+# a value: a quoted string (spaces allowed) or one token
+_VALUE = r'("[^"\n]*"|[^\s"]+)'
+# type tokens before the value: "7", "level 15", "1 md5" (key id + algorithm), EOS "sha512" / "8a", "ascii 0"
+_TYPE = r"(?:\d{1,2}|level \d+|sha512|sha\d*|md5|8a|ascii|hex)"
 SECRET_VALUE = re.compile(
-    r'(?i)\b(secret|password|key-string|key|sha1|sha256|plaintext|encrypted)'
-    # optional type before the value: "7", "level 15", EOS "sha512" / "md5" / "8a"
-    r'((?:\s+(?:\d{1,2}|level \d+|sha512|md5|8a)(?=\s))?)\s+("?)(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level)\b)(?![^\s"]+\s+<masked>)[^\s"]+("?)'
-)
+    r'(?i)\b(secret|password|key-string|key|sha1|sha256|plaintext|encrypted|passphrase|psk|pre-shared-key|wpa-psk)(:?)'
+    rf'((?:\s+{_TYPE}(?=\s)){{0,3}})\s+(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level|auth|priv)\b)'
+    rf'(?![^\s"]+\s+<masked>){_VALUE}')
 # SNMPv3 users: "auth sha <pw> priv aes 128 <pw>" (Cisco), 'auth sha "<hash>" priv aes "<hash>"' (HP),
 # "auth-sha <pw>" / "priv-aes <pw>" variants
 SNMP_SECRET = re.compile(
-    r'(?i)\b(auth[\s-]+(?:sha\d*|md5)|priv(?:[\s-]+(?:aes|des|3des)(?:\s+\d{3})?)?)\s+("?)(?!<redacted>)[^\s"]+("?)')
+    rf'(?i)\b(auth[\s-]+(?:sha\d*|md5)|priv(?:[\s-]+(?:aes|des|3des)(?:\s+\d{{3}})?)?)\s+(?!<redacted>){_VALUE}')
+# SNMPv3 user lines, also as diff lines ("+snmp-server user ...") and Cisco SB "encrypted snmp-server user"
+SNMP_USER_LINE = re.compile(r"(?i)^[+\- ]?\s*(?:encrypted\s+)?(?:snmp-server user|snmpv3 user)\b")
+# "snmp-server host 192.0.2.1 [informs|traps] [version 1|2c|3 <level>] <community>": no keyword before it
+SNMP_HOST = re.compile(r"(?i)^([+\- ]?\s*snmp-server host\s+\S+(?:\s+(?:informs|traps))?"
+                       r"(?:\s+version\s+(?:1|2c|3\s+\w+))?\s+)(?!<redacted>)(?!(?:public|private|informs|traps|version)\b)(\S+)")
 WEAK_COMMUNITY_OK = re.compile(r'(?i)\bcommunity\s+"?(public|private)"?(\s|$)')
 COMMUNITY_VALUE = re.compile(r'(?i)\b(community)\s+("?)[^\s"]+("?)')
 
 
-# JSON configurations flattened by config.flatten_json (SONiC): "passkey=...", "auth_password=...",
-# and SNMP community names used as table keys ("SNMP_COMMUNITY|<name>")
-# (also inside block evidence such as "TACPLUS|global / passkey=...")
-# "key_encrypt=true" is a flag, not a secret
-FIELD_SECRET = re.compile(r"(?i)\b(?!key_encrypt=)([\w-]*(?:passkey|password|secret|key)[\w-]*=)(?!<redacted>)\S+")
+# "name=value" fields: JSON configurations flattened by config.flatten_json (SONiC: "passkey=",
+# "auth_password=", also in block evidence "TACPLUS|global / passkey=...") and RouterOS
+# ("secret=", "wpa2-pre-shared-key="). "key_encrypt=true" is a flag, not a secret.
+# a field name starts the line or follows a space, "/" or "|" (never inside a quoted base64 value
+# such as encrypted-key "QUJD==")
+FIELD = re.compile(r'(?i)(?<![^\s/|])([\w-]{1,64}=)("[^"\n]*"|\S*)')
+SECRET_FIELD_NAME = re.compile(r"(?i)passkey|password|secret|key|psk|passphrase|token|pre-shared")
+# SNMP community names used as table keys ("SNMP_COMMUNITY|<name>")
 JSON_COMMUNITY = re.compile(r"(?i)(SNMP_COMMUNITY\|)(?!(?:public|private)(?:[\s/]|$))(?!<redacted>)[^\s/]+")
-# RouterOS "/snmp community print terse": the community name is the v1/v2c secret
-ROS_COMMUNITY = re.compile(r"(?i)(\bname=)(?!(?:public|private)(?:\s|$))(?!<redacted>)\S+(?=.*\bsecurity=)")
+# RouterOS SNMP communities ("/snmp community add name=..." and "print terse" with "security="):
+# the community name is the v1/v2c secret
+ROS_COMMUNITY_LINE = re.compile(r"(?i)/snmp community\b|\bsecurity=")
+ROS_COMMUNITY = re.compile(r'(?i)(\bname=)(?!"?(?:public|private)"?(?:\s|$))(?!<redacted>)("[^"\n]*"|\S+)')
+
+
+def _field(m: re.Match) -> str:
+    name, value = m.group(1), m.group(2)
+    if (not SECRET_FIELD_NAME.search(name) or name.lower() == "key_encrypt=" or not value
+            or value.startswith("<redacted>")):
+        return m.group(0)
+    return name + "<redacted>"
+
+
+def _secret(m: re.Match) -> str:
+    quote = '"' if m.group(4).startswith('"') else ""
+    return f"{m.group(1)}{m.group(2)}{m.group(3)} {quote}<redacted>{quote}"
 
 
 def redact(line: str) -> str:
-    line = FIELD_SECRET.sub(r"\1<redacted>", line)
+    if len(line) > MAX_EVIDENCE_LINE:
+        line = line[:MAX_EVIDENCE_LINE] + " …(truncated)"
+    line = FIELD.sub(_field, line)
     line = JSON_COMMUNITY.sub(r"\1<redacted>", line)
-    line = ROS_COMMUNITY.sub(r"\1<redacted>", line)
-    line = SECRET_VALUE.sub(r"\1\2 \3<redacted>\4", line)
-    if re.search(r"(?i)^\s*(snmp-server user|snmpv3 user)\b", line):
-        line = SNMP_SECRET.sub(r"\1 \2<redacted>\3", line)
+    if ROS_COMMUNITY_LINE.search(line):
+        line = ROS_COMMUNITY.sub(r"\1<redacted>", line)
+    if SNMP_USER_LINE.search(line):   # before the generic rule, which would take "encrypted" as a keyword
+        line = SNMP_SECRET.sub(lambda m: f"{m.group(1)} " + ('"<redacted>"' if m.group(2).startswith('"') else "<redacted>"), line)
+    line = SNMP_HOST.sub(r"\1<redacted>", line)
+    line = SECRET_VALUE.sub(_secret, line)
     if not WEAK_COMMUNITY_OK.search(line):
         # well-known defaults stay visible (they are the finding); real communities are secrets
         line = COMMUNITY_VALUE.sub(r"\1 \2<redacted>\3", line)
     return line
+
+
+PEM_BEGIN = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")
+PEM_END = re.compile(r"-----END [A-Z ]*PRIVATE KEY-----")
+
+
+def redact_lines(lines: list[str]) -> list[str]:
+    """redact() for consecutive lines (configuration differences): also hides the body of PEM
+    private key blocks, whose lines carry no keyword."""
+    out, inside = [], False
+    for line in lines:
+        if inside and not PEM_END.search(line):
+            out.append((line[:1] if line[:1] in "+- " else "") + "<redacted>")
+            continue
+        out.append(redact(line))
+        if PEM_BEGIN.search(line):
+            inside = not PEM_END.search(line)
+        elif PEM_END.search(line):
+            inside = False
+    return out
 
 
 def _line_hits(lines: list[str], rule: dict) -> list[str]:
@@ -136,7 +189,8 @@ def _ports(cfg: Config, spec: dict) -> set[str]:
     return {normalize_port(m.group(1)) for line in lines if (m := pattern.search(line))}
 
 
-PORT_TOKEN = re.compile(r"^([A-Za-z]*)(\d+)$")
+PORT_TOKEN = re.compile(r"^([A-Za-z]*)(\d{1,6})$")
+MAX_PORT_RANGE = 1024
 
 
 def expand_ports(text: str) -> set[str]:
@@ -148,7 +202,9 @@ def expand_ports(text: str) -> set[str]:
             continue
         first, _, last = item.partition("-")
         a, b = PORT_TOKEN.match(first), PORT_TOKEN.match(last) if last else None
-        if a and b and a.group(1).lower() == b.group(1).lower() and int(a.group(2)) <= int(b.group(2)):
+        # no switch has more than a few hundred ports: a larger range is not expanded (untrusted input)
+        if (a and b and a.group(1).lower() == b.group(1).lower()
+                and int(a.group(2)) <= int(b.group(2)) <= int(a.group(2)) + MAX_PORT_RANGE):
             ports |= {f"{a.group(1).lower()}{n}" for n in range(int(a.group(2)), int(b.group(2)) + 1)}
         else:
             ports.add(normalize_port(item))
@@ -274,6 +330,11 @@ def _uncovered(cfg: Config, spec: dict) -> tuple[set[str], set[str], dict[str, l
     return set(used), set(used) - covered, used
 
 
+STATE_ERROR = re.compile(r"(?i)^\s*%|invalid input|unrecognized command|incomplete command|wrong number of parameters"
+                         r"|bad parameter|bad command name|syntax error|expected end of command|command not found"
+                         r"|permission denied|not authorized")
+
+
 def evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
     """Return (matched, evidence lines). A rule's "say" replaces the evidence with a sentence."""
     matched, evidence = _evaluate_rule(cfg, rule)
@@ -359,6 +420,10 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
             return False, []  # not collected: the rule can neither pass nor fail
         hits = _line_hits(lines, {**rule, "line": rule["state"]})
         if rule.get("absent"):
+            # "nothing matches" proves something only if the command actually answered: an error
+            # message (unknown command, missing privilege) decides nothing
+            if any(STATE_ERROR.search(l) for l in lines):
+                return False, []
             return not hits, [f"{rule.get('section', 'state')}: no line matches {rule['state']}"] if not hits else []
         return bool(hits), hits
 
@@ -557,7 +622,7 @@ def load_firmware_data() -> list[dict]:
 # that one platform writes: a guess that is not sure returns None ("pick the platform").
 VENDOR_SIGNATURES = (
     # Zyxel GS1900 "show version" / System Information: model name or firmware code V2.90(AAHK.1)C0
-    ("zyxel_gs1900", re.compile(r"(?im)^\s*Model Name\s*:?\s*GS1900-|^\s*Firmware Version\s*:?\s*V?\d+\.\d+\([A-Z]{4}\.\d+\)")),
+    ("zyxel_gs1900", re.compile(r"(?im)^[ \t]*Model Name[ \t]*:?[ \t]*GS1900-|^[ \t]*Firmware Version[ \t]*:?[ \t]*V?\d+\.\d+\([A-Z]{4}\.\d+\)")),
     ("sonic", re.compile(r'\A\s*\{[\s\S]*"(?:DEVICE_METADATA|PORT|AAA|MGMT_INTERFACE)"\s*:')),
     ("mikrotik", re.compile(r"(?m)^#.*\bby RouterOS\b|^/(?:interface|ip|ipv6|system|user|snmp|tool|routing)\b")),
     ("cisco_sb", re.compile(r"(?m)^config-file-header\s*$|^v\d+\.\d+\.\d+\.\d+ / R\S+\s*$")),
@@ -569,12 +634,12 @@ VENDOR_SIGNATURES = (
 
 
 def detect_vendor(text: str) -> str | None:
-    """Adapter name for a saved configuration, from its format alone; None when not recognised."""
+    """Adapter name for a saved configuration, from its format alone; None when not recognised.
+    Ambiguous text (signatures of two platforms, e.g. an IOS banner that quotes a Zyxel "Model
+    Name" line) is not guessed either: a wrong platform could turn failures into "unknown"."""
     text = text.lstrip("﻿")
-    for vendor, signature in VENDOR_SIGNATURES:
-        if signature.search(text):
-            return vendor
-    return None
+    found = [vendor for vendor, signature in VENDOR_SIGNATURES if signature.search(text)]
+    return found[0] if len(found) == 1 else None
 
 
 def audit(text: str, vendor: str, max_level: int = 1, state_text: str = "",
@@ -582,7 +647,7 @@ def audit(text: str, vendor: str, max_level: int = 1, state_text: str = "",
     """Assess one device. context carries evidence from outside the device (e.g. "backup")."""
     spec = load_spec()
     adapter = load_adapter(vendor)
-    cfg = parse(text, state_text)
+    cfg = parse(text, state_text, vendor)
     facts = extract_facts(cfg, adapter)
     checks = adapter.get("checks", {})
     return [

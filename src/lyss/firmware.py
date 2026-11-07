@@ -27,7 +27,7 @@ from pathlib import Path
 
 from . import collector, inventory
 
-IMAGE_NAME = re.compile(r"^c1000-universalk9-tar\.(\d{3})-(\d+)\.(E\d+[a-z]?)\.tar$")
+IMAGE_NAME = re.compile(r"^c1000-universalk9-tar\.(\d{3})-(\d+)\.(E\d+[a-z]?)\.tar\Z")
 MODELS = re.compile(r"^(NAL-)?C1000(FE)?-")
 MAX_IMAGE = 200 * 1024 * 1024
 _lock = threading.Lock()
@@ -203,10 +203,17 @@ def activate(device: dict, jump, step) -> dict:
     if st.get("status") != "staged":
         raise RuntimeError("stage the image first")
     target = bin_path(st["image"])
+    previous = st.get("boot_before") or ""
     s = collector.open_session(device, jump)
     try:
-        step(f"boot system {target}")
-        done = s.configure([f"boot system {target}"])
+        step("checking that the new image is in flash")
+        if target.split("/")[-1] not in s.run(f"dir {target}", 60):
+            raise RuntimeError(f"{target} is no longer in flash: stage the image again (nothing changed)")
+        # the previous image stays in the boot path: if the new one fails to load, the switch
+        # falls back to it instead of stopping at the boot loader
+        boot = f"{target};{previous}" if previous and previous != target else target
+        step(f"boot system {boot}")
+        done = s.configure([f"boot system {boot}"])
         if any(collector.CLI_ERROR.search(o) for _, o in done):
             raise RuntimeError("the switch refused the boot command")
         s.save()
@@ -214,11 +221,19 @@ def activate(device: dict, jump, step) -> dict:
             raise RuntimeError("boot variable not updated: reload cancelled")
         step("reloading the switch")
         out = s.conn.send_command_timing("reload", read_timeout=30)
-        if "confirm" in out.lower():
-            try:
-                s.conn.send_command_timing("\n", read_timeout=10)
-            except Exception:
-                pass  # the session drops while the switch reboots
+        if re.search(r"(?i)save\?|\[yes/no\]", out):
+            out = s.conn.send_command_timing("no", read_timeout=30)   # saved just above
+        if "confirm" not in out.lower():
+            # the reload did not start: never leave a new boot variable armed for the next
+            # unplanned reboot
+            s.configure([f"boot system {previous}"] if previous else ["no boot system"])
+            s.save()
+            raise RuntimeError("the switch did not ask to confirm the reload: boot variable restored, "
+                               "nothing changed")
+        try:
+            s.conn.send_command_timing("\n", read_timeout=10)
+        except Exception:
+            pass  # the session drops while the switch reboots
     finally:
         try:
             s.close()
@@ -260,15 +275,22 @@ def running() -> bool:
 def start(action: str, device_id: str, image_name: str = "") -> str | None:
     global _job
     from . import remediate, scan
+    if not remediate.settings().get("firmware"):
+        raise ValueError("firmware upgrades are not allowed: turn them on in Settings > Remediation")
     device = inventory.get_device(device_id)
     if device is None or not eligible(device):
         raise ValueError("this switch is not a supported Catalyst 1000")
     image = get_image(image_name) if action == "stage" else None
     if action == "stage" and image is None:
         raise ValueError("unknown image")
+    previous = remediate.unclean_change(device_id)
+    if previous:   # staging and activation save the running configuration
+        raise ValueError("the last change on this switch may be incomplete (" + previous[:120]
+                         + "): check the switch and run a scan first")
     sj = scan.current_job()
+    remediation_busy = remediate.running()   # before taking our lock: remediate.start does the reverse
     with _lock:
-        if (_job and not _job["finished"]) or remediate.running() or (sj and not sj["finished"]):
+        if (_job and not _job["finished"]) or remediation_busy or (sj and not sj["finished"]):
             return None
         _job = {"id": uuid.uuid4().hex[:8], "action": action, "device": device_id, "status": "running",
                 "message": "", "outcome": "", "started": time.time(), "finished": None}

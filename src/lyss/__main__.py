@@ -5,6 +5,7 @@
   python -m lyss audit --vendor <adapter> <file-or-folder>   assess saved configurations (offline)
   python -m lyss collect [--only id ...]                     collect + audit inventory devices
   python -m lyss oxidized --url http://oxidized:8888         assess the configs backed up by Oxidized
+  python -m lyss data status|seal|unseal|config <device>     encryption at rest, stored configurations
   python -m lyss import-legacy <inventory.csv> <cred-dir>    import devices + PowerShell cred files
   python -m lyss ui [--port 8765]                            start the local web interface
   python -m lyss sim [--lab demo] [--base-port 2201]         simulated switches over SSH (127.0.0.1)
@@ -13,14 +14,15 @@
 
 import argparse
 import csv
+import fnmatch
 import json
 import sys
 import time
 from dataclasses import asdict
 from pathlib import Path
 
-from . import PROJECT_LONG_NAME, PROJECT_NAME, __version__
-from .engine import audit, conformance, detect_vendor, load_spec
+from . import PROJECT_LONG_NAME, PROJECT_NAME, __version__, ci
+from .engine import ADAPTER_DIR, audit, conformance, detect_vendor, load_spec
 
 ICONS = {"pass": "PASS", "fail": "FAIL", "unknown": "????", "not_applicable": "n/a "}
 
@@ -42,13 +44,42 @@ def print_text(name: str, findings, summary) -> None:
 CONFIG_SUFFIXES = (".cfg", ".conf", ".txt", ".rsc", ".json")
 
 
-def config_files(path: Path) -> list[Path]:
+def config_files(path: Path, pattern: str | None = None, recursive: bool = False) -> list[Path]:
     """A file, or the saved configurations in a folder (Cisco/HP .cfg/.txt, RouterOS .rsc exports,
-    SONiC .json); <name>.state.txt files hold optional device state, not configurations."""
+    SONiC .json); <name>.state.txt files hold optional device state, not configurations.
+    pattern: a file name pattern instead of the suffixes ("*" for Oxidized git output, whose
+    files have no suffix). Hidden files and folders (.git, ...) are always skipped."""
     if not path.is_dir():
         return [path]
-    return sorted(p for p in path.iterdir()
-                  if p.is_file() and p.suffix.lower() in CONFIG_SUFFIXES and not p.name.endswith(".state.txt"))
+    root = path.resolve()
+    found = path.rglob("*") if recursive else path.iterdir()
+    picked = []
+    for p in found:
+        if p.is_symlink() or not p.is_file() or p.name.endswith(".state.txt"):
+            continue   # never follow a link: it could lead outside the audited folder (CI: a pull request)
+        if any(part.startswith(".") for part in p.relative_to(path).parts):
+            continue
+        if not p.resolve().is_relative_to(root):
+            continue
+        if fnmatch.fnmatch(p.name, pattern) if pattern else p.suffix.lower() in CONFIG_SUFFIXES:
+            picked.append(p)
+    return sorted(picked, key=lambda p: p.as_posix())   # same order on every OS
+
+
+MAX_CONFIG_BYTES = 20 * 1024 * 1024
+
+
+def _readable(path: Path) -> str:
+    """Why a file is not read ("" if it can be): links, special files and very large files."""
+    import stat
+    if path.is_symlink():
+        return "symbolic link, not followed"
+    st = path.stat()
+    if not stat.S_ISREG(st.st_mode):
+        return "not a regular file"
+    if st.st_size > MAX_CONFIG_BYTES:
+        return f"larger than {MAX_CONFIG_BYTES // (1024 * 1024)} MB"
+    return ""
 
 
 def cmd_audit(args) -> int:
@@ -56,30 +87,66 @@ def cmd_audit(args) -> int:
     if not args.path.exists():
         print(f"{args.path}: no such file or folder", file=sys.stderr)
         return 2
-    files = config_files(args.path)
-    results = []
+    if args.path.is_symlink():   # in CI, a pull request could turn the audited folder into a link
+        print(f"{args.path}: symbolic link, not followed: give the real path", file=sys.stderr)
+        return 2
+    files = config_files(args.path, args.pattern, args.recursive)
+    results, problems = [], []
     status = 0
     for path in files:
+        name = path.relative_to(args.path).as_posix() if args.path.is_dir() else path.name
+        refused = _readable(path)
+        if refused:
+            print(f"{name}: {refused}: skipped", file=sys.stderr)
+            problems.append(f"{name}: {refused}")
+            status = 2
+            continue
         state_file = path.with_name(path.stem + ".state.txt")
-        state_text = state_file.read_text(encoding="utf-8", errors="replace") if state_file.exists() else ""
+        state_text = (state_file.read_text(encoding="utf-8", errors="replace")
+                      if state_file.exists() and not _readable(state_file) else "")
         text = path.read_text(encoding="utf-8", errors="replace")
         vendor = detect_vendor(text) if args.vendor == "auto" else args.vendor
         if vendor is None:
-            print(f"{path.name}: platform not recognised, give it with --vendor", file=sys.stderr)
+            if args.skip_unrecognised:
+                print(f"{name}: platform not recognised, skipped", file=sys.stderr)
+            else:
+                print(f"{name}: platform not recognised, give it with --vendor", file=sys.stderr)
+                problems.append(f"{name}: platform not recognised")
+                status = 2
+            continue
+        from .config import structure_problems
+        odd = structure_problems(text, vendor)
+        if odd:
+            # not a configuration printed by the device: a line outside its block could hide a failure
+            print(f"{name}: not as the switch prints it, {len(odd)} block command(s) not indented "
+                  f"(e.g. {odd[0]!r}): use the device's own output", file=sys.stderr)
+            problems.append(f"{name}: block commands not indented, e.g. {odd[0]!r}")
             status = 2
             continue
         findings = audit(text, vendor, args.level, state_text)
         summary = conformance(findings)
-        if args.json:
-            results.append({"device": path.name, "vendor": vendor,
-                            "summary": summary, "findings": [asdict(f) for f in findings]})
-        else:
-            print_text(f"{path.name} ({vendor})" if args.vendor == "auto" else path.name, findings, summary)
+        results.append({"device": name, "vendor": vendor,
+                        "summary": summary, "findings": [asdict(f) for f in findings]})
+        if not args.json:
+            print_text(f"{name} ({vendor})" if args.vendor == "auto" else name, findings, summary)
 
+    spec_version = load_spec()["spec_version"]
+    document = {"tool": PROJECT_NAME, "version": __version__, "spec_version": spec_version, "results": results}
     if args.json:
-        json.dump({"tool": PROJECT_NAME, "version": __version__,
-                   "spec_version": load_spec()["spec_version"], "results": results},
-                  sys.stdout, indent=2, ensure_ascii=False)
+        json.dump(document, sys.stdout, indent=2, ensure_ascii=False)
+    if args.json_file:
+        args.json_file.write_text(json.dumps(document, indent=2, ensure_ascii=False), encoding="utf-8")
+    bad = ci.failing(results, args.require_level)
+    if args.require_level and not results:
+        problems.append("no switch configuration found")
+        status = 2
+    if args.summary:   # appended: GITHUB_STEP_SUMMARY is shared by every step of the job
+        with args.summary.open("a", encoding="utf-8") as out:
+            out.write(ci.summary_markdown(results, spec_version, args.level, args.require_level, problems))
+    if bad:
+        print(f"{len(bad)} configuration(s) with a failed control up to Level {args.require_level}: "
+              + ", ".join(r["device"] for r in bad[:10]) + (" ..." if len(bad) > 10 else ""), file=sys.stderr)
+        status = max(status, 1)
     return status
 
 
@@ -140,14 +207,66 @@ def cmd_oxidized(args) -> int:
     return 0
 
 
+def cmd_data(args) -> int:
+    """Encryption at rest of collected configurations, device state and results."""
+    from . import history, inventory, sealed
+    if args.action == "status":
+        s = sealed.status()
+        backend = "Windows DPAPI (this Windows user)" if s["backend"] == "dpapi" else "AES-256-GCM (master key)"
+        print(f"encryption at rest: {'on' if s['enabled'] else 'off'} · {backend} · "
+              f"{s['sealed']} encrypted file(s), {s['plain']} plain · data directory {inventory.PRIVATE}")
+        days = history.retention_days()
+        print(f"retention: {f'{days} days' if days else 'no time limit'} (configuration versions and scan history)")
+        return 0
+    if args.action == "seal":
+        settings = inventory.load_settings()
+        settings["encrypt_data"] = True
+        inventory.save_settings(settings)
+        print(f"{sealed.seal_existing()} file(s) encrypted; new files will be encrypted.")
+        return 0
+    if args.action == "unseal":
+        if not args.yes:
+            print("This writes every configuration and result back as PLAIN TEXT and turns encryption off.\n"
+                  "Run again with --yes to confirm.", file=sys.stderr)
+            return 2
+        settings = inventory.load_settings()
+        settings["encrypt_data"] = False
+        inventory.save_settings(settings)
+        print(f"{sealed.unseal_all()} file(s) decrypted; encryption is off for new files.")
+        return 0
+    # config: print a stored configuration (restore), or list the versions
+    if not args.device or not inventory.get_device(args.device):
+        print("give the id of a switch of the inventory", file=sys.stderr)
+        return 2
+    if args.list:
+        for v in history.versions(args.device):
+            print(f"{v['file']}  {v['ts'].replace('T', ' ')}  {v['trigger']}")
+        return 0
+    try:
+        sys.stdout.write(history.read_version(args.device, args.version))
+    except FileNotFoundError as exc:
+        print(f"no such stored version: {exc}", file=sys.stderr)
+        return 2
+    return 0
+
+
 def cmd_import_legacy(args) -> int:
     """Devices from a CSV (name,vendor,ip,cred) + PowerShell Export-Clixml credential files.
     The DPAPI-protected password is copied as-is: it is never decrypted during the import."""
     from . import inventory, vault
 
     devices = inventory.load_devices()
+    vendors = sorted(p.stem for p in ADAPTER_DIR.glob("*.yaml"))
     for row in csv.DictReader(args.csv.open(encoding="utf-8")):
-        user, protected = vault.read_ps_credential(args.cred_dir / row["cred"])
+        # ids and platforms become file names: same checks as the web form
+        errors = [e for e in inventory.validate_device(
+            {"id": row.get("name", ""), "host": row.get("ip", ""), "vendor": row.get("vendor", ""),
+             "port": 22, "username": "x"}, vendors) if not e.startswith("Credential")]
+        cred = Path(row.get("cred", "")).name
+        if errors or not cred:
+            print(f"skipped {row.get('name', '')!r}: {' '.join(errors) or 'no credential file'}", file=sys.stderr)
+            continue
+        user, protected = vault.read_ps_credential(args.cred_dir / cred)
         record = {"id": row["name"], "host": row["ip"], "port": 22, "vendor": row["vendor"],
                   "username": user, "via_jump": args.via_jump, "secret": protected}
         devices = [d for d in devices if d["id"] != record["id"]] + [record]
@@ -170,6 +289,14 @@ def cmd_ui(args) -> int:
         return 2
     scheduler.start_background()
     print(f"{PROJECT_LONG_NAME} UI on http://{args.host}:{args.port}  (Ctrl+C to stop)")
+    from . import inventory
+    from .web import app as webapp
+    if webapp.remote_mode() and inventory.load_settings().get("admin") is None:
+        # whoever reaches the port first must not be able to claim the instance
+        print(f"First start: setup token {webapp.SETUP_TOKEN} (asked when creating the administrator)")
+    if webapp.remote_mode():
+        print("Answers to the host names: " + ", ".join(sorted(webapp.allowed_hosts()))
+              + " (add yours with LYSS_ALLOWED_HOSTS)")
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning", server_header=False)
     return 0
 
@@ -210,16 +337,35 @@ def cmd_demo(args) -> int:
 
 
 def main(argv=None) -> int:
+    import os
+    if os.name == "posix":
+        os.umask(0o077)   # data files (settings with the admin hash, inventory, logs): owner only
+    for stream in (sys.stdout, sys.stderr):
+        try:   # a file name or evidence the console code page cannot show must not crash the audit
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
     parser = argparse.ArgumentParser(prog="lyss", description=f"{PROJECT_LONG_NAME} {__version__}")
     parser.add_argument("--version", action="version", version=f"{PROJECT_NAME} {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     a = sub.add_parser("audit", help="assess saved configuration files, offline (no connection to any device)")
-    a.add_argument("--vendor", default="auto",
-                   help="adapter name: cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic, "
+    vendors = sorted(p.stem for p in ADAPTER_DIR.glob("*.yaml"))
+    a.add_argument("--vendor", default="auto", choices=["auto", *vendors], metavar="VENDOR",
+                   help=f"adapter name: {', '.join(vendors)}, "
                         "or auto (default: recognise each file from its format)")
-    a.add_argument("--level", type=int, default=1, help="highest level to assess: 1, 2 or 3 (default 1)")
+    a.add_argument("--level", type=int, default=1, choices=(1, 2, 3), help="highest level to assess: 1, 2 or 3 (default 1)")
     a.add_argument("--json", action="store_true", help="output JSON instead of text")
+    a.add_argument("--json-file", type=Path, help="also write the JSON results to this file")
+    a.add_argument("--pattern", help='file name pattern in a folder, e.g. "*" for Oxidized git output '
+                                     "(default: .cfg .conf .txt .rsc .json)")
+    a.add_argument("--recursive", action="store_true", help="also look in subfolders (hidden ones are skipped)")
+    a.add_argument("--skip-unrecognised", action="store_true",
+                   help="skip files whose platform is not recognised instead of failing")
+    a.add_argument("--require-level", type=int, choices=(1, 2, 3), metavar="LEVEL",
+                   help="exit code 1 if any control of level 1..LEVEL fails (for CI; unknown verdicts, "
+                        "such as backups a file cannot show, do not fail)")
+    a.add_argument("--summary", type=Path, help="append a markdown summary to this file (CI job summary)")
     a.add_argument("path", type=Path)
     a.set_defaults(func=cmd_audit)
 
@@ -238,6 +384,16 @@ def main(argv=None) -> int:
     o.add_argument("--json", action="store_true", help="output JSON instead of text")
     o.add_argument("--events", action="store_true", help="also send SIEM events (Settings > SIEM events)")
     o.set_defaults(func=cmd_oxidized)
+
+    dt = sub.add_parser("data", help="encryption at rest of configurations and results; print a stored configuration")
+    dt.add_argument("action", choices=("status", "seal", "unseal", "config"),
+                    help="status; seal: encrypt existing files; unseal: back to plain text (needs --yes); "
+                         "config: print a stored configuration of DEVICE (for a restore)")
+    dt.add_argument("device", nargs="?", help="switch id (config)")
+    dt.add_argument("--version", help="stored version file name (config; default: the newest)")
+    dt.add_argument("--list", action="store_true", help="list the stored versions (config)")
+    dt.add_argument("--yes", action="store_true", help="confirm unseal")
+    dt.set_defaults(func=cmd_data)
 
     i = sub.add_parser("import-legacy", help="import devices from CSV + PowerShell cred files")
     i.add_argument("csv", type=Path)

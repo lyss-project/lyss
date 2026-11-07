@@ -12,6 +12,8 @@ services:
       # - ./keys/jump_ed25519:/run/secrets/jump_key:ro
     # environment:
     #   LYSS_MASTER_KEY: "<base64 of 32 random bytes>"   # instead of /data/master.key
+    #   LYSS_ALLOWED_HOSTS: "lyss.example.org"            # names other than 127.0.0.1/localhost (reverse proxy)
+    # First start: the setup token is printed in "docker compose logs lyss".
     read_only: true
     tmpfs:
       - /tmp

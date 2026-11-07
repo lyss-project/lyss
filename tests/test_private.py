@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from lyss import collector, inventory
+from lyss import collector, inventory, sealed
 from lyss.engine import audit, ROOT
 
 PRIVATE = ROOT / "private"
@@ -27,8 +27,8 @@ def current_matrix() -> dict:
             cfg, state = collector.config_paths(device)
             if not cfg.exists() or device["vendor"] == "auto":
                 continue
-            findings = audit(cfg.read_text(encoding="utf-8", errors="replace"), device["vendor"], 2,
-                             state.read_text(encoding="utf-8", errors="replace") if state.exists() else "")
+            findings = audit(sealed.read_text(cfg, errors="replace"), device["vendor"], 2,
+                             sealed.read_text(state, errors="replace") if state.exists() else "")
             # LYSS-BKP-001 depends on time (backup age): excluded from the regression matrix
             matrix[device["id"]] = {f.control_id: f.verdict for f in findings if f.control_id != "LYSS-BKP-001"}
         return matrix

@@ -33,7 +33,7 @@
           {% for c in candidates %}
           <tr>
             <td><input type="checkbox" name="ips" value="{{ c.ip }}" {% if not c.adapter %}disabled title="Unknown platform: add it manually"{% endif %}></td>
-            <td><strong>{{ c.name or c.suggest }}</strong><div class="sub mono">{{ c.ip }}{% if c.site %} <span class="tag" title="Site (from the address)">{{ c.site }}</span>{% endif %}</div></td>
+            <td><strong>{{ c.name or c.suggest }}</strong><div class="sub mono">{{ c.ip }}{% if c.site %} <span class="tag" title="Site (from the address)">{{ c.site }}</span>{% elif sites %} <span class="tag" title="This address is in none of your sites: check it is really one of your switches">outside your sites</span>{% endif %}</div></td>
             <td>{% if c.adapter %}<span class="tag">{{ c.adapter }}</span>{% else %}<span class="tag">unknown</span>{% endif %}
                 <div class="sub">{{ (c.platform or c.label or c.banner or "")[:60] }}</div></td>
             <td class="sub">{% for s in c.sources %}<div>{{ s }}</div>{% endfor %}</td>
@@ -50,8 +50,11 @@
         <label>Credential profile
           <select name="profile">{% for p in profiles %}<option value="{{ p.id }}">{{ p.name }} ({{ p.username }})</option>{% endfor %}</select>
         </label>
-        <label class="check"><input type="checkbox" name="scan_now" checked> Scan them right away</label>
+        <label class="check"><input type="checkbox" name="scan_now"> Scan them right away</label>
         <button class="btn btn-primary" type="submit">Add selected</button>
+        <p class="muted small">Discovered devices are not verified: any device on the network can announce itself as a
+          switch. At the first scan, {{ project }} trusts its SSH key and sends the profile's password to it. Check the
+          addresses (and their sites) before scanning.</p>
         {% else %}
         <span class="muted">To add several switches at once, create a credential profile in <a href="/settings">Settings</a>.</span>
         {% endif %}

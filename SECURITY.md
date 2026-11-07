@@ -27,6 +27,9 @@ is in [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md).
 - Device, SMTP and API credentials are encrypted at rest: Windows DPAPI (current Windows user) or
   AES-256-GCM with a master key (`LYSS_MASTER_KEY` or `<data dir>/master.key`) on other systems.
   They are never sent back to the browser.
+- Collected configurations, device state, archived configuration versions and results are
+  encrypted at rest by default with the same key (Settings > Data protection, `lyss data status`),
+  with an optional retention period for the history.
 - Password hashes, keys and SNMP communities are redacted from all stored and reported evidence.
 - Neighbour names received over LLDP/CDP are untrusted and are only rendered as text.
 

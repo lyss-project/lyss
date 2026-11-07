@@ -10,7 +10,7 @@ import uuid
 from dataclasses import asdict
 from datetime import datetime
 
-from . import collector, discovery, health, history, inventory, notify
+from . import collector, discovery, health, history, inventory, notify, sealed
 from .config import parse
 from .engine import audit, conformance, extract_facts, load_adapter, load_spec
 
@@ -29,14 +29,14 @@ def audit_device(device: dict, trigger: str = "manual", archive: bool = True) ->
     """Audit the last collected configuration/state of a device and store the result.
     archive=True records the configuration as a backup version (done once per collection)."""
     cfg_path, state_path = collector.config_paths(device)
-    config = cfg_path.read_text(encoding="utf-8", errors="replace")
-    state = state_path.read_text(encoding="utf-8", errors="replace") if state_path.exists() else ""
+    config = sealed.read_text(cfg_path, errors="replace")
+    state = sealed.read_text(state_path, errors="replace") if state_path.exists() else ""
     if archive:
         history.archive_config(device["id"], config, trigger)
     context = {"backup": history.backup_status(device["id"])}
     max_level = 3 if inventory.load_settings().get("level3") else MAX_LEVEL
     findings = audit(config, device["vendor"], max_level, state, context)
-    facts = extract_facts(parse(config, state), load_adapter(device["vendor"]))
+    facts = extract_facts(parse(config, state, device["vendor"]), load_adapter(device["vendor"]))
     result = {
         "device": device["id"],
         "vendor": device["vendor"],
@@ -81,6 +81,12 @@ def start(device_ids: list[str], trigger: str = "manual") -> str | None:
             _job["items"][device_id] = {"status": status, "message": message}
 
     def run():
+        notices = []
+        try:   # files written before encryption at rest (or while it was off) are encrypted now
+            if sealed.enabled() and (count := sealed.seal_existing()):
+                notices.append(f"Encrypted {count} data file(s) written without encryption.")
+        except Exception as exc:
+            notices.append(f"Encryption of existing data files failed: {type(exc).__name__}")
         collector.collect_many(devices, inventory.load_settings().get("jump", {}), update)
         changes = {}
         for device in devices:
@@ -102,7 +108,7 @@ def start(device_ids: list[str], trigger: str = "manual") -> str | None:
         with _lock:
             _job["discovered"] = discovered
         # integrations (disabled unless configured in Settings); their errors never break a scan
-        notices = notify.after_scan(current_job(), changes, discovered)
+        notices += notify.after_scan(current_job(), changes, discovered)
         # LYSS's own health: last finished scan, and the external heartbeat after scheduled scans
         try:
             health.record(current_job())

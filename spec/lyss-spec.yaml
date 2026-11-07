@@ -35,6 +35,7 @@ controls:
       iso27001_2022: [A.8.20, A.8.21, A.8.24]
       nist_800_53r5: [CM-7, SC-8, AC-17(2)]
       cis_v8: ["4.8", "12.6"]
+      nis2_art21: [h, g]
 
   - id: LYSS-MGMT-002
     level: 1
@@ -49,6 +50,7 @@ controls:
       iso27001_2022: [A.8.21, A.8.24]
       nist_800_53r5: [SC-8, SC-13, AC-17(2)]
       cis_v8: ["12.6"]
+      nis2_art21: [h]
 
   - id: LYSS-MGMT-003
     level: 1
@@ -63,6 +65,7 @@ controls:
       iso27001_2022: [A.8.21, A.8.24]
       nist_800_53r5: [CM-7, SC-8, AC-17(2)]
       cis_v8: ["4.8", "12.6"]
+      nis2_art21: [h]
 
   - id: LYSS-MGMT-004
     level: 1
@@ -81,6 +84,7 @@ controls:
       iso27001_2022: [A.8.5]
       nist_800_53r5: [AC-12, SC-10]
       cis_v8: ["4.3"]
+      nis2_art21: [i]
 
   - id: LYSS-AUTH-001
     level: 1
@@ -93,6 +97,7 @@ controls:
       iso27001_2022: [A.5.17, A.8.21]
       nist_800_53r5: [IA-5, CM-6]
       cis_v8: ["4.7"]
+      nis2_art21: [i, g]
 
   - id: LYSS-AUTH-002
     level: 1
@@ -116,6 +121,7 @@ controls:
       iso27001_2022: [A.5.17, A.8.5]
       nist_800_53r5: [IA-5(1)]
       cis_v8: ["3.11"]
+      nis2_art21: [h, i]
 
   - id: LYSS-AUTH-003
     level: 1
@@ -128,6 +134,7 @@ controls:
       iso27001_2022: [A.5.17]
       nist_800_53r5: [IA-5(1)]
       cis_v8: ["3.11"]
+      nis2_art21: [h, i]
 
   - id: LYSS-AUTH-004
     level: 1
@@ -143,6 +150,7 @@ controls:
       iso27001_2022: [A.5.17, A.8.24]
       nist_800_53r5: [IA-5, SC-28]
       cis_v8: ["3.11"]
+      nis2_art21: [h]
 
   - id: LYSS-VULN-001
     level: 1
@@ -162,6 +170,7 @@ controls:
       iso27001_2022: [A.8.8]
       nist_800_53r5: [SI-2, SA-22, RA-5]
       cis_v8: ["2.2", "12.1"]
+      nis2_art21: [e]
 
   - id: LYSS-BKP-001
     level: 1
@@ -185,6 +194,7 @@ controls:
       iso27001_2022: [A.8.9, A.8.13]
       nist_800_53r5: [CP-9, CM-2(3)]
       cis_v8: ["11.2"]
+      nis2_art21: [c]
 
   # ---------------- Level 2: Hardened ----------------
 
@@ -202,6 +212,7 @@ controls:
       iso27001_2022: [A.5.16, A.8.5]
       nist_800_53r5: [IA-2, AC-2]
       cis_v8: ["12.5"]
+      nis2_art21: [i]
 
   - id: LYSS-AUTH-011
     level: 2
@@ -216,6 +227,7 @@ controls:
       iso27001_2022: [A.8.21, A.8.24]
       nist_800_53r5: [SC-8, SC-13, IA-5]
       cis_v8: ["12.6"]
+      nis2_art21: [h, i]
 
   - id: LYSS-MGMT-010
     level: 2
@@ -228,6 +240,7 @@ controls:
       iso27001_2022: [A.8.20, A.8.22]
       nist_800_53r5: [AC-17, SC-7]
       cis_v8: ["12.3"]
+      nis2_art21: [i]
 
   - id: LYSS-MGMT-011
     level: 2
@@ -245,6 +258,7 @@ controls:
       iso27001_2022: [A.8.22]
       nist_800_53r5: [SC-7, AC-4]
       cis_v8: ["12.2"]
+      nis2_art21: [i]
 
   - id: LYSS-MGMT-012
     level: 2
@@ -260,6 +274,7 @@ controls:
       iso27001_2022: [A.5.10]
       nist_800_53r5: [AC-8]
       cis_v8: []
+      nis2_art21: []
 
   - id: LYSS-MGMT-013
     level: 2
@@ -275,6 +290,7 @@ controls:
       iso27001_2022: [A.8.24, A.8.21]
       nist_800_53r5: [SC-8, SC-13]
       cis_v8: ["3.10", "12.6"]
+      nis2_art21: [h]
 
   - id: LYSS-LOG-010
     level: 2
@@ -289,6 +305,7 @@ controls:
       iso27001_2022: [A.8.15, A.8.16]
       nist_800_53r5: [AU-4(1), AU-6]
       cis_v8: ["8.2", "8.9"]
+      nis2_art21: [b]
 
   - id: LYSS-LOG-011
     level: 2
@@ -305,6 +322,7 @@ controls:
       iso27001_2022: [A.8.17]
       nist_800_53r5: [AU-8, SC-45]
       cis_v8: ["8.4"]
+      nis2_art21: [b]
 
   - id: LYSS-ACC-010
     level: 2
@@ -317,6 +335,7 @@ controls:
       iso27001_2022: [A.8.20]
       nist_800_53r5: [CM-7]
       cis_v8: ["12.3"]
+      nis2_art21: [g, i]
 
   - id: LYSS-ACC-011
     level: 2
@@ -335,6 +354,7 @@ controls:
       iso27001_2022: [A.8.20]
       nist_800_53r5: [SC-5, CM-6]
       cis_v8: ["12.2"]
+      nis2_art21: [g]
 
   # ---------------- Level 3: Advanced ----------------
   # Access-layer protections against attacks from user ports. "Access ports" are the ports that are
@@ -361,6 +381,7 @@ controls:
     mappings:
       iso27001_2022: [A.8.20, A.8.22]
       nist_800_53r5: [SC-7, SI-4]
+      nis2_art21: [g]
 
   - id: LYSS-ACC-021
     level: 3
@@ -379,6 +400,7 @@ controls:
     mappings:
       iso27001_2022: [A.8.20, A.8.22]
       nist_800_53r5: [SC-7, SI-4]
+      nis2_art21: [g]
 
   - id: LYSS-ACC-022
     level: 3
@@ -398,6 +420,7 @@ controls:
       iso27001_2022: [A.8.20, A.5.15]
       nist_800_53r5: [IA-3, AC-3]
       cis_v8: ["13.9"]
+      nis2_art21: [i]
 
   - id: LYSS-ACC-023
     level: 3
@@ -414,6 +437,7 @@ controls:
     mappings:
       iso27001_2022: [A.8.20, A.8.6]
       nist_800_53r5: [SC-5]
+      nis2_art21: [g]
 
   - id: LYSS-ACC-024
     level: 3
@@ -433,3 +457,4 @@ controls:
       iso27001_2022: [A.8.20, A.8.9]
       nist_800_53r5: [CM-7]
       cis_v8: ["4.8"]
+      nis2_art21: [g]

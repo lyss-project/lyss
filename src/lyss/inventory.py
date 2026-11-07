@@ -42,9 +42,29 @@ def configure(data_dir: Path | str) -> None:
 
 configure(os.environ.get("LYSS_DATA_DIR") or default_data_dir())
 
-ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
-HOST_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$")
+ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}\Z")
+HOST_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.-]{0,252}\Z")
 _lock = threading.Lock()
+
+
+def strict_ip(value, version: int | None = None) -> str | None:
+    """value if it is exactly an IP address, else None. Safe to put on a command line: Python's
+    ipaddress accepts IPv6 scope ids with any character ("fe80::1%x;reboot"), so scope ids,
+    spaces and control characters are refused. version=4 accepts IPv4 only."""
+    if not isinstance(value, str) or "%" in value or any(ord(c) <= 0x20 or ord(c) == 0x7F for c in value):
+        return None
+    try:
+        ip = ipaddress.ip_address(value)
+    except ValueError:
+        return None
+    if version and ip.version != version:
+        return None
+    return str(ip)
+
+
+def valid_id(device_id) -> bool:
+    """Device ids become file names: only ids of the inventory's own format are ever used in a path."""
+    return isinstance(device_id, str) and bool(ID_PATTERN.match(device_id))
 
 
 def _read(path: Path, default):
@@ -52,10 +72,18 @@ def _read(path: Path, default):
 
 
 def _write(path: Path, data) -> None:
+    """Atomic JSON write through a temporary file of its own (mode 0600 where supported)."""
+    import tempfile
+    from . import locks
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    os.replace(tmp, path)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data, indent=2, ensure_ascii=False))
+        locks.replace(Path(tmp), path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
 
 
 # ---------------- devices ----------------
@@ -73,11 +101,8 @@ def validate_device(data: dict, vendors: list[str]) -> list[str]:
     if not ID_PATTERN.match(data.get("id", "")):
         errors.append("Name: lowercase letters, digits and dashes only (max 40).")
     host = data.get("host", "")
-    try:
-        ipaddress.ip_address(host)
-    except ValueError:
-        if not HOST_PATTERN.match(host):
-            errors.append("Address: not a valid IP address or hostname.")
+    if strict_ip(host) is None and not HOST_PATTERN.match(host):
+        errors.append("Address: not a valid IP address or hostname.")
     if data.get("vendor") not in vendors and data.get("vendor") != "auto":
         errors.append("Platform: unknown adapter.")
     if not 1 <= int(data.get("port") or 0) <= 65535:
@@ -137,6 +162,8 @@ def set_vendor(device_id: str, vendor: str) -> None:
 
 
 def delete_device(device_id: str) -> None:
+    if not valid_id(device_id) or get_device(device_id) is None:
+        return   # never build a path from an arbitrary name (e.g. "..\\settings" on Windows)
     with _lock:
         _write(DEVICES_FILE, [d for d in load_devices() if d["id"] != device_id])
         (RESULTS_DIR / f"{device_id}.json").unlink(missing_ok=True)
@@ -188,13 +215,39 @@ def delete_profile(profile_id: str) -> bool:
 
 # ---------------- settings ----------------
 
+class Settings(dict):
+    """The settings as loaded, plus a copy of what they were at that moment: saving writes only
+    the keys changed since, onto the current file. Two writers (two browser tabs, the web
+    interface and "lyss data seal") never undo each other's change."""
+
+    def __init__(self, data: dict):
+        super().__init__(data)
+        self._base = json.loads(json.dumps(data))
+
+
 def load_settings() -> dict:
-    return _read(SETTINGS_FILE, {"jump": {}, "admin": None})
+    return Settings(_read(SETTINGS_FILE, {"jump": {}, "admin": None}))
 
 
 def save_settings(settings: dict) -> None:
-    with _lock:
-        _write(SETTINGS_FILE, settings)
+    from . import locks
+    with _lock, locks.file_lock(SETTINGS_FILE):
+        base = getattr(settings, "_base", None)
+        if base is None:
+            data = dict(settings)   # a plain dict replaces the whole file (explicit full write)
+        else:
+            data = dict(_read(SETTINGS_FILE, {"jump": {}, "admin": None}))
+            for key in set(base) | set(settings):
+                if key not in settings:
+                    data.pop(key, None)
+                elif base.get(key, _MISSING) != settings[key]:
+                    data[key] = settings[key]
+        _write(SETTINGS_FILE, data)
+        if base is not None:
+            settings._base = json.loads(json.dumps(dict(settings)))
+
+
+_MISSING = object()
 
 
 def hash_password(password: str, salt: bytes | None = None) -> dict:
@@ -213,8 +266,15 @@ def check_password(password: str, stored: dict | None) -> bool:
 # ---------------- results ----------------
 
 def save_result(device_id: str, result: dict) -> None:
-    _write(RESULTS_DIR / f"{device_id}.json", result)
+    from . import sealed   # results list each switch's weaknesses: encrypted at rest by default
+    if not valid_id(device_id):
+        raise ValueError(f"invalid device id {device_id!r}")
+    sealed.write_text(RESULTS_DIR / f"{device_id}.json", json.dumps(result, indent=2, ensure_ascii=False))
 
 
 def load_result(device_id: str) -> dict | None:
-    return _read(RESULTS_DIR / f"{device_id}.json", None)
+    from . import sealed
+    if not valid_id(device_id):
+        return None
+    path = RESULTS_DIR / f"{device_id}.json"
+    return json.loads(sealed.read_text(path)) if path.exists() else None

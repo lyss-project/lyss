@@ -93,7 +93,7 @@ def assess(node: dict, config: str, level: int = 2, now: datetime | None = None)
             f.verdict = "unknown"
             f.note = ("Oxidized hides this secret (remove_secret): how it is stored cannot be checked "
                       "from the backup. " + (f.note or "")).strip()
-    facts = extract_facts(parse(config, ""), load_adapter(vendor))
+    facts = extract_facts(parse(config, "", vendor), load_adapter(vendor))
     return {
         "device": node["name"], "host": node.get("ip", ""), "group": node.get("group") or "",
         "vendor": vendor, "model": facts.get("model", ""), "firmware": facts.get("version", ""),

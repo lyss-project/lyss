@@ -90,7 +90,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Telnet sends credentials and session data in cleartext; anyone on the path can capture administrator passwords.
 - **Test procedure.** Check that no management service listens on TCP 23 (device state) and that no remote CLI line or service is configured to accept Telnet (configuration). Fail if either shows Telnet accepted. Unknown if the platform hides the Telnet default and no device state is available.
 - **Evidence.** config, state
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.21, A.8.24 · NIST SP 800-53 r5 CM-7, SC-8, AC-17(2) · CIS Controls v8 4.8, 12.6
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.21, A.8.24 · NIST SP 800-53 r5 CM-7, SC-8, AC-17(2) · CIS Controls v8 4.8, 12.6 · NIS2 Art. 21(2)(h), 21(2)(g)
 
 #### LYSS-MGMT-002
 
@@ -100,7 +100,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** SSHv1 has known cryptographic weaknesses and must not be negotiable.
 - **Test procedure.** Read the SSH identification string of the switch: "SSH-2.0-" passes, "SSH-1.99-" or "SSH-1.5-" fails. Without device state, an explicit "version 2 only" setting passes.
 - **Evidence.** config, state
-- **References (informative).** ISO/IEC 27001:2022 A.8.21, A.8.24 · NIST SP 800-53 r5 SC-8, SC-13, AC-17(2) · CIS Controls v8 12.6
+- **References (informative).** ISO/IEC 27001:2022 A.8.21, A.8.24 · NIST SP 800-53 r5 SC-8, SC-13, AC-17(2) · CIS Controls v8 12.6 · NIS2 Art. 21(2)(h)
 
 #### LYSS-MGMT-003
 
@@ -110,7 +110,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Plain HTTP exposes administrator credentials and session cookies.
 - **Test procedure.** Fail if a management web service listens on TCP 80 (device state) or the plain HTTP server is enabled in the configuration, including when it is enabled by default and not disabled.
 - **Evidence.** config, state
-- **References (informative).** ISO/IEC 27001:2022 A.8.21, A.8.24 · NIST SP 800-53 r5 CM-7, SC-8, AC-17(2) · CIS Controls v8 4.8, 12.6
+- **References (informative).** ISO/IEC 27001:2022 A.8.21, A.8.24 · NIST SP 800-53 r5 CM-7, SC-8, AC-17(2) · CIS Controls v8 4.8, 12.6 · NIS2 Art. 21(2)(h)
 
 #### LYSS-MGMT-004
 
@@ -121,7 +121,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Test procedure.** Determine the effective idle timeout of every console and remote CLI line: the configured value, or the platform's documented default when none is configured. Fail if any effective timeout is disabled (0, never) or above the parameter. For example, Cisco IOS and Cisco Business default to 10 minutes (pass when unset); HPE AOS-S defaults to no timeout (fail when unset).
 - **Parameters.** `max_idle_minutes` = 10
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.5 · NIST SP 800-53 r5 AC-12, SC-10 · CIS Controls v8 4.3
+- **References (informative).** ISO/IEC 27001:2022 A.8.5 · NIST SP 800-53 r5 AC-12, SC-10 · CIS Controls v8 4.3 · NIS2 Art. 21(2)(i)
 
 #### LYSS-AUTH-001
 
@@ -131,7 +131,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Default communities give anyone on the network read (or write) access to the device.
 - **Test procedure.** Fail if an SNMP community named "public", "private" or a documented vendor default is configured.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.21 · NIST SP 800-53 r5 IA-5, CM-6 · CIS Controls v8 4.7
+- **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.21 · NIST SP 800-53 r5 IA-5, CM-6 · CIS Controls v8 4.7 · NIS2 Art. 21(2)(i), 21(2)(g)
 
 #### LYSS-AUTH-002
 
@@ -141,7 +141,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Reversible encodings (e.g. Cisco type 7) are decoded instantly by public tools from any configuration backup, and MD5- or SHA-1-based hashes (e.g. Cisco type 5) are cracked quickly on commodity hardware.
 - **Test procedure.** Fail if the privileged credential, or a local account with full privileges, is stored in cleartext, a reversible form, or with MD5, SHA-1 or Cisco type 4 (e.g. Cisco "enable password", type 4 or 5, a 40-hex-digit SHA-1 value, HPE "sha1"). Pass if it uses an accepted algorithm, or if there is no privileged credential and privileged access is only granted through central AAA. Unknown if the algorithm cannot be identified.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.5 · NIST SP 800-53 r5 IA-5(1) · CIS Controls v8 3.11
+- **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.5 · NIST SP 800-53 r5 IA-5(1) · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h), 21(2)(i)
 
 #### LYSS-AUTH-003
 
@@ -151,7 +151,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Configuration backups circulate (backup servers, tickets, e-mail); stored passwords must not be recoverable.
 - **Test procedure.** Fail if any local account credential is stored in cleartext or a reversible encoding.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.5.17 · NIST SP 800-53 r5 IA-5(1) · CIS Controls v8 3.11
+- **References (informative).** ISO/IEC 27001:2022 A.5.17 · NIST SP 800-53 r5 IA-5(1) · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h), 21(2)(i)
 
 #### LYSS-AUTH-004
 
@@ -161,7 +161,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** A cleartext RADIUS key in a backup lets an attacker impersonate the AAA server or decrypt authentication traffic.
 - **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding is not cleartext and passes this control; storing keys irreversibly or with a device-specific encryption key is planned as a separate Level 2 control.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.24 · NIST SP 800-53 r5 IA-5, SC-28 · CIS Controls v8 3.11
+- **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.24 · NIST SP 800-53 r5 IA-5, SC-28 · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h)
 
 #### LYSS-VULN-001
 
@@ -171,7 +171,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Unsupported or vulnerable firmware is the most common path to switch compromise.
 - **Test procedure.** Identify the model and firmware version from device state and compare them with a sourced knowledge base (vendor advisories, end-of-life bulletins, CISA KEV). Fail if security support has ended, or if an applicable critical (CVSS >= 9.0) or known-exploited (CISA KEV) advisory is unfixed in the running version; other advisories do not affect this control. Unknown if the platform is not in the knowledge base: a pass is never assumed.
 - **Evidence.** state, external_data
-- **References (informative).** ISO/IEC 27001:2022 A.8.8 · NIST SP 800-53 r5 SI-2, SA-22, RA-5 · CIS Controls v8 2.2, 12.1
+- **References (informative).** ISO/IEC 27001:2022 A.8.8 · NIST SP 800-53 r5 SI-2, SA-22, RA-5 · CIS Controls v8 2.2, 12.1 · NIS2 Art. 21(2)(e)
 
 #### LYSS-BKP-001
 
@@ -182,7 +182,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Test procedure.** Pass if the most recent automatic (scheduled) collection of the running configuration is at most the parameter old at the time of assessment; a schedule less frequent than the parameter therefore fails between runs. Otherwise pass on an external backup system only with evidence of its last successful backup for this device, at most the parameter old (for example from the backup system's records), or with an administrator attestation, renewed at least every 90 days, that the external system backs the device up at least as often as the parameter and alerts on failure. Fail if the last automatic backup is older, or only manual collections exist.
 - **Parameters.** `max_age_days` = 7
 - **Evidence.** backup_system
-- **References (informative).** ISO/IEC 27001:2022 A.8.9, A.8.13 · NIST SP 800-53 r5 CP-9, CM-2(3) · CIS Controls v8 11.2
+- **References (informative).** ISO/IEC 27001:2022 A.8.9, A.8.13 · NIST SP 800-53 r5 CP-9, CM-2(3) · CIS Controls v8 11.2 · NIS2 Art. 21(2)(c)
 
 ### Level 2: Hardened
 
@@ -194,7 +194,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Central AAA gives individual accounts, immediate revocation and an audit trail; shared local passwords do not.
 - **Test procedure.** Pass if an AAA server is defined and every login method list used for remote administrative access starts with the AAA server, local accounts coming only after it. Fail if any such list starts with a local account, a line password or no authentication.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.5.16, A.8.5 · NIST SP 800-53 r5 IA-2, AC-2 · CIS Controls v8 12.5
+- **References (informative).** ISO/IEC 27001:2022 A.5.16, A.8.5 · NIST SP 800-53 r5 IA-2, AC-2 · CIS Controls v8 12.5 · NIS2 Art. 21(2)(i)
 
 #### LYSS-AUTH-011
 
@@ -204,7 +204,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** SNMPv1/v2c communities travel in cleartext and are equivalent to shared passwords.
 - **Test procedure.** Fail if any SNMPv1/v2c community or v1/v2 group is configured, or if any SNMPv3 group or user has a security level below authentication with privacy (noAuthNoPriv or authNoPriv).
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.21, A.8.24 · NIST SP 800-53 r5 SC-8, SC-13, IA-5 · CIS Controls v8 12.6
+- **References (informative).** ISO/IEC 27001:2022 A.8.21, A.8.24 · NIST SP 800-53 r5 SC-8, SC-13, IA-5 · CIS Controls v8 12.6 · NIS2 Art. 21(2)(h), 21(2)(i)
 
 #### LYSS-MGMT-010
 
@@ -214,7 +214,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Limiting who can even reach the login prompt removes most password-guessing and exploit attempts.
 - **Test procedure.** Pass if every remote management access path is bound to an access list of authorized sources.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 AC-17, SC-7 · CIS Controls v8 12.3
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 AC-17, SC-7 · CIS Controls v8 12.3 · NIS2 Art. 21(2)(i)
 
 #### LYSS-MGMT-011
 
@@ -224,7 +224,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Separating management from user networks prevents users from reaching the management plane.
 - **Test procedure.** Fail if VLAN 1 carries a management address, or if an access (untagged, non-uplink) port is a member of the management VLAN. Pass if the management address is on another VLAN with no access port.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.22 · NIST SP 800-53 r5 SC-7, AC-4 · CIS Controls v8 12.2
+- **References (informative).** ISO/IEC 27001:2022 A.8.22 · NIST SP 800-53 r5 SC-7, AC-4 · CIS Controls v8 12.2 · NIS2 Art. 21(2)(i)
 
 #### LYSS-MGMT-012
 
@@ -234,7 +234,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** The warning supports legal action against intruders and informs users that activity is monitored.
 - **Test procedure.** Pass if a banner displayed before authentication (login or message-of-the-day, not a post-login exec banner) is configured and its text states the authorized-use restriction ("authorized", "authorised", "unauthorized" or "unauthorised"). Fail otherwise.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.5.10 · NIST SP 800-53 r5 AC-8 · CIS Controls v8 —
+- **References (informative).** ISO/IEC 27001:2022 A.5.10 · NIST SP 800-53 r5 AC-8 · CIS Controls v8 — · NIS2 Art. —
 
 #### LYSS-MGMT-013
 
@@ -244,7 +244,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** SHA-1 key exchange, CBC ciphers and ssh-rsa (SHA-1) signatures are deprecated; modern clients refuse them and they weaken the management channel.
 - **Test procedure.** Connect offering the strongest algorithms first and record the negotiated ones (the best the switch supports). Fail on a SHA-1 or group1 key exchange, a CBC/3DES/RC4 cipher, or an ssh-rsa/ssh-dss host key signature.
 - **Evidence.** state
-- **References (informative).** ISO/IEC 27001:2022 A.8.24, A.8.21 · NIST SP 800-53 r5 SC-8, SC-13 · CIS Controls v8 3.10, 12.6
+- **References (informative).** ISO/IEC 27001:2022 A.8.24, A.8.21 · NIST SP 800-53 r5 SC-8, SC-13 · CIS Controls v8 3.10, 12.6 · NIS2 Art. 21(2)(h)
 
 #### LYSS-LOG-010
 
@@ -254,7 +254,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Local logs are lost on reboot and can be erased by an intruder; remote logs support detection and investigation.
 - **Test procedure.** Fail if logging is disabled globally (e.g. "no logging on"). Pass if at least one remote syslog destination is configured and logging is enabled.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.15, A.8.16 · NIST SP 800-53 r5 AU-4(1), AU-6 · CIS Controls v8 8.2, 8.9
+- **References (informative).** ISO/IEC 27001:2022 A.8.15, A.8.16 · NIST SP 800-53 r5 AU-4(1), AU-6 · CIS Controls v8 8.2, 8.9 · NIS2 Art. 21(2)(b)
 
 #### LYSS-LOG-011
 
@@ -264,7 +264,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Without a reliable clock, logs cannot be correlated and certificates and schedules misbehave.
 - **Test procedure.** Fail if no NTP or SNTP server is configured, or if the device state reports the clock as not synchronized. Pass if a time server is configured and the clock is reported synchronized; without device state, a configured time server passes and the report says that synchronization was not verified.
 - **Evidence.** config, state
-- **References (informative).** ISO/IEC 27001:2022 A.8.17 · NIST SP 800-53 r5 AU-8, SC-45 · CIS Controls v8 8.4
+- **References (informative).** ISO/IEC 27001:2022 A.8.17 · NIST SP 800-53 r5 AU-8, SC-45 · CIS Controls v8 8.4 · NIS2 Art. 21(2)(b)
 
 #### LYSS-ACC-010
 
@@ -274,7 +274,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** An enabled, unused port lets anyone plug in an unauthorized device.
 - **Test procedure.** Fail if any port is operationally down while administratively enabled (device state).
 - **Evidence.** config, state
-- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 CM-7 · CIS Controls v8 12.3
+- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 CM-7 · CIS Controls v8 12.3 · NIS2 Art. 21(2)(g), 21(2)(i)
 
 #### LYSS-ACC-011
 
@@ -284,7 +284,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
 - **Test procedure.** Edge ports are all ports minus uplinks, and uplinks are only the ports configured as trunks or link-aggregation members (tagged on HPE AOS-S). Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
 - **Evidence.** config, state
-- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 SC-5, CM-6 · CIS Controls v8 12.2
+- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 SC-5, CM-6 · CIS Controls v8 12.2 · NIS2 Art. 21(2)(g)
 
 ### Level 3: Advanced
 
@@ -296,9 +296,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** A rogue DHCP server on a user port can hand out its own gateway and DNS server and intercept traffic; DHCP snooping drops server messages from untrusted ports and builds the binding table that ARP inspection and IP source guard rely on.
 - **Test procedure.** Fail if DHCP snooping is not enabled globally, or if a VLAN used by an access port is not in the snooping VLAN list. Pass if it is enabled and every such VLAN is covered (on platforms where snooping applies to the whole bridge, the bridge setting covers every access port). Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 —
-
-*Draft: requirement text and checks to be written.*
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 — · NIS2 Art. 21(2)(g)
 
 #### LYSS-ACC-021
 
@@ -308,9 +306,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Without ARP inspection, any user device can claim the gateway's IP address (ARP spoofing) and read or alter the traffic of every host in the VLAN.
 - **Test procedure.** Fail if a VLAN used by an access port is not covered by dynamic ARP inspection, or if the platform offers no ARP inspection (the report names the platform limit). Pass if every such VLAN is covered. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 —
-
-*Draft: requirement text and checks to be written.*
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 — · NIS2 Art. 21(2)(g)
 
 #### LYSS-ACC-022
 
@@ -320,9 +316,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Without port authentication, anyone who can plug a cable into a wall socket is on the internal network.
 - **Test procedure.** Fail if port authentication is not enabled globally where the platform requires it, or if an access port has no 802.1X / MAC authentication setting. Pass if every access port has one. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.5.15 · NIST SP 800-53 r5 IA-3, AC-3 · CIS Controls v8 13.9
-
-*Draft: requirement text and checks to be written.*
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.5.15 · NIST SP 800-53 r5 IA-3, AC-3 · CIS Controls v8 13.9 · NIS2 Art. 21(2)(i)
 
 #### LYSS-ACC-023
 
@@ -332,9 +326,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** A loop or a misbehaving device on one user port can flood broadcast traffic to every port of the VLAN and take the network down; a rate limit contains it on the offending port.
 - **Test procedure.** Fail if an access port has no broadcast rate limit. Pass if every access port has one. Unknown when the platform sets it on the switch chip and the setting cannot be read. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.6 · NIST SP 800-53 r5 SC-5 · CIS Controls v8 —
-
-*Draft: requirement text and checks to be written.*
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.6 · NIST SP 800-53 r5 SC-5 · CIS Controls v8 — · NIS2 Art. 21(2)(g)
 
 #### LYSS-ACC-024
 
@@ -344,9 +336,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** CDP and LLDP advertisements tell anyone on a user port the switch name, model, software version, management address and VLANs, which helps an attacker choose an exploit.
 - **Test procedure.** Pass if neighbor discovery transmission is disabled globally, or on every access port without a voice VLAN, for each protocol the platform sends by default or that is enabled. Fail otherwise. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.9 · NIST SP 800-53 r5 CM-7 · CIS Controls v8 4.8
-
-*Draft: requirement text and checks to be written.*
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.9 · NIST SP 800-53 r5 CM-7 · CIS Controls v8 4.8 · NIS2 Art. 21(2)(g)
 
 ## 6. Requirements for adapters
 
@@ -393,5 +383,7 @@ While the version is below 1.0.0 the specification is a draft and MAY change wit
 
 ## 9. References (informative)
 
-Mappings to ISO/IEC 27001:2022 Annex A, NIST SP 800-53 revision 5 and CIS Controls v8 are
-informative: they help reuse LYSS results as audit evidence and do not change the requirements.
+Mappings to ISO/IEC 27001:2022 Annex A, NIST SP 800-53 revision 5, CIS Controls v8 and
+Article 21(2) of the NIS2 Directive (EU) 2022/2555 are informative: they help reuse LYSS
+results as audit evidence and do not change the requirements. The same mappings, read from each
+framework, are in [MAPPINGS.md](MAPPINGS.md).
