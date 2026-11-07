@@ -268,12 +268,12 @@ checks:
 
   LYSS-ACC-020:
     not_applicable_if_any: &ios_no_access
-      - {not: {block: '^interface \S*Ethernet', where: '^switchport mode access'}, say: 'no access port ("switchport mode access") in the configuration'}
+      - {not: {block: '^interface \S*Ethernet', where: '^switchport mode access', where_not: '^shutdown$'}, say: 'no enabled access port ("switchport mode access") in the configuration'}
     fail_if_any:
       - {not: {line: '^ip dhcp snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("ip dhcp snooping")'}
       - uncovered: &ios_snooping
           what: access VLANs without DHCP snooping
-          used: &ios_access_vlans {block: '^interface \S*Ethernet', where: '^switchport mode access', line: '^switchport access vlan (\d+)', default: 1}
+          used: &ios_access_vlans {block: '^interface \S*Ethernet', where: '^switchport mode access', where_not: '^shutdown$', line: '^switchport access vlan (\d+)', default: 1}
           covered: {line: '^ip dhcp snooping vlan (\S+)'}
           lists: true
     pass_if_any:
@@ -308,7 +308,7 @@ checks:
       - {not: {line: '^dot1x system-auth-control'}, say: '802.1X is not enabled globally ("dot1x system-auth-control")'}
       - uncovered: &ios_nac
           what: access ports without 802.1X / MAB
-          used: &ios_access_ports {block: '^interface (\S*Ethernet\S+)', where: '^switchport mode access'}
+          used: &ios_access_ports {block: '^interface (\S*Ethernet\S+)', where: '^switchport mode access', where_not: '^shutdown$'}
           covered: {block: '^interface (\S*Ethernet\S+)', where: '^((authentication|access-session|dot1x) port-control auto|mab)\b'}
     pass_if_any:
       - {uncovered: *ios_nac, absent: true}
@@ -344,7 +344,7 @@ checks:
           - {not: {line: '^no cdp run'}}
           - uncovered: &ios_cdp
               what: access ports sending CDP
-              used: &ios_user_ports {block: '^interface (\S*Ethernet\S+)', where: '^switchport mode access', where_not: '^switchport voice vlan'}
+              used: &ios_user_ports {block: '^interface (\S*Ethernet\S+)', where: '^switchport mode access', where_not: '^(switchport voice vlan|shutdown$)'}
               covered: {block: '^interface (\S*Ethernet\S+)', where: '^no cdp enable'}
       - all:
           - {line: '^lldp run'}

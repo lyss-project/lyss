@@ -10,7 +10,7 @@ verdicts:
   LYSS-AUTH-001: fail
   LYSS-AUTH-002: fail
   LYSS-AUTH-004: fail
-  LYSS-VULN-001: unknown
+  LYSS-VULN-001: fail
   LYSS-MGMT-013: unknown
   LYSS-LOG-011: fail
   LYSS-ACC-010: unknown

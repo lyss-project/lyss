@@ -13,7 +13,7 @@ Serial number: FAKE0000020
 Hardware MAC address: 0200.0000.0020
 System MAC address: 0200.0000.0020
 
-Software image version: 4.30.1F-12345678.4301F (engineering build)
+Software image version: 4.24.5F-12345678.4245F (engineering build)
 Architecture: x86_64
 ===== show management telnet =====
 Telnet status for Default VRF is enabled

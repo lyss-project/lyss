@@ -12,11 +12,11 @@ documentation block `00:00:5e:00:53:xx` (RFC 7042), fake serial numbers and secr
 python -m lyss demo --open
 ```
 
-- Starts the eight simulated switches on `127.0.0.1:2201-2208` (SSH).
+- Starts the nine simulated switches on `127.0.0.1:2201-2209` (SSH).
 - Uses its **own data directory** (`<temp>/lyss-demo`, or `--data-dir`); the demo refuses to run in,
   or inside, your real LYSS data directory (`private/` or `LYSS_DATA_DIR`).
 - At the first start it creates the organisation "Demo Corp", a credential profile for the
-  simulated switches, the eight devices, and an **admin account whose random password is printed
+  simulated switches, the nine devices, and an **admin account whose random password is printed
   once** in the console. `--reset` starts again from an empty demo directory.
 - Runs a first scan, recorded as a *scheduled* scan (the simulated "nightly" scan), so the
   configuration-backup control has evidence; then opens the web interface on

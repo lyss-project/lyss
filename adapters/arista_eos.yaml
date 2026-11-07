@@ -129,11 +129,13 @@ checks:
     firmware: true
     otherwise: unknown
     note: >-
-      Arista EOS is not yet in data/firmware.yaml. The one EOS flaw in the CISA KEV catalogue
-      (CVE-2026-7473, Security Advisory 0137) has no fixed release: on 7020R / 7280R(2) / 7500R(2)
-      tunnel endpoints (VXLAN, GRE, decap-group) the mitigation is the ACL in the advisory.
+      Firmware version not collected (no "show version" and no "! device:" header). Version data
+      covers the critical EOS advisories with fixed releases (SA-0071, SA-0072). The one EOS flaw in
+      the CISA KEV catalogue (CVE-2026-7473, SA-0137) has no fixed release and is not decided by
+      version: on 7020R / 7280R(2) / 7500R(2) tunnel endpoints (VXLAN, GRE, decap-group) apply the
+      ACL of the advisory.
     remediation: |
-      ! compare the version with Arista's security advisories (arista.com > Support > Security Advisories)
+      ! upgrade to the latest release of your EOS train (arista.com > Support > Software Download)
       ! VXLAN / GRE endpoints on 7020R, 7280R(2), 7500R(2): apply the ACL of Security Advisory 0137
 
   LYSS-BKP-001:
@@ -278,14 +280,14 @@ checks:
 
   LYSS-ACC-020:
     not_applicable_if_any: &eos_no_access
-      - {not: {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b'}, say: 'no access port (every Ethernet interface is a trunk, routed or LAG member)'}
+      - {not: {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|shutdown)\b'}, say: 'no enabled access port (every Ethernet interface is shut, a trunk, routed or LAG member)'}
     fail_if_any:
       - {not: {line: '^ip dhcp snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("ip dhcp snooping")'}
       # EOS: without the information option, DHCP snooping is not operational (DISA STIG V-255973)
       - {not: {line: '^ip dhcp snooping information option'}, say: 'DHCP snooping information option (82) is not enabled: snooping is not operational on EOS'}
       - uncovered: &eos_snooping
           what: access VLANs without DHCP snooping
-          used: &eos_access_vlans {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b', line: '^switchport access vlan (\d+)', default: 1}
+          used: &eos_access_vlans {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|shutdown)\b', line: '^switchport access vlan (\d+)', default: 1}
           covered: {line: '^ip dhcp snooping vlan (\S+)'}
           lists: true
     pass_if_any:
@@ -318,7 +320,7 @@ checks:
       - {not: {line: '^dot1x system-auth-control'}, say: '802.1X is not enabled globally ("dot1x system-auth-control")'}
       - uncovered: &eos_nac
           what: access ports without 802.1X / MAC authentication
-          used: &eos_access_ports {block: '^interface (Ethernet\S+)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b'}
+          used: &eos_access_ports {block: '^interface (Ethernet\S+)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|shutdown)\b'}
           covered: {block: '^interface (Ethernet\S+)', where: '^dot1x (port-control auto|mac based authentication)\b'}
     pass_if_any:
       - {uncovered: *eos_nac, absent: true}
@@ -351,7 +353,7 @@ checks:
           - {not: {line: '^no lldp run'}}
           - uncovered: &eos_lldp
               what: access ports sending LLDP
-              used: {block: '^interface (Ethernet\S+)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|switchport phone)\b'}
+              used: {block: '^interface (Ethernet\S+)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|switchport phone|shutdown)\b'}
               covered: {block: '^interface (Ethernet\S+)', where: '^no lldp transmit'}
     otherwise: pass
     note: Ports with an IP phone configuration ("switchport phone") are exempt; EOS does not send CDP.

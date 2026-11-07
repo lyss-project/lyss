@@ -18,7 +18,7 @@ example to `C:\LYSS`. If you use git: `git clone https://github.com/lyss-project
 
 ## 3. Try the demo first
 
-The demo starts eight simulated switches of a fictitious company ("Demo Corp") on your PC and the
+The demo starts nine simulated switches of a fictitious company ("Demo Corp") on your PC and the
 LYSS web interface on http://127.0.0.1:8766. It never touches your network.
 
 - **Windows**: double-click **`Start-LYSS-Demo.cmd`**. The first start installs LYSS into a

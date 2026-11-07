@@ -289,3 +289,27 @@ platforms:
       https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
       https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
     verified: 2026-11-08
+
+  # ---------------- Arista EOS ----------------
+  # critical advisories (CVSS >= 9.0, NVD) with fixed releases; versions newer than every listed
+  # train are fixed. The KEV flaw CVE-2026-7473 (SA-0137) has no fixed release and depends on the
+  # platform and tunnel configuration: explained in the adapter note, not decided by version.
+
+  - vendor: arista_eos
+    models: '.'
+    family: Arista EOS
+    advisories:
+      - id: CVE-2021-28503 (SA-0072, eAPI certificate authentication bypass)
+        cvss: 9.8
+        fixed_in: ['4.23.10', '4.24.8', '4.25.6', '4.26.3']
+        note: Only when eAPI uses user certificate authentication (management api http-commands with an SSL profile); every 4.22 release is affected.
+      - id: CVE-2021-28506 (SA-0071, gNOI factory reset without authentication)
+        cvss: 9.1
+        affected_from: '4.24.2'
+        fixed_in: ['4.24.8', '4.25.6', '4.26.3']
+        note: Only when OpenConfig gNMI/gNOI is enabled (management api gnmi); the 4.25.4.x maintenance train is fixed in 4.25.4.1M.
+    source: >-
+      https://www.arista.com/en/support/advisories-notices/security-advisory/13605-security-advisory-0072 ;
+      https://www.arista.com/en/support/advisories-notices/security-advisory/13449-security-advisory-0071 ;
+      https://nvd.nist.gov/ (CVE API 2.0: CVE-2021-28503 9.8, CVE-2021-28506 9.1; no other critical EOS CVE)
+    verified: 2026-11-08

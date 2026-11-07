@@ -35,28 +35,32 @@ def collect(devices) -> dict:
     return status
 
 
-# what the demo lab is designed to show (see src/lyss/sim/labs/demo/lab.yaml)
+# what the demo lab is designed to show (see src/lyss/sim/labs/demo/lab.yaml), Level 3 included
+LEVEL3 = {"LYSS-ACC-020", "LYSS-ACC-021", "LYSS-ACC-022", "LYSS-ACC-023", "LYSS-ACC-024"}
 EXPECTED_FAILS = {
-    "demo-core": set(),
+    "demo-core": LEVEL3,                       # Level 2; no access-layer protection on its user ports
     "demo-acc-01": {"LYSS-MGMT-004", "LYSS-AUTH-010", "LYSS-MGMT-010", "LYSS-MGMT-012", "LYSS-LOG-010",
-                    "LYSS-ACC-010", "LYSS-ACC-011"},
-    "demo-sb-01": {"LYSS-MGMT-010", "LYSS-MGMT-012", "LYSS-ACC-010", "LYSS-ACC-011"},
+                    "LYSS-ACC-010", "LYSS-ACC-011"} | LEVEL3,
+    "demo-sb-01": {"LYSS-MGMT-010", "LYSS-MGMT-012", "LYSS-ACC-010", "LYSS-ACC-011"} | LEVEL3,
     # RouterOS factory defaults, 7.24.1 = one point release before the CISA KEV fixes
     "demo-crs-01": {"LYSS-MGMT-001", "LYSS-MGMT-003", "LYSS-VULN-001", "LYSS-AUTH-010", "LYSS-MGMT-010",
                     "LYSS-MGMT-011", "LYSS-MGMT-012", "LYSS-MGMT-013", "LYSS-LOG-010", "LYSS-ACC-010",
-                    "LYSS-ACC-011"},
+                    "LYSS-ACC-011", "LYSS-ACC-020", "LYSS-ACC-021", "LYSS-ACC-022", "LYSS-ACC-024"},
     # well-run SONiC switch, except SONiC's own "public" community and cleartext TACACS+ key
     "demo-leaf-01": {"LYSS-AUTH-001", "LYSS-AUTH-004", "LYSS-AUTH-011", "LYSS-ACC-010"},
+    # Arista campus switch hardened to Level 3 (simulated EOS, fixed outputs)
+    "demo-eos-01": set(),
 }
 # preview platforms: controls they cannot show both ways stay unknown (see tests/test_controls.py)
 EXPECTED_UNKNOWNS = {
-    "demo-crs-01": {"LYSS-AUTH-002"},
+    "demo-crs-01": {"LYSS-AUTH-002", "LYSS-ACC-023"},   # CRS storm-rate: switch-chip setting
     "demo-leaf-01": {"LYSS-VULN-001", "LYSS-ACC-011"},
 }
 
 
 def test_whole_lab_is_collected_audited_and_mapped(data_dir, sim):
     devices = register(sim)
+    inventory.save_settings({**inventory.load_settings(), "level3": True})   # as the demo does
     status = collect(devices)
     assert all(s == "collected" for s, _ in status.values()), status
 
@@ -84,7 +88,7 @@ def test_whole_lab_is_collected_audited_and_mapped(data_dir, sim):
     assert managed == {frozenset(pair) for pair in [
         ("demo-core", "demo-acc-01"), ("demo-core", "demo-acc-02"), ("demo-core", "demo-sb-01"),
         ("demo-core", "demo-hp-01"), ("demo-acc-01", "demo-sb-02"),
-        ("demo-acc-01", "demo-crs-01"), ("demo-acc-01", "demo-leaf-01")]}
+        ("demo-acc-01", "demo-crs-01"), ("demo-acc-01", "demo-leaf-01"), ("demo-core", "demo-eos-01")]}
     core_acc = next(e for e in graph["edges"] if {e["a"], e["b"]} == {"demo-core", "demo-acc-01"})
     assert core_acc["ports"][0]["confirmed"]  # seen from both ends
     externals = {n["label"].split(".")[0]: n["kind"] for n in graph["nodes"] if not n["managed"]}

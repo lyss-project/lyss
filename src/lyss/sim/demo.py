@@ -62,6 +62,7 @@ def prepare(data_dir: Path, lab: Lab, sim: Simulator, reset: bool = False) -> st
         settings["admin"] = inventory.hash_password(password)
     settings["organization"] = lab.organization
     settings.setdefault("schedule", {"enabled": True, "time": "02:30", "days": list(range(7))})
+    settings.setdefault("level3", True)   # the demo shows all three levels (Settings > Assessment)
     settings.setdefault("remediation", {"enabled": True, "syslog": "192.0.2.60", "ntp": ["192.0.2.123"],
                                         "banner": "Authorized access only. Activity is logged."})
     inventory.save_settings(settings)

@@ -2,6 +2,20 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.11.0 (2026-11-08)
+
+Arista EOS firmware data and a Level 3 switch in the demo. Specification unchanged (0.6.0-draft).
+
+- Arista EOS firmware data: the two critical EOS advisories with fixed releases, SA-0072
+  (CVE-2021-28503, eAPI certificate authentication bypass) and SA-0071 (CVE-2021-28506, gNOI
+  factory reset), so LYSS-VULN-001 now gives a verdict on EOS.
+- Demo: a ninth switch in the simulated network, an Arista campus switch (`demo-eos-01`)
+  hardened up to Level 3; Level 3 is on in the demo. The simulator speaks EOS (read-only).
+- Level 3 counts only enabled access ports: a shut-down port is not an access risk (Cisco IOS,
+  Arista EOS).
+- Web interface and reports: Level 3 has its own colour in the topology map and the level
+  badges, and the dashboard / report text says "Levels 1 to 3" when Level 3 is assessed.
+
 ## 0.10.0 (2026-11-08)
 
 Level 3 (Advanced) and Zyxel GS1900. Specification 0.6.0-draft.

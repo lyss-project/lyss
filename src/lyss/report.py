@@ -68,6 +68,8 @@ def render_html(device_ids: list[str] | None = None, scope: str = "") -> str:
     return _env().get_template("report.html").render(
         rows=rows,
         fleet=fleet(rows),
+        # Level 3 appears in the report text when the results include Level 3 findings
+        level3=any(f["level"] >= 3 for r in rows for f in r["result"]["findings"]),
         scope=scope,
         organization=inventory.load_settings().get("organization", ""),
         generated=datetime.now().strftime("%Y-%m-%d %H:%M"),

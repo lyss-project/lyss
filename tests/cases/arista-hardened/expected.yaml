@@ -10,7 +10,7 @@ verdicts:
   LYSS-AUTH-002: pass
   LYSS-AUTH-003: pass
   LYSS-AUTH-004: pass
-  LYSS-VULN-001: unknown
+  LYSS-VULN-001: pass
   LYSS-BKP-001: pass
   LYSS-AUTH-010: pass
   LYSS-AUTH-011: pass

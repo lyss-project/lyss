@@ -22,7 +22,7 @@ def _peer(nb: dict) -> dict:
             "lldp_caps": "B", "cdp_caps": "S I", "cdp_caps_long": "Switch IGMP",
             "lldp": True, "cdp": cisco,
             "platform": {"cisco_ios": "cisco ", "cisco_sb": "Cisco ", "mikrotik": "MikroTik ",
-                         "sonic": "SONiC "}.get(peer.platform, "HPE ") + peer.model,
+                         "sonic": "SONiC ", "arista_eos": "Arista "}.get(peer.platform, "HPE ") + peer.model,
         }
     return {
         "name": ext["name"], "mac": ext["mac"], "ip": ext.get("ip", ""), "model": ext.get("model", ""),
@@ -45,6 +45,8 @@ def _version_line(sw: SimSwitch) -> str:
         return f"MikroTik RouterOS {sw.version} (stable) {sw.model}"
     if sw.platform == "sonic":
         return f"SONiC Software Version: SONiC.{sw.version} - HwSku: {sw.model}"
+    if sw.platform == "arista_eos":
+        return f"Arista Networks EOS version {sw.version} running on an Arista {sw.model}"
     return f"HPE {sw.model} Switch, revision {sw.version}"
 
 

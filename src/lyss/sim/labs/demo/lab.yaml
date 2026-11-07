@@ -6,8 +6,8 @@ name: demo
 organization: Demo Corp
 description: >-
   One core switch, two Cisco Catalyst access switches, two Cisco Small Business switches, one
-  HPE Aruba switch, one MikroTik CRS and one SONiC campus switch, with a realistic mix of good
-  and bad security settings.
+  HPE Aruba switch, one MikroTik CRS, one SONiC campus switch and one Arista campus switch
+  hardened to Level 3, with a realistic mix of good and bad security settings.
 credentials: {username: lyss-demo, password: demo}
 
 switches:
@@ -107,6 +107,15 @@ switches:
     mgmt_ip: 192.0.2.41
     ports: 54
     expected_level: 0        # well run, but SONiC's "public" SNMP community and a cleartext TACACS+ key
+  demo-eos-01:
+    platform: arista_eos     # read-only platform: fixed outputs in demo-eos-01.cfg / .state
+    hostname: demo-eos-01
+    model: CCS-720XP-24ZY4
+    version: 4.32.2F
+    mac: 00:00:5e:00:53:09
+    mgmt_ip: 192.0.2.45
+    ports: 28
+    expected_level: 3        # campus access switch hardened to Level 3 (when Level 3 is assessed)
 
 # cables: [switch, port, switch, port] (port numbers; each platform names them its own way)
 links:
@@ -117,6 +126,7 @@ links:
   - [demo-acc-01, 26, demo-sb-02, 28]
   - [demo-acc-01, 27, demo-crs-01, sfp-sfpplus1]
   - [demo-acc-01, 28, demo-leaf-01, Ethernet48]
+  - [demo-core, 48, demo-eos-01, Ethernet25]
 
 # devices that are not simulated switches but appear in neighbour tables
 externals:

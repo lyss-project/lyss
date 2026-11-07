@@ -31,7 +31,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   ARP inspection, 802.1X / MAC authentication, storm control, no CDP/LLDP towards users
   (opt-in: `lyss audit --level 3`, or Settings > Assessment).
 
-> Status: **0.10, draft specification 0.6, preview.** The specification and the tool may still change
+> Status: **0.11, draft specification 0.6, preview.** The specification and the tool may still change
 > before 1.0. Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
@@ -70,8 +70,8 @@ An installed LYSS keeps its data (devices, encrypted credentials, results) in `%
 on Windows and `~/.local/share/lyss` elsewhere; a source checkout in `private/`. `LYSS_DATA_DIR`
 overrides both.
 
-This starts a simulated network of eight fictitious switches (Cisco IOS, Cisco Small Business,
-HPE Aruba, MikroTik RouterOS, SONiC) on 127.0.0.1 and the LYSS web interface on a separate demo data folder. Everything
+This starts a simulated network of nine fictitious switches (Cisco IOS, Cisco Small Business,
+HPE Aruba, MikroTik RouterOS, SONiC, Arista EOS, one of them hardened up to Level 3) on 127.0.0.1 and the LYSS web interface on a separate demo data folder. Everything
 you see is invented. See [docs/DEMO.md](docs/DEMO.md). On Windows, double-click
 `Start-LYSS-Demo.cmd` instead (the first start installs LYSS).
 

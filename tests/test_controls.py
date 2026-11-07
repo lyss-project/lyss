@@ -19,7 +19,6 @@ PREVIEW_VENDORS = {
     "arista_eos": {
         "LYSS-MGMT-002": "EOS speaks SSH protocol version 2 only",
         "LYSS-AUTH-003": "EOS stores local passwords as one-way hashes only (SHA-512 or MD5 crypt)",
-        "LYSS-VULN-001": "no EOS firmware data yet (the one CISA KEV flaw, SA-0137, has no fixed release)",
     },
     "mikrotik": {
         "LYSS-MGMT-002": "RouterOS (ROSSSH) speaks SSH protocol version 2 only",

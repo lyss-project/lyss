@@ -70,7 +70,17 @@ def test_core_switch_without_access_ports_is_not_applicable():
     text = (HERE / "l3" / "cisco_ios-core.cfg").read_text(encoding="utf-8")
     found = _verdicts(text, "cisco_ios")
     assert {f.verdict for f in found.values()} == {"not_applicable"}
-    assert "no access port" in found["LYSS-ACC-020"].evidence[0]
+    assert "no enabled access port" in found["LYSS-ACC-020"].evidence[0]
+
+
+def test_shut_ports_are_not_access_ports_for_level_3():
+    # an unused port that is shut down is no access risk: only enabled access ports need 802.1X
+    text = (HERE / "l3" / "cisco_ios.cfg").read_text(encoding="utf-8").replace(
+        "!\nlldp run", "!\ninterface GigabitEthernet1/0/20\n switchport mode access\n shutdown\n!\nlldp run")
+    assert _verdicts(text, "cisco_ios")["LYSS-ACC-022"].verdict == "pass"
+    unshut = text.replace(" switchport mode access\n shutdown\n", " switchport mode access\n")
+    finding = _verdicts(unshut, "cisco_ios")["LYSS-ACC-022"]
+    assert finding.verdict == "fail" and "GigabitEthernet1/0/20" in finding.evidence[0]
 
 
 def test_sonic_level_3_not_applicable_with_reason():

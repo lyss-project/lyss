@@ -108,6 +108,7 @@ def _new_session(response) -> None:
 
 def _render(request: Request, name: str, session: dict | None = None, status: int = 200, **ctx):
     ctx.update(csrf=(session or {}).get("csrf", ""), logged_in=session is not None)
+    ctx.setdefault("level3", bool(inventory.load_settings().get("level3")))   # Settings > Assessment
     return templates.TemplateResponse(request, name, ctx, status_code=status)
 
 

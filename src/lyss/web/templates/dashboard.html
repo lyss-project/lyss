@@ -8,7 +8,7 @@
 <div class="page-head">
   <div>
     <h1>Switches{% if current_site %} · {{ site_names.get(current_site, "No site") }}{% endif %}</h1>
-    <p class="muted">Read-only assessment against the {{ project }} specification, Levels 1 and 2.{% if current_site %} <a href="/">Show all sites</a>{% endif %}</p>
+    <p class="muted">Read-only assessment against the {{ project }} specification, Levels 1{% if level3 %} to 3{% else %} and 2{% endif %}.{% if current_site %} <a href="/">Show all sites</a>{% endif %}</p>
   </div>
   <div class="actions">
     <div class="menu">

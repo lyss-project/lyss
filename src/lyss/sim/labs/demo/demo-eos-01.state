@@ -1,0 +1,51 @@
+===== show version =====
+Arista CCS-720XP-24ZY4
+Hardware version: 11.00
+Serial number: DEMO0000009
+Hardware MAC address: 0000.5e00.5309
+System MAC address: 0000.5e00.5309
+
+Software image version: 4.32.2F
+Architecture: aarch64
+===== show management telnet =====
+Telnet status for Default VRF is disabled
+Telnet session limit is 20
+Telnet session limit per host is 20
+===== show management ssh =====
+SSHD status for Default VRF: enabled
+SSH connection limit: 50
+SSH per host connection limit: 20
+FIPS status: disabled
+===== show interfaces status =====
+Port       Name                Status       Vlan     Duplex Speed  Type            Flags Encapsulation
+Et1                            connected    10       full   1G     1000BASE-T
+Et2                            connected    10       full   1G     1000BASE-T
+Et3                            connected    10       full   1G     1000BASE-T
+Et4                            connected    10       full   1G     1000BASE-T
+Et5                            disabled     1        full   1G     1000BASE-T
+Et6                            disabled     1        full   1G     1000BASE-T
+Et25       Uplink DEMO-CORE    connected    trunk    full   10G    10GBASE-SR
+===== show lldp neighbors detail =====
+Interface Ethernet1 detected 0 LLDP neighbors:
+
+Interface Ethernet25 detected 1 LLDP neighbors:
+
+  Neighbor 0000.5e00.5301/"Gi1/0/48", age 12 seconds
+  Discovered 3 days, 2:11:04 ago; Last changed 3 days, 2:11:04 ago
+  - Chassis ID type: MAC address (4)
+    Chassis ID     : 0000.5e00.5301
+  - Port ID type: Interface name (5)
+    Port ID     : "Gi1/0/48"
+  - Time To Live: 120 seconds
+  - System Name: "DEMO-CORE"
+  - System Description: "Cisco IOS Software, C1000 Software (C1000-UNIVERSALK9-M), Version 15.2(7)E14, RELEASE SOFTWARE (fc1)"
+  - System Capabilities : Bridge
+    Enabled Capabilities: Bridge
+  - Management Address Subtype: IPv4 (1)
+    Management Address        : 192.0.2.1
+    Interface Number Subtype  : ifIndex (2)
+    Interface Number          : 48
+===== show ntp status =====
+synchronised to NTP server (192.0.2.123) at stratum 3
+   time correct to within 9 ms
+   polling server every 1024 s

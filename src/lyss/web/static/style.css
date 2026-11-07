@@ -125,7 +125,8 @@ h2 { font-size: 1.1rem; margin: 0 0 .4rem; }
 .level { font-size: .78rem; font-weight: 650; padding: .2rem .6rem; border-radius: 99px; background: var(--fail-bg); color: var(--fail); white-space: nowrap; }
 #devices td:first-child, #devices td:nth-child(2) { white-space: nowrap; }
 .level-1 { background: var(--unknown-bg); color: var(--unknown); }
-.level-2, .level-3 { background: var(--pass-bg); color: var(--pass); }
+.level-2 { background: var(--pass-bg); color: var(--pass); }
+.level-3 { background: #e1ecf7; color: var(--level3, #0b4f8a); }
 .bar { display: flex; height: 7px; width: 170px; border-radius: 99px; overflow: hidden; background: var(--surface-2); margin-bottom: .25rem; }
 .bar span { display: block; width: 0; }
 .seg-pass { background: var(--pass); }
@@ -343,7 +344,8 @@ textarea { font: .88rem ui-monospace, Consolas, monospace; color: var(--text); b
 .topo .stripe { fill: var(--muted); }
 .topo .lvl-0 .stripe, .topo .lvl-0 .badge { fill: var(--fail); }
 .topo .lvl-1 .stripe, .topo .lvl-1 .badge { fill: var(--unknown); }
-.topo .lvl-2 .stripe, .topo .lvl-2 .badge, .topo .lvl-3 .stripe, .topo .lvl-3 .badge { fill: var(--pass); }
+.topo .lvl-2 .stripe, .topo .lvl-2 .badge { fill: var(--pass); }
+.topo .lvl-3 .stripe, .topo .lvl-3 .badge { fill: var(--level3, #0b4f8a); }
 .topo .badge-text { font: 700 10.5px system-ui, sans-serif; fill: #fff; text-anchor: middle; }
 .topo .external .box { stroke-dasharray: 5 4; fill: var(--surface-2); }
 .topo .count { fill: var(--accent); }
@@ -356,7 +358,7 @@ textarea { font: .88rem ui-monospace, Consolas, monospace; color: var(--text); b
 .topo-legend { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; padding: .7rem 1rem; border-top: 1px solid var(--border); font-size: .8rem; align-items: center; }
 .topo-legend span { display: inline-flex; align-items: center; gap: .35rem; }
 .lg { display: inline-block; width: 12px; height: 12px; border-radius: 3px; }
-.lg-l0 { background: var(--fail); } .lg-l1 { background: var(--unknown); } .lg-l2 { background: var(--pass); }
+.lg-l0 { background: var(--fail); } .lg-l1 { background: var(--unknown); } .lg-l2 { background: var(--pass); } .lg-l3 { background: var(--level3, #0b4f8a); }
 .lg-ext { border: 1.5px dashed var(--muted); }
 .lg-line { display: inline-block; width: 22px; border-top: 2.4px solid var(--muted); }
 .lg-dash { border-top-style: dashed; }

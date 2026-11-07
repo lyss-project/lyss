@@ -66,7 +66,7 @@
     <div>
       <div class="kicker">{{ project }} · {{ project_long }}</div>
       <h1>Network switch security assessment</h1>
-      <p class="muted">Read-only assessment of the switch fleet against the {{ project }} specification (vendor-neutral security controls, conformance Levels 1 and 2).</p>
+      <p class="muted">Read-only assessment of the switch fleet against the {{ project }} specification (vendor-neutral security controls, conformance Levels 1{% if level3 %} to 3{% else %} and 2{% endif %}).</p>
       <dl class="meta">
         {% if organization %}<dt>Organization</dt><dd>{{ organization }}</dd>{% endif %}
         {% if scope %}<dt>Site</dt><dd>{{ scope }}</dd>{% endif %}

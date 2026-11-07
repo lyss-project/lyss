@@ -25,6 +25,7 @@ INVALID = {
     "hp_procurve": "Invalid input: {word}",
     "mikrotik": "bad command name {word} (line 1 column 1)",
     "sonic": "-bash: {word}: command not found",
+    "arista_eos": "% Invalid input",
 }
 
 
@@ -197,6 +198,12 @@ class Shell:
             # read-only platforms: fixed outputs, nothing can be changed
             if low in ("exit", "logout", "quit", "/quit"):
                 return False
+            if sw.platform == "arista_eos" and (low.startswith("terminal ") or low in ("enable", "no page")):
+                # netmiko session preparation; EOS answers "terminal width N" with this sentence
+                m = re.match(r"terminal width (\d+)", low)
+                if m:
+                    return f"Width set to {m.group(1)} columns."
+                return "Pagination disabled." if low.startswith("terminal length") else ""
             out = sw.static_output(cmd)
             return self._invalid(cmd) if out is None else out
         if self.mode == "exec":

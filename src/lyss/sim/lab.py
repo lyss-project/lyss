@@ -12,10 +12,10 @@ import yaml
 from .config import RunningConfig
 
 LABS = Path(__file__).parent / "labs"
-PLATFORMS = ("cisco_ios", "cisco_sb", "hp_procurve", "mikrotik", "sonic")
+PLATFORMS = ("cisco_ios", "cisco_sb", "hp_procurve", "mikrotik", "sonic", "arista_eos")
 # read-only platforms (no LYSS remediation): fixed outputs from <switch>.cfg and <switch>.state,
 # a "===== command =====" section per command, as in a LYSS state file
-STATIC = ("mikrotik", "sonic")
+STATIC = ("mikrotik", "sonic", "arista_eos")
 
 
 def parse_sections(text: str) -> dict[str, str]:
@@ -134,7 +134,8 @@ class SimSwitch:
 
     def static_output(self, command: str) -> str | None:
         """Fixed output of a read-only platform; None for an unknown command."""
-        if command == {"mikrotik": "/export terse", "sonic": "show runningconfiguration all"}[self.platform]:
+        if command == {"mikrotik": "/export terse", "sonic": "show runningconfiguration all",
+                       "arista_eos": "show running-config"}[self.platform]:
             return self.config_text.rstrip("\n")
         return self.outputs.get(command)
 
@@ -143,6 +144,8 @@ class SimSwitch:
             return "SSH-2.0-ROSSSH"
         if self.platform == "sonic":
             return "SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u5"
+        if self.platform == "arista_eos":
+            return "SSH-2.0-OpenSSH_9.9"
         if self.platform == "cisco_ios":
             return "SSH-2.0-Cisco-1.25" if self.has_line(r"^ip ssh version 2$") else "SSH-1.99-Cisco-1.25"
         if self.platform == "cisco_sb":
