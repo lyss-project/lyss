@@ -15,9 +15,11 @@ This repository contains two kinds of work under two licences:
 The map of Morocco in src/lyss/web/static/maroc.svg is derived from Natural Earth data
 (public domain, naturalearthdata.com).
 
-The SHA-1 key exchange classes in src/lyss/legacy_ssh.py extend paramiko's key exchange classes
-and follow paramiko 3.5's kex_group14.py and kex_gex.py (paramiko, Copyright (C) 2003-2007 Robey
-Pointer and contributors, GNU Lesser General Public License 2.1, github.com/paramiko/paramiko).
+Exception: src/lyss/legacy_ssh.py (legacy SHA-1 SSH algorithms for old switches) is
+dual-licensed, AGPL-3.0-only OR MIT, at the user's choice; the MIT text is in the file. The
+additional terms below do not apply when that file is used under MIT. It uses paramiko (GNU
+Lesser General Public License 2.1, github.com/paramiko/paramiko) as a library and extends its key
+exchange classes; no paramiko code is copied.
 
 
 ADDITIONAL TERMS (section 7 of the GNU Affero General Public License, version 3)
