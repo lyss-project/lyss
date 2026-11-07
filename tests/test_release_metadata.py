@@ -37,6 +37,13 @@ def test_changelog_has_an_entry_for_the_current_version():
     assert re.search(rf"(?m)^## {re.escape(__version__)} \(\d{{4}}-\d{{2}}-\d{{2}}", changelog)
 
 
+def test_every_workflow_file_is_valid_yaml():
+    """GitHub silently fails a workflow it cannot parse (e.g. ": " inside a plain value)."""
+    for f in sorted((ROOT / ".github" / "workflows").glob("*.yml")) + [ROOT / "action.yml"]:
+        data = yaml.safe_load(f.read_text(encoding="utf-8"))
+        assert isinstance(data, dict) and (data.get("jobs") or data.get("runs")), f.name
+
+
 def test_third_party_actions_are_pinned_to_commit_shas():
     files = sorted((ROOT / ".github" / "workflows").glob("*.yml")) + [ROOT / "action.yml"]
     for f in files:
