@@ -5,14 +5,22 @@ assesses it on your PC: no SSH, no account on the device, nothing sent anywhere.
 
 ```sh
 pip install lyss
-lyss audit --vendor mikrotik --level 2 router.rsc        # one file
-lyss audit --vendor cisco_ios --level 2 configs/          # every configuration in a folder
-lyss audit --vendor mikrotik --level 2 --json router.rsc > router-lyss.json
+lyss audit --level 2 router.rsc                  # one file
+lyss audit --level 2 configs/                    # every configuration in a folder, any mix of platforms
+lyss audit --level 2 --json router.rsc > router-lyss.json
 ```
 
-`--vendor` is one of `cisco_ios`, `cisco_sb`, `hp_procurve`, `mikrotik`, `sonic`. `--level 2`
-assesses Level 1 and Level 2 controls (the default is Level 1 only). In a folder, LYSS reads
-`.cfg`, `.conf`, `.txt`, `.rsc` and `.json` files.
+LYSS recognises the platform from the configuration's own format (RouterOS export header,
+Cisco Business `config-file-header`, HPE `Configuration Editor` line, SONiC config_db keys,
+Cisco IOS `version`/`service`/`line vty` lines). When it cannot tell, it says so and skips the
+file: give the platform with `--vendor cisco_ios|cisco_sb|hp_procurve|mikrotik|sonic`.
+`--level 2` assesses Level 1 and Level 2 controls (the default is Level 1 only). In a folder,
+LYSS reads `.cfg`, `.conf`, `.txt`, `.rsc` and `.json` files.
+
+**Without installing anything:** paste the configuration into
+[lyss.dev/audit.html](https://lyss.dev/audit.html). The same engine runs inside the page
+(Pyodide, served from lyss.dev); the configuration is not uploaded, and the page's
+Content-Security-Policy (`connect-src 'self'`) forbids it from contacting any other server.
 
 ## Saving the configuration
 

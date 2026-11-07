@@ -479,6 +479,27 @@ def load_firmware_data() -> list[dict]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))["platforms"] if path.exists() else []
 
 
+# Recognise a saved configuration by its own format, most specific first. Only headers and syntax
+# that one platform writes: a guess that is not sure returns None ("pick the platform").
+VENDOR_SIGNATURES = (
+    ("sonic", re.compile(r'\A\s*\{[\s\S]*"(?:DEVICE_METADATA|PORT|AAA|MGMT_INTERFACE)"\s*:')),
+    ("mikrotik", re.compile(r"(?m)^#.*\bby RouterOS\b|^/(?:interface|ip|ipv6|system|user|snmp|tool|routing)\b")),
+    ("cisco_sb", re.compile(r"(?m)^config-file-header\s*$|^v\d+\.\d+\.\d+\.\d+ / R\S+\s*$")),
+    ("hp_procurve", re.compile(r'(?m)^; \S+ Configuration Editor; Created on release|^hostname "[^"]*"\s*$')),
+    ("cisco_ios", re.compile(r"(?m)^version \d+\.\d+\s*$|^(?:no )?service (?:password-encryption|timestamps)\b"
+                             r"|^line vty \d+")),
+)
+
+
+def detect_vendor(text: str) -> str | None:
+    """Adapter name for a saved configuration, from its format alone; None when not recognised."""
+    text = text.lstrip("﻿")
+    for vendor, signature in VENDOR_SIGNATURES:
+        if signature.search(text):
+            return vendor
+    return None
+
+
 def audit(text: str, vendor: str, max_level: int = 1, state_text: str = "",
           context: dict | None = None) -> list[Finding]:
     """Assess one device. context carries evidence from outside the device (e.g. "backup")."""

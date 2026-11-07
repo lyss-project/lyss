@@ -9,7 +9,9 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 <IfModule mod_headers.c>
   Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-  Header always set Content-Security-Policy "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  # audit.html runs LYSS in the browser (WebAssembly): 'wasm-unsafe-eval' allows WebAssembly only,
+  # and connect-src 'self' means the page can fetch from lyss.dev and nowhere else
+  Header always set Content-Security-Policy "default-src 'none'; style-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "no-referrer"
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
@@ -20,4 +22,6 @@ RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 Options -Indexes
 AddType image/svg+xml .svg
 AddType font/woff2 .woff2
+AddType application/wasm .wasm
+AddType text/javascript .mjs
 AddDefaultCharset UTF-8

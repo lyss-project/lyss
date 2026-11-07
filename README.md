@@ -14,7 +14,7 @@ tool that checks your switches against it, shows the evidence and gives the fix.
 
 ![LYSS demo: one-click read-only scan, evidence and fix for every finding, topology, control matrix, low-risk fixes verified by a new scan](docs/media/lyss-demo.gif)
 
-<sub>Demo on a fictitious network. Cisco IOS · Cisco Business · HPE Aruba AOS-S · Website: [lyss.dev](https://lyss.dev)</sub>
+<sub>Demo on a fictitious network. Cisco IOS · Cisco Business · HPE Aruba AOS-S · MikroTik RouterOS · SONiC · Website: [lyss.dev](https://lyss.dev) · Try it in your browser: [lyss.dev/audit.html](https://lyss.dev/audit.html)</sub>
 
 LYSS defines **what** a securely managed switch looks like, once, independently of any vendor
 (the [specification](docs/LYSS-Specification.md)), and **how to verify it** on each platform
@@ -26,7 +26,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   remote logging and time synchronization, access-port hygiene.
 - **Level 3, Advanced**: access-layer protections (draft).
 
-> Status: **0.7.0, draft specification 0.5, preview.** The specification and the tool may still change
+> Status: **0.8, draft specification 0.5, preview.** The specification and the tool may still change
 > before 1.0. Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
@@ -49,10 +49,14 @@ python -m venv .venv
 
 **No connection to your devices at all?** Audit a configuration you saved yourself (a MikroTik
 `/export`, a Cisco or HPE `show running-config`, a SONiC config_db): nothing is sent anywhere.
+The platform is recognised from the file.
 
 ```sh
-lyss audit --vendor mikrotik --level 2 router.rsc      # or a folder of saved configurations
+lyss audit --level 2 router.rsc      # or a folder of saved configurations
 ```
+
+Or, without installing anything, paste it into **[lyss.dev/audit.html](https://lyss.dev/audit.html)**:
+LYSS runs inside the page and the configuration is not uploaded.
 
 See [docs/OFFLINE.md](docs/OFFLINE.md): how to save the configuration on each platform, what a
 configuration alone can and cannot tell, and how to add device state by hand.

@@ -30,7 +30,7 @@
   "description": "Open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, HPE Aruba AOS-S, MikroTik RouterOS and SONiC.",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Windows, Linux",
-  "softwareVersion": "0.8.1",
+  "softwareVersion": "0.8.2",
   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
   "codeRepository": "https://github.com/lyss-project/lyss",
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
@@ -53,6 +53,7 @@
     <nav aria-label="Sections">
       <a href="#levels"><span class="en">Levels</span><span class="fr">Niveaux</span></a>
       <a href="#how"><span class="en">How it works</span><span class="fr">Fonctionnement</span></a>
+      <a href="audit.html"><span class="en">Try it</span><span class="fr">Essayer</span></a>
       <a href="screenshots.html"><span class="en">Screenshots</span><span class="fr">Captures</span></a>
       <a href="#open"><span class="en">Open</span><span class="fr">Ouvert</span></a>
     </nav>
@@ -78,9 +79,11 @@
         <span class="fr">LYSS définit ce qu'est un switch correctement sécurisé, une fois pour toutes et pour tous les fabricants, et fournit un outil gratuit, en lecture seule, qui vérifie vos switchs, explique chaque écart et aide à le corriger.</span>
       </p>
       <div class="cta">
-        <a class="btn btn-ghost" href="screenshots.html"><span class="en">See screenshots</span><span class="fr">Voir les captures</span></a>
-        <a class="btn" href="https://github.com/lyss-project/lyss"><span class="en">Get it on GitHub</span><span class="fr">Le télécharger sur GitHub</span></a>
+        <a class="btn" href="audit.html"><span class="en">Audit a configuration now</span><span class="fr">Auditer une configuration</span></a>
+        <a class="btn btn-ghost" href="https://github.com/lyss-project/lyss"><span class="en">Get it on GitHub</span><span class="fr">Le télécharger sur GitHub</span></a>
+        <a class="btn btn-ghost" href="screenshots.html"><span class="en">Screenshots</span><span class="fr">Captures</span></a>
       </div>
+      <p class="small hero-note"><span class="en">Paste a configuration and get the assessment in your browser: nothing is uploaded.</span><span class="fr">Collez une configuration et obtenez l'évaluation dans votre navigateur : rien n'est envoyé.</span></p>
     </div>
     <figure class="report" aria-label="Example assessment (fictitious)">
       <figcaption><span class="en">Example assessment · fictitious switch</span><span class="fr">Exemple d'évaluation · switch fictif</span></figcaption>
@@ -154,7 +157,7 @@
         <p><span class="en">Off by default. Low-risk fixes only, previewed, applied one switch at a time, verified over a new connection, rolled back automatically, logged.</span><span class="fr">Désactivé par défaut. Corrections à faible risque uniquement, prévisualisées, appliquées switch par switch, vérifiées par une nouvelle connexion, annulées automatiquement en cas d'échec, journalisées.</span></p>
       </li>
     </ol>
-    <p class="note"><span class="en">Runs on your own machine or server. Your configurations never leave your network.</span><span class="fr">Fonctionne sur votre propre poste ou serveur. Vos configurations ne quittent jamais votre réseau.</span></p>
+    <p class="note"><span class="en">Runs on your own machine or server. Your configurations never leave your network. No access to the switches at all? <a href="audit.html">Audit a saved configuration in your browser</a>, or with <code>lyss audit</code>.</span><span class="fr">Fonctionne sur votre propre poste ou serveur. Vos configurations ne quittent jamais votre réseau. Aucun accès aux switchs ? <a href="audit.html">Auditez une configuration sauvegardée dans votre navigateur</a>, ou avec <code>lyss audit</code>.</span></p>
   </div>
 </section>
 

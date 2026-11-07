@@ -2,6 +2,20 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.8.2 (2026-11-07)
+
+Audit in the browser, nothing uploaded.
+- New page [lyss.dev/audit.html](https://lyss.dev/audit.html): paste or open a saved
+  configuration and get the assessment, with evidence and fixes. The same engine, adapters and
+  firmware data run inside the page on Pyodide (Python for WebAssembly), served from lyss.dev
+  itself; the page's Content-Security-Policy (`connect-src 'self'`) forbids any other server.
+  Optional device state, fictitious examples, English/French. Built by
+  `tools/build_web_audit.py` (Pyodide files pinned by SHA-256).
+- `lyss audit` recognises the platform from the configuration's own format: `--vendor` is now
+  optional (default `auto`), a folder can mix platforms, and a file that is not recognised is
+  reported, never guessed.
+- `lyss --version`.
+
 ## 0.8.1 (2026-11-06)
 
 Offline audit made first-class, after a question from the MikroTik community ("why not analyse a

@@ -20,7 +20,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import PROJECT_LONG_NAME, PROJECT_NAME, __version__
-from .engine import audit, conformance, load_spec
+from .engine import audit, conformance, detect_vendor, load_spec
 
 ICONS = {"pass": "PASS", "fail": "FAIL", "unknown": "????", "not_applicable": "n/a "}
 
@@ -58,22 +58,29 @@ def cmd_audit(args) -> int:
         return 2
     files = config_files(args.path)
     results = []
+    status = 0
     for path in files:
         state_file = path.with_name(path.stem + ".state.txt")
         state_text = state_file.read_text(encoding="utf-8", errors="replace") if state_file.exists() else ""
-        findings = audit(path.read_text(encoding="utf-8", errors="replace"), args.vendor, args.level, state_text)
+        text = path.read_text(encoding="utf-8", errors="replace")
+        vendor = detect_vendor(text) if args.vendor == "auto" else args.vendor
+        if vendor is None:
+            print(f"{path.name}: platform not recognised, give it with --vendor", file=sys.stderr)
+            status = 2
+            continue
+        findings = audit(text, vendor, args.level, state_text)
         summary = conformance(findings)
         if args.json:
-            results.append({"device": path.name, "vendor": args.vendor,
+            results.append({"device": path.name, "vendor": vendor,
                             "summary": summary, "findings": [asdict(f) for f in findings]})
         else:
-            print_text(path.name, findings, summary)
+            print_text(f"{path.name} ({vendor})" if args.vendor == "auto" else path.name, findings, summary)
 
     if args.json:
         json.dump({"tool": PROJECT_NAME, "version": __version__,
                    "spec_version": load_spec()["spec_version"], "results": results},
                   sys.stdout, indent=2, ensure_ascii=False)
-    return 0
+    return status
 
 
 def cmd_collect(args) -> int:
@@ -204,10 +211,13 @@ def cmd_demo(args) -> int:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="lyss", description=f"{PROJECT_LONG_NAME} {__version__}")
+    parser.add_argument("--version", action="version", version=f"{PROJECT_NAME} {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     a = sub.add_parser("audit", help="assess saved configuration files, offline (no connection to any device)")
-    a.add_argument("--vendor", required=True, help="adapter name, e.g. cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic")
+    a.add_argument("--vendor", default="auto",
+                   help="adapter name: cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic, "
+                        "or auto (default: recognise each file from its format)")
     a.add_argument("--level", type=int, default=1, help="highest level to assess (default 1)")
     a.add_argument("--json", action="store_true", help="output JSON instead of text")
     a.add_argument("path", type=Path)

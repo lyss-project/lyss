@@ -8,3 +8,5 @@ private/
 reports/
 *.cred.xml
 integrations/wazuh/test/.actual.txt
+# in-browser audit: Pyodide + bundle, built by tools/build_web_audit.py
+site/py/
