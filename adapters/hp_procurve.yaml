@@ -6,7 +6,7 @@
 # "spanning-tree 1-24 bpdu-protection"): edge-port rules use uplink_lists / require_lists.
 # Credentials only appear in the config when "include-credentials" is enabled.
 adapter: hp_procurve
-spec_version: "0.5.0-draft"
+spec_version: "0.6.0-draft"
 platform: HP ProCurve / HPE Aruba AOS-S
 status: draft, validated on synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
 
@@ -246,3 +246,92 @@ checks:
     remediation: |
       ! only on edge ports (users, printers, APs, servers) - never on links to other switches
       spanning-tree <edge-ports> bpdu-protection
+
+  # ---------------- Level 3 ----------------
+  # Syntax from the AOS-S 16.x guides; simulator and synthetic outputs only so far. User VLANs =
+  # VLANs with untagged access ports (as for LYSS-MGMT-011); edge ports as for LYSS-ACC-011.
+
+  LYSS-ACC-020:
+    not_applicable_if_any: &hp_no_access
+      - {not: {captured: {untagged_access_vlans: true}}, say: 'no VLAN with untagged access ports'}
+    fail_if_any:
+      - {not: {line: '^dhcp-snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("dhcp-snooping")'}
+      - uncovered: &hp_snooping
+          what: access VLANs without DHCP snooping
+          used: {untagged_access_vlans: true}
+          covered: {line: '^dhcp-snooping vlan (.+)$'}
+          lists: true
+    pass_if_any:
+      - {uncovered: *hp_snooping, absent: true}
+    otherwise: fail
+    remediation: |
+      dhcp-snooping
+      dhcp-snooping vlan <access-vlans>
+      dhcp-snooping trust <uplink-ports>
+
+  LYSS-ACC-021:
+    not_applicable_if_any: *hp_no_access
+    fail_if_any:
+      - {not: {line: '^arp-protect\s*$'}, say: 'ARP protection is not enabled globally ("arp-protect")'}
+      - uncovered: &hp_dai
+          what: access VLANs without ARP protection
+          used: {untagged_access_vlans: true}
+          covered: {line: '^arp-protect vlan (.+)$'}
+          lists: true
+    pass_if_any:
+      - {uncovered: *hp_dai, absent: true}
+    otherwise: fail
+    remediation: |
+      arp-protect
+      arp-protect vlan <access-vlans>
+      arp-protect trust <uplink-ports>
+
+  LYSS-ACC-022:
+    not_applicable_if_any: *hp_no_access
+    fail_if_any:
+      - edge_ports_missing: &hp_nac
+          ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
+          uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
+          require_lists: '^aaa port-access (?:authenticator|mac-based) ([A-Z]?\d[\w,-]*)'
+    pass_if_any:
+      - {edge_ports_missing: *hp_nac, absent: true}
+    otherwise: unknown
+    note: Needs "show interfaces brief" to know the ports; "aaa port-access authenticator active" must also be set.
+    remediation: |
+      aaa port-access authenticator <edge-ports>
+      aaa port-access authenticator active
+      aaa port-access mac-based <ports-without-supplicant>
+
+  LYSS-ACC-023:
+    not_applicable_if_any: *hp_no_access
+    fail_if_any:
+      - edge_ports_missing: &hp_storm
+          ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
+          uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
+          require: '^(broadcast-limit|rate-limit bcast in)\b'
+    pass_if_any:
+      - {edge_ports_missing: *hp_storm, absent: true}
+    otherwise: unknown
+    note: Needs "show interfaces brief" to know the ports.
+    remediation: |
+      interface <edge-ports>
+         rate-limit bcast in percent 5
+         exit
+
+  LYSS-ACC-024:
+    not_applicable_if_any: *hp_no_access
+    # LLDP transmits by default; AOS-S does not transmit CDP (receive only)
+    fail_if_any:
+      - all:
+          - {not: {line: '^no lldp run'}}
+          - edge_ports_missing: &hp_lldp
+              ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
+              uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
+              require_lists: '^lldp admin-status (\S+) (?:rxonly|disable)'
+    pass_if_any:
+      - {line: '^no lldp run'}
+      - {edge_ports_missing: *hp_lldp, absent: true}
+    otherwise: unknown
+    note: Tagged ports (uplinks, IP phones in a voice VLAN) are exempt; AOS-S only receives CDP.
+    remediation: |
+      lldp admin-status <edge-ports> rxonly

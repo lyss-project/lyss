@@ -230,18 +230,48 @@ def _captures(cfg: Config, source) -> dict[str, list[str]]:
         return found
     header = re.compile(source["block"])
     where = re.compile(source["where"]) if source.get("where") else None
+    where_not = re.compile(source["where_not"]) if source.get("where_not") else None
     line = re.compile(source["line"]) if source.get("line") else None
     for b in cfg.blocks:
         hm = header.search(b.header)
         if not hm or (where and not any(where.search(c) for c in b.children)):
             continue
+        if where_not and any(where_not.search(c) for c in b.children):
+            continue
         if line is None:
             found.setdefault(hm.group(1), []).append(b.header)
             continue
-        for c in b.children:
-            if m := line.search(c):
-                found.setdefault(m.group(1), []).append(f"{b.header} / {c}")
+        hits = [(m, c) for c in b.children if (m := line.search(c))]
+        for m, c in hits:
+            found.setdefault(m.group(1), []).append(f"{b.header} / {c}")
+        if not hits and source.get("default") is not None:
+            # e.g. a Cisco access port without "switchport access vlan" is in VLAN 1
+            found.setdefault(str(source["default"]), []).append(f"{b.header} (default {source['default']})")
     return found
+
+
+def expand_numbers(text: str) -> set[str]:
+    """VLAN lists: "10,20-22" / "10 20" / "10-12,30" -> {"10", "20", "21", "22"}."""
+    values = set()
+    for item in re.split(r"[,\s]+", text.strip().strip('"')):
+        first, _, last = item.partition("-")
+        if first.isdigit() and last.isdigit() and int(first) <= int(last) <= int(first) + 4094:
+            values |= {str(n) for n in range(int(first), int(last) + 1)}
+        elif first.isdigit() and not last:
+            values.add(str(int(first)))
+    return values
+
+
+def _uncovered(cfg: Config, spec: dict) -> tuple[set[str], set[str], dict[str, list[str]]]:
+    """(used values, uncovered values, evidence per used value): e.g. VLANs of access ports that a
+    "ip dhcp snooping vlan 10,20-30" list does not cover. "lists: true" expands covered lists."""
+    used = _captures(cfg, spec["used"])
+    covered: set[str] = set()
+    for value in _captures(cfg, spec["covered"]):
+        covered |= expand_numbers(value) if spec.get("lists") else {value}
+    if spec.get("all_covered") and _captures(cfg, spec["all_covered"]):
+        covered |= set(used)   # e.g. a setting that applies to every VLAN / port
+    return set(used), set(used) - covered, used
 
 
 def evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
@@ -253,11 +283,42 @@ def evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
 
 
 def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
+    if "any" in rule:
+        # at least one sub-rule matches, e.g. CDP off globally OR on every access port
+        for r in rule["any"]:
+            matched, evidence = evaluate_rule(cfg, r)
+            if matched:
+                return True, evidence
+        return False, []
+
+    if "captured" in rule:
+        # a capture source (see _captures) finds at least one value
+        found = _captures(cfg, rule["captured"])
+        return bool(found), [ev[0] for ev in found.values()][:3]
+
+    if "not" in rule:
+        # configuration rules only: true when the sub-rule finds nothing in a non-empty configuration
+        matched, _ = evaluate_rule(cfg, rule["not"])
+        return (bool(cfg.lines) and not matched), []
+
+    if "uncovered" in rule:
+        spec = rule["uncovered"]
+        used, missing, evidence = _uncovered(cfg, spec)
+        what = spec.get("what", "values")
+        if rule.get("absent"):
+            # pass form: something is in use and all of it is covered
+            ok = bool(used) and not missing
+            return ok, [f"every {what} covered: {', '.join(sorted(used, key=_port_sort))}"] if ok else []
+        if not missing:
+            return False, []
+        listed = sorted(missing, key=_port_sort)
+        return True, [f"{what}: {', '.join(listed)}"] + [evidence[v][0] for v in listed[:3]]
+
     if "all" in rule:
         # every sub-rule must match, e.g. SNMP enabled AND a default community present
         results = [evaluate_rule(cfg, r) for r in rule["all"]]
         if all(matched for matched, _ in results):
-            return True, [e for _, ev in results for e in ev]
+            return True, list(dict.fromkeys(e for _, ev in results for e in ev))   # same line once
         return False, []
 
     if "comment" in rule:
@@ -328,6 +389,9 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
         evidence = [f"{b.header} / {c}" for b in blocks for c in b.children if pattern.search(c)]
         return ok, evidence
 
+    if "line" not in rule:
+        # {block: H, where: W}: such a block exists
+        return bool(blocks), [b.header for b in blocks]
     evidence = [f"{b.header} / {hit}" for b in blocks for hit in _line_hits(b.children, rule)]
     return bool(evidence), evidence
 
@@ -373,6 +437,12 @@ def evaluate_control(cfg: Config, control: dict, check: dict | None, facts: dict
     if check is None:
         return finding("not_applicable", [])
 
+    # e.g. an access-layer control on a switch without any access port (core, aggregation)
+    for rule in check.get("not_applicable_if_any", []):
+        matched, evidence = evaluate_rule(cfg, rule)
+        if matched:
+            return finding("not_applicable", evidence)
+
     # every failing rule contributes evidence, so the report shows all the reasons at once
     failed = [ev for matched, ev in (evaluate_rule(cfg, r) for r in check.get("fail_if_any", [])) if matched]
     if failed:
@@ -413,8 +483,11 @@ def extract_facts(cfg: Config, adapter: dict) -> dict:
         # a fact may list several sources; the first one that matches wins
         for spec in specs if isinstance(specs, list) else [specs]:
             pattern = re.compile(spec["line"])
-            # "config comments": header comments of the configuration itself (HP release line)
-            source = cfg.comments if spec.get("section") == "config comments" else _state_lines(cfg, spec.get("section"))
+            # "config comments": header comments of the configuration itself (HP release line);
+            # "config": lines of the pasted text itself (e.g. a pasted "show version")
+            section = spec.get("section")
+            source = (cfg.comments if section == "config comments" else
+                      cfg.lines if section == "config" else _state_lines(cfg, section))
             for line in source or []:
                 if m := pattern.search(line):
                     facts[name] = spec.get("format", "{0}").format(*m.groups()).strip()
@@ -483,6 +556,8 @@ def load_firmware_data() -> list[dict]:
 # Recognise a saved configuration by its own format, most specific first. Only headers and syntax
 # that one platform writes: a guess that is not sure returns None ("pick the platform").
 VENDOR_SIGNATURES = (
+    # Zyxel GS1900 "show version" / System Information: model name or firmware code V2.90(AAHK.1)C0
+    ("zyxel_gs1900", re.compile(r"(?im)^\s*Model Name\s*:?\s*GS1900-|^\s*Firmware Version\s*:?\s*V?\d+\.\d+\([A-Z]{4}\.\d+\)")),
     ("sonic", re.compile(r'\A\s*\{[\s\S]*"(?:DEVICE_METADATA|PORT|AAA|MGMT_INTERFACE)"\s*:')),
     ("mikrotik", re.compile(r"(?m)^#.*\bby RouterOS\b|^/(?:interface|ip|ipv6|system|user|snmp|tool|routing)\b")),
     ("cisco_sb", re.compile(r"(?m)^config-file-header\s*$|^v\d+\.\d+\.\d+\.\d+ / R\S+\s*$")),

@@ -21,7 +21,7 @@
 # Per control: fail_if_any -> fail; firmware -> data/firmware.yaml; pass_if_all / pass_if_any -> pass;
 # else `otherwise`. A state rule never matches when that state was not collected.
 adapter: cisco_ios
-spec_version: "0.5.0-draft"
+spec_version: "0.6.0-draft"
 platform: Cisco IOS / IOS-XE
 status: draft, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
 
@@ -261,3 +261,101 @@ checks:
     otherwise: fail
     remediation: |
       spanning-tree portfast edge bpduguard default
+
+  # ---------------- Level 3 ----------------
+  # access ports = "switchport mode access" interfaces (as for LYSS-ACC-011); an access port
+  # without "switchport access vlan" is in VLAN 1
+
+  LYSS-ACC-020:
+    not_applicable_if_any: &ios_no_access
+      - {not: {block: '^interface \S*Ethernet', where: '^switchport mode access'}, say: 'no access port ("switchport mode access") in the configuration'}
+    fail_if_any:
+      - {not: {line: '^ip dhcp snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("ip dhcp snooping")'}
+      - uncovered: &ios_snooping
+          what: access VLANs without DHCP snooping
+          used: &ios_access_vlans {block: '^interface \S*Ethernet', where: '^switchport mode access', line: '^switchport access vlan (\d+)', default: 1}
+          covered: {line: '^ip dhcp snooping vlan (\S+)'}
+          lists: true
+    pass_if_any:
+      - {uncovered: *ios_snooping, absent: true}
+    otherwise: fail
+    remediation: |
+      ip dhcp snooping
+      ip dhcp snooping vlan <access-vlans>
+      interface <uplink>
+       ip dhcp snooping trust
+
+  LYSS-ACC-021:
+    not_applicable_if_any: *ios_no_access
+    fail_if_any:
+      - uncovered: &ios_dai
+          what: access VLANs without ARP inspection
+          used: *ios_access_vlans
+          covered: {line: '^ip arp inspection vlan (\S+)'}
+          lists: true
+    pass_if_any:
+      - {uncovered: *ios_dai, absent: true}
+    otherwise: fail
+    note: ARP inspection checks ARP packets against the DHCP snooping bindings (LYSS-ACC-020) or ARP access lists for static hosts.
+    remediation: |
+      ip arp inspection vlan <access-vlans>
+      interface <uplink>
+       ip arp inspection trust
+
+  LYSS-ACC-022:
+    not_applicable_if_any: *ios_no_access
+    fail_if_any:
+      - {not: {line: '^dot1x system-auth-control'}, say: '802.1X is not enabled globally ("dot1x system-auth-control")'}
+      - uncovered: &ios_nac
+          what: access ports without 802.1X / MAB
+          used: &ios_access_ports {block: '^interface (\S*Ethernet\S+)', where: '^switchport mode access'}
+          covered: {block: '^interface (\S*Ethernet\S+)', where: '^((authentication|access-session|dot1x) port-control auto|mab)\b'}
+    pass_if_any:
+      - {uncovered: *ios_nac, absent: true}
+    otherwise: fail
+    remediation: |
+      aaa new-model
+      aaa authentication dot1x default group <radius-group>
+      dot1x system-auth-control
+      interface range <access-ports>
+       authentication port-control auto
+       dot1x pae authenticator
+       mab
+
+  LYSS-ACC-023:
+    not_applicable_if_any: *ios_no_access
+    fail_if_any:
+      - uncovered: &ios_storm
+          what: access ports without broadcast storm control
+          used: *ios_access_ports
+          covered: {block: '^interface (\S*Ethernet\S+)', where: '^storm-control broadcast level'}
+    pass_if_any:
+      - {uncovered: *ios_storm, absent: true}
+    otherwise: fail
+    remediation: |
+      interface range <access-ports>
+       storm-control broadcast level 5.00
+
+  LYSS-ACC-024:
+    # CDP is on by default; LLDP only with "lldp run". Ports with a voice VLAN keep them (IP phones).
+    not_applicable_if_any: *ios_no_access
+    fail_if_any:
+      - all:
+          - {not: {line: '^no cdp run'}}
+          - uncovered: &ios_cdp
+              what: access ports sending CDP
+              used: &ios_user_ports {block: '^interface (\S*Ethernet\S+)', where: '^switchport mode access', where_not: '^switchport voice vlan'}
+              covered: {block: '^interface (\S*Ethernet\S+)', where: '^no cdp enable'}
+      - all:
+          - {line: '^lldp run'}
+          - uncovered: &ios_lldp
+              what: access ports sending LLDP
+              used: *ios_user_ports
+              covered: {block: '^interface (\S*Ethernet\S+)', where: '^no lldp transmit'}
+    otherwise: pass
+    note: Access ports with a voice VLAN are exempt (IP phones need CDP or LLDP-MED).
+    remediation: |
+      interface range <user-access-ports>
+       no cdp enable
+       no lldp transmit
+      ! or, if no device needs CDP at all: no cdp run

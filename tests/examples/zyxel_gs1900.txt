@@ -1,0 +1,4 @@
+Model Name       : GS1900-24E
+System Name      : demo-gs1900
+Firmware Version : V2.90(AAHK.1)C0 | 06/10/2026
+Serial Number    : FAKE0000040

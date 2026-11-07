@@ -27,9 +27,11 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   supported firmware without known critical or exploited vulnerabilities, automatic backups.
 - **Level 2, Hardened**: central authentication, restricted and modern management access,
   remote logging and time synchronization, access-port hygiene.
-- **Level 3, Advanced**: access-layer protections (draft).
+- **Level 3, Advanced**: access-layer protection against attacks from user ports: DHCP snooping,
+  ARP inspection, 802.1X / MAC authentication, storm control, no CDP/LLDP towards users
+  (opt-in: `lyss audit --level 3`, or Settings > Assessment).
 
-> Status: **0.9, draft specification 0.5, preview.** The specification and the tool may still change
+> Status: **0.10, draft specification 0.6, preview.** The specification and the tool may still change
 > before 1.0. Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
@@ -87,6 +89,7 @@ read-only account ([docs/ACCOUNTS.md](docs/ACCOUNTS.md)), and tell me what you f
 | MikroTik RouterOS 6.x / 7.x (CRS, RouterBOARD, CHR), preview | yes | yes | yes | no | RouterOS (CISA KEV + critical) |
 | SONiC (community builds), preview | yes | yes | yes | no | no |
 | Arista EOS (7000 series, cEOS / vEOS), preview | yes | yes | yes | no | no |
+| Zyxel GS1900, preview: **firmware only**, offline | no | no | no | no | GS1900 (CVE-2026-7273, CISA KEV) |
 
 Cisco IOS and Cisco Small Business are validated on real switches; HPE Aruba AOS-S on the
 simulator and synthetic outputs so far (reports from real AOS-S switches are welcome). MikroTik
@@ -100,6 +103,13 @@ end-of-support data for community builds). Arista EOS is validated on cEOS-lab 4
 (default, insecure and hardened configurations, LLDP topology between two switches); its
 firmware check stays "unknown" for now: the one EOS flaw in the CISA KEV catalogue
 (CVE-2026-7473, Security Advisory 0137) has no fixed release, only a mitigation ACL.
+
+**Zyxel GS1900** (web-managed; Zyxel's CLI is a troubleshooting shell): LYSS checks the firmware
+against CVE-2026-7273, the web-interface flaw exploited on about 1,000 GS1900 switches since
+August 2026 (CISA KEV). Paste the output of `show version`, or the text of the web page
+*System Information*, into [lyss.dev/audit.html](https://lyss.dev/audit.html) or run
+`lyss audit version.txt`. The other controls stay "unknown" until the configuration format is
+verified on a real switch: if you own a GS1900, a sanitized configuration export helps.
 
 ## What the tool does
 

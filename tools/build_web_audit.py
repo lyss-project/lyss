@@ -50,6 +50,7 @@ EXAMPLES = {
     "hp_procurve.cfg": DEMO / "demo-hp-01.cfg",
     "sonic.json": DEMO / "demo-leaf-01.cfg",
     "arista_eos.cfg": ROOT / "tests" / "cases" / "arista-weak" / "config.cfg",
+    "zyxel_gs1900.txt": ROOT / "tests" / "examples" / "zyxel_gs1900.txt",
 }
 FIXED_TIME = (2026, 1, 1, 0, 0, 0)
 

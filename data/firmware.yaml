@@ -145,3 +145,147 @@ platforms:
       https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.04: CVE-2026-67279, -86060, -67277, CVE-2018-7445, CVE-2018-14847) ;
       https://mikrotik.com/supportsec (fixed versions of CVE-2026-84411, CVE-2026-67277/67279)
     verified: 2026-11-06
+
+  # ---------------- Zyxel GS1900 (smart managed) ----------------
+  # one entry per model: the advisory gives one patched firmware per model. The model is matched by
+  # its name (Model Name) or by the firmware code in the version string, e.g. V2.90(AAHK.1)C0 = GS1900-24E.
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-8(\s|$)|\bAAHH\b'
+    family: Zyxel GS1900-8
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(AAHH.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(AAHH.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-8HP(\s|$)|\bAAHI\b'
+    family: Zyxel GS1900-8HP
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(AAHI.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(AAHI.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-10HP(\s|$)|\bAAZI\b'
+    family: Zyxel GS1900-10HP
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(AAZI.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(AAZI.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-16(\s|$)|\bAAHJ\b'
+    family: Zyxel GS1900-16
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(AAHJ.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(AAHJ.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-24(\s|$)|\bAAHL\b'
+    family: Zyxel GS1900-24
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(AAHL.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(AAHL.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-24E(\s|$)|\bAAHK\b'
+    family: Zyxel GS1900-24E
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(AAHK.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(AAHK.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-24EP(\s|$)|\bABTO\b'
+    family: Zyxel GS1900-24EP
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(ABTO.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(ABTO.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-24HP ?v2(\s|$)|\bABTP\b'
+    family: Zyxel GS1900-24HPv2
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(ABTP.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(ABTP.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-48(\s|$)|\bAAHN\b'
+    family: Zyxel GS1900-48
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(AAHN.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(AAHN.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08
+
+  - vendor: zyxel_gs1900
+    models: '(?i)^GS1900-48HP ?v2(\s|$)|\bABTQ\b'
+    family: Zyxel GS1900-48HPv2
+    advisories:
+      - id: CVE-2026-7273 (web management CGI, stack buffer overflow, no authentication)
+        cvss: 8.8
+        kev: true
+        fixed_in: '2.90(ABTQ.2)'
+        note: 'Exploited since August 2026 (GreyNoise: 996 switches, 48 countries); CISA KEV 2026-09-21. Affected: 2.90(ABTQ.1)C0 and earlier.'
+    source: >-
+      https://www.zyxel.com/global/en/support/security-advisories/zyxel-security-advisory-for-stack-based-buffer-overflow-vulnerability-in-gs1900-series-switches-06-16-2026 ;
+      https://www.cisa.gov/known-exploited-vulnerabilities-catalog (catalog 2026.11.06)
+    verified: 2026-11-08

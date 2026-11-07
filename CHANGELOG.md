@@ -2,6 +2,32 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.10.0 (2026-11-08)
+
+Level 3 (Advanced) and Zyxel GS1900. Specification 0.6.0-draft.
+- **Level 3 controls written and assessed** (they were drafts): LYSS-ACC-020 DHCP snooping on
+  user VLANs, ACC-021 dynamic ARP inspection, ACC-022 802.1X / MAC authentication on access
+  ports, ACC-023 broadcast storm control, ACC-024 no CDP/LLDP sent towards users (IP phone ports
+  exempt). Each has a statement, rationale, test procedure and ISO 27001 / NIST SP 800-53 / CIS
+  references; not applicable on a switch without access ports (core, spine).
+- Checks on every platform: Cisco IOS, Cisco Business, HPE Aruba AOS-S, Arista EOS (802.1X and
+  LLDP checked on cEOS-lab; the rest needs switching hardware, syntax from Arista's manual and
+  the DISA STIG), MikroTik RouterOS 7 (bridge DHCP snooping and ARP inspection, 802.1X server,
+  neighbour discovery: checked on CHR 7.25.1). Not applicable on SONiC (data-centre fabric, no
+  user ports).
+- Level 3 is opt-in: `lyss audit --level 3`, the "1 + 2 + 3" choice of the browser audit, or
+  Settings > Assessment in the web interface (switches are re-assessed from their last
+  collection).
+- Engine: rule forms `any`, `not`, `captured`, `uncovered` (VLAN or port coverage, with VLAN
+  ranges such as `10,20-30`) and `not_applicable_if_any`.
+- **Zyxel GS1900 (preview, firmware only)**: CVE-2026-7273, the pre-authentication flaw of the web
+  interface exploited on about 1,000 GS1900 switches since August 2026 (CISA KEV), with the
+  patched firmware of each of the 10 models in Zyxel's advisory. Paste `show version` or the
+  System Information page; the firmware code alone identifies the model. Configuration controls
+  stay "unknown" (never "not applicable") until the format is verified on a real switch.
+- SECURITY.md: why the low-severity paramiko advisory (SHA-1 RSA signatures, CVE-2026-44405) is
+  accepted instead of moving to paramiko 5, which cannot talk to legacy switches.
+
 ## 0.9.0 (2026-11-07)
 
 Arista EOS (preview), validated on cEOS-lab 4.37.0F. Specification unchanged (0.5.0-draft).

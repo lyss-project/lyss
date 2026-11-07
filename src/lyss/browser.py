@@ -9,7 +9,7 @@ from dataclasses import asdict
 from . import PROJECT_NAME, __version__
 from .engine import audit, conformance, detect_vendor, load_spec
 
-VENDORS = ("arista_eos", "cisco_ios", "cisco_sb", "hp_procurve", "mikrotik", "sonic")
+VENDORS = ("arista_eos", "cisco_ios", "cisco_sb", "hp_procurve", "mikrotik", "sonic", "zyxel_gs1900")
 
 
 def run(text: str, vendor: str = "auto", level: int = 2, state_text: str = "") -> str:
@@ -24,7 +24,7 @@ def run(text: str, vendor: str = "auto", level: int = 2, state_text: str = "") -
             return json.dumps({"ok": False, "error": "unrecognised"})
     elif vendor not in VENDORS:
         return json.dumps({"ok": False, "error": "vendor"})
-    findings = audit(text, vendor, max(1, min(int(level), 2)), state_text or "")
+    findings = audit(text, vendor, max(1, min(int(level), 3)), state_text or "")
     return json.dumps({
         "ok": True, "tool": PROJECT_NAME, "version": __version__, "spec_version": load_spec()["spec_version"],
         "vendor": vendor, "detected": detected, "summary": conformance(findings),

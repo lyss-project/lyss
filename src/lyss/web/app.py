@@ -444,7 +444,7 @@ def _settings_page(request: Request, session: dict, status: int = 200, **ctx):
     site_list = [{**s, "used": sum(1 for d in devices if sites.of(d, all_sites) == s["id"])} for s in all_sites]
     return _render(request, "settings.html", session, status=status, profiles=profiles, sites=site_list,
                    unsited=sum(1 for d in devices if not sites.of(d, all_sites)),
-                   organization=settings.get("organization", ""),
+                   organization=settings.get("organization", ""), level3=bool(settings.get("level3")),
                    schedule=settings.get("schedule", {"time": "02:30", "days": list(range(7))}),
                    smtp=_public(settings.get("smtp", {})), ciso=_public(settings.get("ciso", {})),
                    siem=settings.get("siem", {}), siem_default_file=str(inventory.PRIVATE / "lyss-events.jsonl"),
@@ -949,6 +949,22 @@ def save_organization(request: Request, csrf: str = Form(""), organization: str 
     settings["organization"] = organization.strip()[:120]
     inventory.save_settings(settings)
     return _settings_page(request, session, saved="Organization saved.")
+
+
+@app.post("/settings/assessment")
+def save_assessment(request: Request, csrf: str = Form(""), level3: str = Form("")):
+    session = _session(request)
+    _check_csrf(session, csrf)
+    settings = inventory.load_settings()
+    settings["level3"] = level3 == "1"
+    inventory.save_settings(settings)
+    redone = 0
+    for device in inventory.load_devices():
+        if collector.config_paths(device)[0].exists():
+            _reaudit(device["id"])
+            redone += 1
+    return _settings_page(request, session, saved=f"Assessment saved: Level 3 {'on' if settings['level3'] else 'off'}; "
+                                                   f"{redone} switch(es) re-assessed.")
 
 
 @app.post("/settings/jump")

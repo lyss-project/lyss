@@ -30,7 +30,7 @@
   "description": "Open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, HPE Aruba AOS-S, Arista EOS, MikroTik RouterOS and SONiC.",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Windows, Linux",
-  "softwareVersion": "0.9.0",
+  "softwareVersion": "0.10.0",
   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
   "codeRepository": "https://github.com/lyss-project/lyss",
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
@@ -69,7 +69,7 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="kicker"><span class="en">Lyaazale Switch Security · preview 0.9</span><span class="fr">Lyaazale Switch Security · préversion 0.9</span></p>
+      <p class="kicker"><span class="en">Lyaazale Switch Security · preview 0.10</span><span class="fr">Lyaazale Switch Security · préversion 0.10</span></p>
       <h1>
         <span class="en">The open security standard for network switches.</span>
         <span class="fr">Le standard ouvert de sécurité des commutateurs réseau.</span>
@@ -133,7 +133,7 @@
       <article class="level">
         <span class="badge b3">3</span>
         <h3><span class="en">Advanced</span><span class="fr">Avancé</span></h3>
-        <p><span class="en">Access-layer protections such as DHCP snooping, dynamic ARP inspection and port security. Draft, open for contributions.</span><span class="fr">Protections de la couche d'accès : DHCP snooping, inspection ARP dynamique, sécurité des ports. En cours de rédaction, ouvert aux contributions.</span></p>
+        <p><span class="en">Protection against attacks from user ports: DHCP snooping, dynamic ARP inspection, 802.1X or MAC authentication, storm control, and no CDP/LLDP towards users.</span><span class="fr">Protection contre les attaques depuis les ports utilisateurs : DHCP snooping, inspection ARP dynamique, authentification 802.1X ou MAC, contrôle des tempêtes de broadcast, et pas de CDP/LLDP vers les utilisateurs.</span></p>
       </article>
     </div>
     <p class="note"><span class="en">Every control has a requirement, a rationale, a vendor-neutral test procedure and informative mappings to ISO/IEC 27001:2022, NIST SP 800-53 r5 and CIS Controls v8.</span><span class="fr">Chaque contrôle comporte une exigence, une justification, une procédure de test indépendante du fabricant et des correspondances avec l'ISO/IEC 27001:2022, le NIST SP 800-53 r5 et les CIS Controls v8.</span></p>
@@ -170,12 +170,13 @@
           <tr><th><span class="en">Platform</span><span class="fr">Plateforme</span></th><th><span class="en">Levels</span><span class="fr">Niveaux</span></th><th><span class="en">Fixes</span><span class="fr">Corrections</span></th></tr>
         </thead>
         <tbody>
-          <tr><td>Cisco IOS / IOS-XE (Catalyst)</td><td>1 · 2</td><td><span class="en">yes</span><span class="fr">oui</span></td></tr>
-          <tr><td>Cisco Small Business / Business (SG, CBS)</td><td>1 · 2</td><td><span class="en">yes</span><span class="fr">oui</span></td></tr>
-          <tr><td>HPE Aruba AOS-S (ProCurve)</td><td>1 · 2</td><td><span class="en">basic</span><span class="fr">de base</span></td></tr>
-          <tr><td><span class="en">MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR) · preview</span><span class="fr">MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR) · préversion</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td>Cisco IOS / IOS-XE (Catalyst)</td><td>1 · 2 · 3</td><td><span class="en">yes</span><span class="fr">oui</span></td></tr>
+          <tr><td>Cisco Small Business / Business (SG, CBS)</td><td>1 · 2 · 3</td><td><span class="en">yes</span><span class="fr">oui</span></td></tr>
+          <tr><td>HPE Aruba AOS-S (ProCurve)</td><td>1 · 2 · 3</td><td><span class="en">basic</span><span class="fr">de base</span></td></tr>
+          <tr><td><span class="en">MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR) · preview</span><span class="fr">MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR) · préversion</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
           <tr><td><span class="en">SONiC (community builds) · preview</span><span class="fr">SONiC (versions communautaires) · préversion</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
-          <tr><td><span class="en">Arista EOS (7000 series, cEOS / vEOS) · preview</span><span class="fr">Arista EOS (série 7000, cEOS / vEOS) · préversion</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td><span class="en">Arista EOS (7000 series, cEOS / vEOS) · preview</span><span class="fr">Arista EOS (série 7000, cEOS / vEOS) · préversion</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td><span class="en">Zyxel GS1900 · preview</span><span class="fr">Zyxel GS1900 · préversion</span></td><td><span class="en">firmware only (CVE-2026-7273)</span><span class="fr">firmware uniquement (CVE-2026-7273)</span></td><td><span class="en">offline</span><span class="fr">hors ligne</span></td></tr>
         </tbody>
       </table>
     </div>

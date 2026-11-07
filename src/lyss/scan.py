@@ -14,7 +14,7 @@ from . import collector, discovery, history, inventory, notify
 from .config import parse
 from .engine import audit, conformance, extract_facts, load_adapter, load_spec
 
-MAX_LEVEL = 2
+MAX_LEVEL = 2           # Level 3 (Advanced) only when enabled in Settings > Assessment
 TRIGGERS = ("manual", "schedule", "cli", "change")  # change: rescan after a SIEM change alert (changes.py)
 _lock = threading.Lock()
 _job: dict | None = None
@@ -34,7 +34,8 @@ def audit_device(device: dict, trigger: str = "manual", archive: bool = True) ->
     if archive:
         history.archive_config(device["id"], config, trigger)
     context = {"backup": history.backup_status(device["id"])}
-    findings = audit(config, device["vendor"], MAX_LEVEL, state, context)
+    max_level = 3 if inventory.load_settings().get("level3") else MAX_LEVEL
+    findings = audit(config, device["vendor"], max_level, state, context)
     facts = extract_facts(parse(config, state), load_adapter(device["vendor"]))
     result = {
         "device": device["id"],

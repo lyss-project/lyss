@@ -35,6 +35,9 @@ def test_explicit_vendor_level_and_state():
     assert without["LYSS-ACC-010"] == "unknown" and with_state["LYSS-ACC-010"] == "fail"
     level1 = json.loads(run(config, "mikrotik", 1))
     assert {f["level"] for f in level1["findings"]} == {1} and not level1["detected"]
+    level3 = json.loads(run(config, "mikrotik", 3))
+    assert {f["level"] for f in level3["findings"]} == {1, 2, 3}
+    assert {f["level"] for f in json.loads(run(config, "mikrotik", 9))["findings"]} == {1, 2, 3}
 
 
 def test_errors_are_codes_for_the_page():

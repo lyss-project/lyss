@@ -8,7 +8,7 @@
 #     3     name=telnet port=23 proto=tcp available-from= vrf=main max-sessions=20
 #     5  X  name=www-ssl port=443 ...                 (flag X = disabled, R = running, D = dynamic)
 adapter: mikrotik
-spec_version: "0.5.0-draft"
+spec_version: "0.6.0-draft"
 platform: MikroTik RouterOS
 status: preview, validated on CHR 7.25.1 (2026-11)
 
@@ -293,3 +293,78 @@ checks:
     note: Access ports are bridge ports with frame-types=admit-only-untagged-and-priority-tagged or edge=yes.
     remediation: |
       /interface bridge port set [find frame-types=admit-only-untagged-and-priority-tagged] bpdu-guard=yes edge=yes
+
+  # ---------------- Level 3 ----------------
+  # Checked on CHR 7.25.1: "/interface bridge add arp-inspection=yes dhcp-snooping=yes ...",
+  # "/interface dot1x server add interface=etherN", "/ip neighbor discovery-settings set
+  # discover-interface-list=none". Access ports = bridge ports admitting untagged frames only or
+  # marked edge (as for LYSS-ACC-011). Snooping and ARP inspection are bridge-wide settings.
+
+  LYSS-ACC-020:
+    not_applicable_if_any: &ros_no_access
+      - {not: {captured: &ros_access_ports {line: '^/interface bridge port (?:add|set) (?=.*(?:\bframe-types=admit-only-untagged|\bedge=yes\b))(?=.*\binterface=(\S+))'}}, say: 'no access bridge port (frame-types=admit-only-untagged... or edge=yes)'}
+    pass_if_any:
+      - {line: '^/interface bridge (?:add|set) .*\bdhcp-snooping=yes\b'}
+    otherwise: fail
+    note: DHCP snooping is off by default on RouterOS bridges; mark the uplink bridge ports trusted=yes.
+    remediation: |
+      /interface bridge set [find] dhcp-snooping=yes
+      /interface bridge port set [find interface=<uplink>] trusted=yes
+      ! note: DHCP snooping turns off bridge fast-path
+
+  LYSS-ACC-021:
+    not_applicable_if_any: *ros_no_access
+    pass_if_any:
+      - all:
+          - {line: '^/interface bridge (?:add|set) .*\barp-inspection=yes\b'}
+          - {line: '^/interface bridge (?:add|set) .*\bdhcp-snooping=yes\b'}
+    otherwise: fail
+    note: >-
+      ARP inspection (bridge arp-inspection=yes) checks ARP against the DHCP snooping bindings and
+      needs dhcp-snooping=yes; it exists in recent RouterOS 7 (checked on 7.25.1), not in RouterOS 6.
+    remediation: |
+      /interface bridge set [find] dhcp-snooping=yes arp-inspection=yes
+      /interface bridge port set [find interface=<uplink>] trusted=yes trusted-arp=yes
+
+  LYSS-ACC-022:
+    not_applicable_if_any: *ros_no_access
+    fail_if_any:
+      - uncovered: &ros_nac
+          what: access ports without an 802.1X server
+          used: *ros_access_ports
+          covered: {line: '^/interface dot1x server add (?!.*\bdisabled=yes\b)(?=.*\binterface=(\S+))'}
+    pass_if_any:
+      - {uncovered: *ros_nac, absent: true}
+    otherwise: fail
+    note: RouterOS 7 802.1X authenticator ("/interface dot1x server") on Ethernet ports, with MAC authentication fallback (auth-types=dot1x,mac-auth).
+    remediation: |
+      /radius add address=<radius-ip> secret=<secret> service=dot1x
+      /interface dot1x server add interface=<access-port> auth-types=dot1x,mac-auth
+
+  LYSS-ACC-023:
+    not_applicable_if_any: *ros_no_access
+    pass_if_any:
+      - uncovered: &ros_storm
+          what: access ports without storm control
+          used: *ros_access_ports
+          covered: {line: '^/interface ethernet switch port set (?:\[ find name=)?"?([\w.-]+)"?\]? .*\bstorm-rate=\d'}
+        absent: true
+    otherwise: unknown
+    note: Storm control is a switch-chip setting (CRS3xx "/interface ethernet switch port set <port> storm-rate=<percent>"); routers and CHR have none.
+    remediation: |
+      /interface ethernet switch port set <access-port> storm-rate=5
+
+  LYSS-ACC-024:
+    # factory: CDP, LLDP and MNDP sent on every static interface (discover-interface-list=static)
+    not_applicable_if_any: *ros_no_access
+    fail_if_any:
+      - {line: '^/ip neighbor discovery-settings set .*\bdiscover-interface-list=(all|static)\b'}
+      - {not: {line: '^/ip neighbor discovery-settings set .*\b(discover-interface-list|mode)='}, say: 'neighbor discovery left at the factory setting: CDP, LLDP and MNDP sent on every interface'}
+    pass_if_any:
+      - {line: '^/ip neighbor discovery-settings set .*\bdiscover-interface-list=none\b'}
+      - {line: '^/ip neighbor discovery-settings set .*\bmode=rx-only\b'}
+    otherwise: unknown
+    note: A custom interface list is accepted only after checking that it holds no access port (LYSS cannot tell from the export).
+    remediation: |
+      /ip neighbor discovery-settings set discover-interface-list=none
+      ! or a list with only uplinks / the management interface

@@ -62,6 +62,7 @@
           <select id="vendor" name="vendor">
             <option value="auto">Auto-detect · Détection auto</option>
             <option value="arista_eos">Arista EOS</option>
+            <option value="zyxel_gs1900">Zyxel GS1900 (firmware)</option>
             <option value="cisco_ios">Cisco IOS / IOS-XE</option>
             <option value="cisco_sb">Cisco Small Business / Business</option>
             <option value="hp_procurve">HPE Aruba AOS-S (ProCurve)</option>
@@ -72,6 +73,7 @@
         <label><span class="en">Levels</span><span class="fr">Niveaux</span>
           <select id="level" name="level">
             <option value="2">1 + 2</option>
+            <option value="3">1 + 2 + 3</option>
             <option value="1">1</option>
           </select>
         </label>
@@ -86,7 +88,7 @@
       <label class="audit-label" for="config"><span class="en">Configuration</span><span class="fr">Configuration</span></label>
       <textarea id="config" name="config" spellcheck="false" wrap="off" rows="16"
         placeholder="show running-config · /export · config_db.json"></textarea>
-      <p class="small"><span class="en">Cisco / HPE / Arista: <code>show running-config</code>. MikroTik: <code>/export</code> (RouterOS 6: <code>/export hide-sensitive</code>). SONiC: <code>/etc/sonic/config_db.json</code>. You can also drop a file here. Secrets are hidden in the results; you may remove passwords before pasting.</span><span class="fr">Cisco / HPE / Arista : <code>show running-config</code>. MikroTik : <code>/export</code> (RouterOS 6 : <code>/export hide-sensitive</code>). SONiC : <code>/etc/sonic/config_db.json</code>. Vous pouvez aussi déposer un fichier ici. Les secrets sont masqués dans les résultats ; vous pouvez retirer les mots de passe avant de coller.</span></p>
+      <p class="small"><span class="en">Cisco / HPE / Arista: <code>show running-config</code>. MikroTik: <code>/export</code> (RouterOS 6: <code>/export hide-sensitive</code>). SONiC: <code>/etc/sonic/config_db.json</code>. Zyxel GS1900: <code>show version</code> or the System Information page (firmware check). You can also drop a file here. Secrets are hidden in the results; you may remove passwords before pasting.</span><span class="fr">Cisco / HPE / Arista : <code>show running-config</code>. MikroTik : <code>/export</code> (RouterOS 6 : <code>/export hide-sensitive</code>). SONiC : <code>/etc/sonic/config_db.json</code>. Zyxel GS1900 : <code>show version</code> ou la page System Information (contrôle du firmware). Vous pouvez aussi déposer un fichier ici. Les secrets sont masqués dans les résultats ; vous pouvez retirer les mots de passe avant de coller.</span></p>
 
       <details class="audit-state">
         <summary><span class="en">Device state (optional): outputs that a configuration cannot show</span><span class="fr">État de l'équipement (facultatif) : sorties qu'une configuration ne montre pas</span></summary>

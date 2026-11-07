@@ -11,7 +11,7 @@
 #   username lyss-audit privilege 15 role network-operator secret <password>
 #   aaa authorization commands all default local      ! roles are enforced only with this
 adapter: arista_eos
-spec_version: "0.5.0-draft"
+spec_version: "0.6.0-draft"
 platform: Arista EOS
 status: preview, validated on cEOS-lab 4.37.0F (container, 2026-11)
 
@@ -267,3 +267,94 @@ checks:
       spanning-tree edge-port bpduguard default
       interface <access-ports>
          spanning-tree portfast
+
+  # ---------------- Level 3 ----------------
+  # cEOS-lab 4.37 accepts "dot1x system-auth-control", "dot1x port-control auto" and
+  # "no lldp transmit"; DHCP snooping, ARP inspection, storm control and MAC-based authentication
+  # need switching hardware ("not supported on this hardware platform" in a container): their
+  # syntax follows the Arista EOS manual and the DISA STIG (Arista MLS EOS 4.x L2S).
+  # access ports = Ethernet interfaces that are not trunks, routed ports or LAG members (as for
+  # LYSS-ACC-011); EOS switchports are access ports in VLAN 1 unless configured otherwise.
+
+  LYSS-ACC-020:
+    not_applicable_if_any: &eos_no_access
+      - {not: {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b'}, say: 'no access port (every Ethernet interface is a trunk, routed or LAG member)'}
+    fail_if_any:
+      - {not: {line: '^ip dhcp snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("ip dhcp snooping")'}
+      # EOS: without the information option, DHCP snooping is not operational (DISA STIG V-255973)
+      - {not: {line: '^ip dhcp snooping information option'}, say: 'DHCP snooping information option (82) is not enabled: snooping is not operational on EOS'}
+      - uncovered: &eos_snooping
+          what: access VLANs without DHCP snooping
+          used: &eos_access_vlans {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b', line: '^switchport access vlan (\d+)', default: 1}
+          covered: {line: '^ip dhcp snooping vlan (\S+)'}
+          lists: true
+    pass_if_any:
+      - {uncovered: *eos_snooping, absent: true}
+    otherwise: fail
+    remediation: |
+      ip dhcp snooping
+      ip dhcp snooping information option
+      ip dhcp snooping vlan <access-vlans>
+
+  LYSS-ACC-021:
+    not_applicable_if_any: *eos_no_access
+    fail_if_any:
+      - uncovered: &eos_dai
+          what: access VLANs without ARP inspection
+          used: *eos_access_vlans
+          covered: {line: '^ip arp inspection vlan (\S+)'}
+          lists: true
+    pass_if_any:
+      - {uncovered: *eos_dai, absent: true}
+    otherwise: fail
+    remediation: |
+      ip arp inspection vlan <access-vlans>
+      interface <uplink>
+         ip arp inspection trust
+
+  LYSS-ACC-022:
+    not_applicable_if_any: *eos_no_access
+    fail_if_any:
+      - {not: {line: '^dot1x system-auth-control'}, say: '802.1X is not enabled globally ("dot1x system-auth-control")'}
+      - uncovered: &eos_nac
+          what: access ports without 802.1X / MAC authentication
+          used: &eos_access_ports {block: '^interface (Ethernet\S+)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b'}
+          covered: {block: '^interface (Ethernet\S+)', where: '^dot1x (port-control auto|mac based authentication)\b'}
+    pass_if_any:
+      - {uncovered: *eos_nac, absent: true}
+    otherwise: fail
+    remediation: |
+      dot1x system-auth-control
+      interface <access-ports>
+         dot1x port-control auto
+         dot1x mac based authentication
+
+  LYSS-ACC-023:
+    not_applicable_if_any: *eos_no_access
+    fail_if_any:
+      - uncovered: &eos_storm
+          what: access ports without broadcast storm control
+          used: *eos_access_ports
+          covered: {block: '^interface (Ethernet\S+)', where: '^storm-control broadcast level'}
+    pass_if_any:
+      - {uncovered: *eos_storm, absent: true}
+    otherwise: fail
+    remediation: |
+      interface <access-ports>
+         storm-control broadcast level 5
+
+  LYSS-ACC-024:
+    # EOS transmits LLDP by default (no CDP); phone ports ("switchport phone") keep LLDP-MED
+    not_applicable_if_any: *eos_no_access
+    fail_if_any:
+      - all:
+          - {not: {line: '^no lldp run'}}
+          - uncovered: &eos_lldp
+              what: access ports sending LLDP
+              used: {block: '^interface (Ethernet\S+)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|switchport phone)\b'}
+              covered: {block: '^interface (Ethernet\S+)', where: '^no lldp transmit'}
+    otherwise: pass
+    note: Ports with an IP phone configuration ("switchport phone") are exempt; EOS does not send CDP.
+    remediation: |
+      interface <user-access-ports>
+         no lldp transmit

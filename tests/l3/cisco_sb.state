@@ -1,0 +1,7 @@
+===== show interfaces status =====
+                                             Flow Link          Back   Mdix
+Port     Type         Duplex  Speed Neg      ctrl State       Pressure Mode
+-------- ------------ ------  ----- -------- ---- ----------- -------- -------
+gi1      1G-Copper    Full    1000  Enabled  Off  Up          Disabled On
+gi2      1G-Copper    Full    1000  Enabled  Off  Up          Disabled On
+gi3      1G-Copper    Full    1000  Enabled  Off  Up          Disabled On

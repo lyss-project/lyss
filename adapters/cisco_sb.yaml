@@ -6,7 +6,7 @@
 # families and firmware versions, so config-only checks often end as "unknown";
 # device state (tools/Collect-State.ps1) resolves them.
 adapter: cisco_sb
-spec_version: "0.5.0-draft"
+spec_version: "0.6.0-draft"
 platform: Cisco Small Business / Business switches
 status: draft, validated on SG300 1.4.11.5, SRW2024P, SG350 2.5.0.83 (real devices, 2026-11)
 
@@ -265,4 +265,104 @@ checks:
       ! only on edge ports (users, printers, APs, servers) - never on links to other switches
       interface range <edge-ports>
        spanning-tree bpduguard enable
+      exit
+
+  # ---------------- Level 3 ----------------
+  # Syntax from the Cisco Business 350 CLI guide; not yet checked on a real switch with these
+  # features enabled (reports welcome). Edge ports as for LYSS-ACC-011 (need "show interfaces status").
+
+  LYSS-ACC-020:
+    fail_if_any:
+      - {not: {line: '^ip dhcp snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("ip dhcp snooping")'}
+      - uncovered: &sb_snooping
+          what: access VLANs without DHCP snooping
+          used: &sb_access_vlans {block: '(?i)^interface (?:gi|te|fa|gigabitethernet|tengigabitethernet|fastethernet)', where_not: '^(switchport mode (trunk|general)|channel-group)\b', line: '^switchport access vlan (\d+)', default: 1}
+          covered: {line: '^ip dhcp snooping vlan (\S+)'}
+          lists: true
+    pass_if_any:
+      - {uncovered: *sb_snooping, absent: true}
+    otherwise: fail
+    note: VLANs are read from the interfaces listed in the configuration; ports never configured stay in VLAN 1 and are not counted.
+    remediation: |
+      ip dhcp snooping
+      ip dhcp snooping vlan <access-vlan>
+      interface <uplink>
+       ip dhcp snooping trust
+      exit
+
+  LYSS-ACC-021:
+    fail_if_any:
+      - {not: {line: '^ip arp inspection\s*$'}, say: 'ARP inspection is not enabled globally ("ip arp inspection")'}
+      - uncovered: &sb_dai
+          what: access VLANs without ARP inspection
+          used: *sb_access_vlans
+          covered: {line: '^ip arp inspection vlan (\S+)'}
+          lists: true
+    pass_if_any:
+      - {uncovered: *sb_dai, absent: true}
+    otherwise: fail
+    remediation: |
+      ip arp inspection
+      ip arp inspection vlan <access-vlan>
+      interface <uplink>
+       ip arp inspection trust
+      exit
+
+  LYSS-ACC-022:
+    fail_if_any:
+      - {not: {line: '^dot1x system-auth-control'}, say: '802.1X is not enabled globally ("dot1x system-auth-control")'}
+      - edge_ports_missing: &sb_nac
+          ports: {section: show interfaces status, line: '^((?:gi|te|fa)\S+)\s'}
+          uplink_config: '^(switchport mode (trunk|general)|channel-group)\b'
+          require: '^dot1x (port-control (auto|mac-and-802\.1x|mac-only)|authentication\b.*\bmac)'
+    pass_if_any:
+      - {edge_ports_missing: *sb_nac, absent: true}
+    otherwise: unknown
+    note: Needs "show interfaces status" to know the edge ports.
+    remediation: |
+      dot1x system-auth-control
+      interface range <edge-ports>
+       dot1x port-control auto
+      exit
+
+  LYSS-ACC-023:
+    fail_if_any:
+      - edge_ports_missing: &sb_storm
+          ports: {section: show interfaces status, line: '^((?:gi|te|fa)\S+)\s'}
+          uplink_config: '^(switchport mode (trunk|general)|channel-group)\b'
+          require: '^storm-control broadcast (enable|level)\b'
+    pass_if_any:
+      - {edge_ports_missing: *sb_storm, absent: true}
+    otherwise: unknown
+    note: Needs "show interfaces status" to know the edge ports.
+    remediation: |
+      interface range <edge-ports>
+       storm-control broadcast enable
+       storm-control broadcast level 5
+      exit
+
+  LYSS-ACC-024:
+    # LLDP and CDP are both on by default; ports in a voice VLAN keep them (IP phones)
+    fail_if_any:
+      - all:
+          - {not: {line: '^no lldp run'}}
+          - edge_ports_missing: &sb_lldp
+              ports: {section: show interfaces status, line: '^((?:gi|te|fa)\S+)\s'}
+              uplink_config: '^(switchport mode (trunk|general)|channel-group|switchport voice vlan|voice vlan enable)\b'
+              require: '^no lldp transmit'
+      - all:
+          - {not: {line: '^no cdp run'}}
+          - edge_ports_missing: &sb_cdp
+              ports: {section: show interfaces status, line: '^((?:gi|te|fa)\S+)\s'}
+              uplink_config: '^(switchport mode (trunk|general)|channel-group|switchport voice vlan|voice vlan enable)\b'
+              require: '^no cdp enable'
+    pass_if_all:
+      - any: [{line: '^no lldp run'}, {edge_ports_missing: *sb_lldp, absent: true}]
+      - any: [{line: '^no cdp run'}, {edge_ports_missing: *sb_cdp, absent: true}]
+    otherwise: unknown
+    note: Needs "show interfaces status" unless LLDP and CDP are disabled globally; voice-VLAN ports are exempt.
+    remediation: |
+      interface range <user-edge-ports>
+       no lldp transmit
+       no cdp enable
       exit

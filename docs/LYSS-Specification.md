@@ -2,7 +2,7 @@
 
 # LYSS Specification: security controls for network switches
 
-**Version 0.5.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
+**Version 0.6.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
 
 ## 1. Scope
 
@@ -40,13 +40,13 @@ RFC 2119 and RFC 8174 when, and only when, they appear in capitals.
 |---|---|---|
 | 1 | Baseline | the minimum every managed switch must meet: no cleartext management, no default or recoverable credentials, supported firmware, automatic backups. |
 | 2 | Hardened | a hardened management plane: central authentication, restricted and modern management access, remote logging and time, basic access-port hygiene. |
-| 3 | Advanced | access-layer protections against attacks from user ports (draft: no checks yet). |
+| 3 | Advanced | access-layer protections against attacks from user ports: DHCP snooping, ARP inspection, port authentication, storm control, no neighbor discovery towards users. |
 
 A device is **LYSS Level N conformant** when every control of levels 1 to N is `pass` or
 `not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.5.0-draft), assessed 2026-11-03 with LYSS 0.3.0.
+> core-sw-01 is LYSS Level 1 conformant (specification 0.6.0-draft), assessed 2026-11-03 with LYSS 0.3.0.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
 
@@ -77,8 +77,8 @@ A claim is valid for the configuration and firmware assessed; any change require
 | [LYSS-ACC-020](#lyss-acc-020) | 3 | DHCP snooping is enabled on user VLANs |
 | [LYSS-ACC-021](#lyss-acc-021) | 3 | Dynamic ARP inspection is enabled on user VLANs |
 | [LYSS-ACC-022](#lyss-acc-022) | 3 | Access ports require 802.1X or MAC authentication |
-| [LYSS-ACC-023](#lyss-acc-023) | 3 | Storm control limits broadcast/multicast on access ports |
-| [LYSS-ACC-024](#lyss-acc-024) | 3 | Neighbor discovery (CDP/LLDP) is disabled on untrusted access ports |
+| [LYSS-ACC-023](#lyss-acc-023) | 3 | Storm control limits broadcast traffic on access ports |
+| [LYSS-ACC-024](#lyss-acc-024) | 3 | Neighbor discovery (CDP/LLDP) is not sent on untrusted access ports |
 
 ### Level 1: Baseline
 
@@ -292,8 +292,11 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **DHCP snooping is enabled on user VLANs**
 
+- **Requirement.** DHCP snooping is enabled globally and on every VLAN used by an access port, so that DHCP server messages are only accepted from trusted (uplink) ports.
+- **Rationale.** A rogue DHCP server on a user port can hand out its own gateway and DNS server and intercept traffic; DHCP snooping drops server messages from untrusted ports and builds the binding table that ARP inspection and IP source guard rely on.
+- **Test procedure.** Fail if DHCP snooping is not enabled globally, or if a VLAN used by an access port is not in the snooping VLAN list. Pass if it is enabled and every such VLAN is covered (on platforms where snooping applies to the whole bridge, the bridge setting covers every access port). Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 — · CIS Controls v8 —
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 —
 
 *Draft: requirement text and checks to be written.*
 
@@ -301,8 +304,11 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Dynamic ARP inspection is enabled on user VLANs**
 
+- **Requirement.** ARP packets received on access ports are checked against the DHCP snooping bindings (or static ARP access lists) on every VLAN used by an access port.
+- **Rationale.** Without ARP inspection, any user device can claim the gateway's IP address (ARP spoofing) and read or alter the traffic of every host in the VLAN.
+- **Test procedure.** Fail if a VLAN used by an access port is not covered by dynamic ARP inspection, or if the platform offers no ARP inspection (the report names the platform limit). Pass if every such VLAN is covered. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 — · CIS Controls v8 —
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 —
 
 *Draft: requirement text and checks to be written.*
 
@@ -310,26 +316,35 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Access ports require 802.1X or MAC authentication**
 
+- **Requirement.** Every access port authenticates the connected device (IEEE 802.1X, or MAC authentication bypass for devices without a supplicant) before granting network access.
+- **Rationale.** Without port authentication, anyone who can plug a cable into a wall socket is on the internal network.
+- **Test procedure.** Fail if port authentication is not enabled globally where the platform requires it, or if an access port has no 802.1X / MAC authentication setting. Pass if every access port has one. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.5.15 · NIST SP 800-53 r5 — · CIS Controls v8 13.9
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.5.15 · NIST SP 800-53 r5 IA-3, AC-3 · CIS Controls v8 13.9
 
 *Draft: requirement text and checks to be written.*
 
 #### LYSS-ACC-023
 
-**Storm control limits broadcast/multicast on access ports**
+**Storm control limits broadcast traffic on access ports**
 
+- **Requirement.** Every access port limits the rate of broadcast traffic it accepts (storm control).
+- **Rationale.** A loop or a misbehaving device on one user port can flood broadcast traffic to every port of the VLAN and take the network down; a rate limit contains it on the offending port.
+- **Test procedure.** Fail if an access port has no broadcast rate limit. Pass if every access port has one. Unknown when the platform sets it on the switch chip and the setting cannot be read. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 — · CIS Controls v8 —
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.6 · NIST SP 800-53 r5 SC-5 · CIS Controls v8 —
 
 *Draft: requirement text and checks to be written.*
 
 #### LYSS-ACC-024
 
-**Neighbor discovery (CDP/LLDP) is disabled on untrusted access ports**
+**Neighbor discovery (CDP/LLDP) is not sent on untrusted access ports**
 
+- **Requirement.** Access ports do not transmit CDP or LLDP advertisements, except ports that serve IP phones (a voice VLAN), which need LLDP-MED or CDP.
+- **Rationale.** CDP and LLDP advertisements tell anyone on a user port the switch name, model, software version, management address and VLANs, which helps an attacker choose an exploit.
+- **Test procedure.** Pass if neighbor discovery transmission is disabled globally, or on every access port without a voice VLAN, for each protocol the platform sends by default or that is enabled. Fail otherwise. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 — · CIS Controls v8 —
+- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.9 · NIST SP 800-53 r5 CM-7 · CIS Controls v8 4.8
 
 *Draft: requirement text and checks to be written.*
 

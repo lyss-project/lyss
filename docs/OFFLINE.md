@@ -33,6 +33,7 @@ Content-Security-Policy (`connect-src 'self'`) forbids it from contacting any ot
 | HPE Aruba AOS-S | `show running-config` | |
 | SONiC | `show runningconfiguration all > switch.json` (or a copy of `/etc/sonic/config_db.json`) | |
 | Arista EOS | `show running-config` (or `copy running-config flash:switch.cfg`) | |
+| Zyxel GS1900 | `show version`, or copy the text of the web page System > System Information | firmware check only (CVE-2026-7273) |
 
 A file copied from a terminal and saved with Notepad works (LYSS ignores the byte-order mark
 Notepad adds). Evidence in the LYSS report never shows passwords, keys or SNMP community names,

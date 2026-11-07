@@ -8,7 +8,7 @@
 # Device state: SONiC "show" commands, plus "ss -tlnH" (listening TCP ports; read-only, no sudo).
 # Local account password hashes live in /etc/shadow, which a read-only account cannot read.
 adapter: sonic
-spec_version: "0.5.0-draft"
+spec_version: "0.6.0-draft"
 platform: SONiC (community)
 status: preview, validated on SONiC-VS 202505 (virtual switch, 2026-11)
 
@@ -216,3 +216,16 @@ checks:
       (the usual data-centre leaf) have no spanning tree and no edge ports: the verdict stays unknown.
     remediation: |
       sudo config spanning_tree interface bpdu_guard enable <edge-port>
+
+  # ---------------- Level 3 ----------------
+  # Community SONiC is a data-centre fabric OS: servers and other switches, no user access ports,
+  # and no DHCP snooping, ARP inspection or 802.1X. Level 3 (access-layer protection against users)
+  # does not apply; storm control (PORT_STORM_CONTROL) would, but only with user ports.
+
+  LYSS-ACC-020: &sonic_l3
+    otherwise: not_applicable
+    note: Data-centre platform without user access ports; Level 3 access-layer controls apply to campus access switches.
+  LYSS-ACC-021: *sonic_l3
+  LYSS-ACC-022: *sonic_l3
+  LYSS-ACC-023: *sonic_l3
+  LYSS-ACC-024: *sonic_l3

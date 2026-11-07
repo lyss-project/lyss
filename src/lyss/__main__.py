@@ -218,7 +218,7 @@ def main(argv=None) -> int:
     a.add_argument("--vendor", default="auto",
                    help="adapter name: cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic, "
                         "or auto (default: recognise each file from its format)")
-    a.add_argument("--level", type=int, default=1, help="highest level to assess (default 1)")
+    a.add_argument("--level", type=int, default=1, help="highest level to assess: 1, 2 or 3 (default 1)")
     a.add_argument("--json", action="store_true", help="output JSON instead of text")
     a.add_argument("path", type=Path)
     a.set_defaults(func=cmd_audit)
@@ -233,7 +233,7 @@ def main(argv=None) -> int:
     o.add_argument("--url", required=True, help="Oxidized REST API, e.g. http://oxidized:8888")
     o.add_argument("--user", help="HTTP basic auth user (password in LYSS_OXIDIZED_PASSWORD)")
     o.add_argument("--insecure", action="store_true", help="do not verify the TLS certificate")
-    o.add_argument("--level", type=int, default=2, help="highest level to assess (default 2)")
+    o.add_argument("--level", type=int, default=2, help="highest level to assess: 1, 2 or 3 (default 2)")
     o.add_argument("--only", nargs="*", help="node names (default: all supported nodes)")
     o.add_argument("--json", action="store_true", help="output JSON instead of text")
     o.add_argument("--events", action="store_true", help="also send SIEM events (Settings > SIEM events)")

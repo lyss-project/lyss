@@ -1,0 +1,78 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+# LYSS adapter: Zyxel GS1900 series (smart managed switches), preview: FIRMWARE ONLY.
+# Rule forms: see adapters/cisco_ios.yaml.
+#
+# The GS1900 is managed through its web interface; Zyxel describes its SSH/Telnet CLI as a
+# troubleshooting shell (a few "show" commands). LYSS therefore audits it OFFLINE: paste the
+# output of "show version", or the text of the web page System > System Information. Model and
+# firmware come from lines like
+#     Model Name       : GS1900-24E
+#     Firmware Version : V2.90(AAHK.1)C0 | 06/10/2026
+# The firmware code in brackets (AAHK) identifies the model, so the version line alone is enough.
+# Configuration controls stay "unknown" until a real GS1900 configuration export is available:
+# reports and sanitized samples are welcome (see CONTRIBUTING.md).
+adapter: zyxel_gs1900
+spec_version: "0.6.0-draft"
+platform: Zyxel GS1900 (firmware check only)
+status: preview, firmware data from the Zyxel advisory of 2026-06-16 (CVE-2026-7273, CISA KEV)
+
+facts:
+  model:
+    - {section: show version, line: '(?i)Model Name\s*:?\s*(GS1900-\S+(?: v\d)?)'}
+    - {section: config, line: '(?i)Model Name\s*:?\s*(GS1900-\S+(?: v\d)?)'}
+    - {section: show version, line: 'Firmware Version\s*:?\s*V?\d+\.\d+\(([A-Z]{4})\.\d+\)', format: 'GS1900 firmware code {0}'}
+    - {section: config, line: 'Firmware Version\s*:?\s*V?\d+\.\d+\(([A-Z]{4})\.\d+\)', format: 'GS1900 firmware code {0}'}
+  version:
+    # "V2.90(AAHK.1)C0" -> 2.90(AAHK.1): the "C0" suffix is not part of the comparison
+    - {section: show version, line: 'Firmware Version\s*:?\s*V?(\d+\.\d+\([A-Z]{4}\.\d+\))'}
+    - {section: config, line: 'Firmware Version\s*:?\s*V?(\d+\.\d+\([A-Z]{4}\.\d+\))'}
+
+checks:
+
+  LYSS-VULN-001:
+    firmware: true
+    otherwise: unknown
+    note: >-
+      Paste "show version" or the System Information page (model name and firmware version).
+      Models not in the Zyxel advisory table (end-of-support GS1900 models) have no patch data.
+    remediation: |
+      ! upgrade to the patched firmware for the model (Zyxel advisory 2026-06-16, CVE-2026-7273),
+      ! e.g. GS1900-24E: V2.90(AAHK.2)C0 - download from zyxel.com > Support > Download Library
+      ! until then: restrict the web interface to the management VLAN / admin hosts
+      ! (System > Management access / Access control), the flaw needs no password
+
+  LYSS-BKP-001:
+    backup: true
+    otherwise: unknown
+    note: No backup evidence yet. Attest the external backup (e.g. configuration exports) on the switch page.
+    remediation: |
+      ! Maintenance > Configuration > Backup, kept outside the switch; attest it on the switch page
+
+  # every configuration control: not assessed yet on the GS1900 (never 'not applicable', which
+  # would let a switch reach a level without being checked)
+  LYSS-MGMT-001: &zyxel_unknown
+    otherwise: unknown
+    note: GS1900 configuration checks are not written yet (no verified configuration format); only the firmware is assessed.
+  LYSS-MGMT-002: *zyxel_unknown
+  LYSS-MGMT-003: *zyxel_unknown
+  LYSS-MGMT-004: *zyxel_unknown
+  LYSS-AUTH-001: *zyxel_unknown
+  LYSS-AUTH-002: *zyxel_unknown
+  LYSS-AUTH-003: *zyxel_unknown
+  LYSS-AUTH-004: *zyxel_unknown
+  LYSS-AUTH-010: *zyxel_unknown
+  LYSS-AUTH-011: *zyxel_unknown
+  LYSS-MGMT-010: *zyxel_unknown
+  LYSS-MGMT-011: *zyxel_unknown
+  LYSS-MGMT-012: *zyxel_unknown
+  LYSS-MGMT-013: *zyxel_unknown
+  LYSS-LOG-010: *zyxel_unknown
+  LYSS-LOG-011: *zyxel_unknown
+  LYSS-ACC-010: *zyxel_unknown
+  LYSS-ACC-011: *zyxel_unknown
+  LYSS-ACC-020: *zyxel_unknown
+  LYSS-ACC-021: *zyxel_unknown
+  LYSS-ACC-022: *zyxel_unknown
+  LYSS-ACC-023: *zyxel_unknown
+  LYSS-ACC-024: *zyxel_unknown

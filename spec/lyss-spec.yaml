@@ -2,7 +2,7 @@
 # This file is the normative source: docs/LYSS-Specification.md is generated from it
 # (python tools/build_spec.py). It says WHAT must be true; HOW to check it on each platform
 # lives in adapters/. Licensed CC BY 4.0 (see LICENSE-SPEC).
-spec_version: "0.5.0-draft"
+spec_version: "0.6.0-draft"
 status: draft
 levels:
   1: Baseline
@@ -336,10 +336,100 @@ controls:
       nist_800_53r5: [SC-5, CM-6]
       cis_v8: ["12.2"]
 
-  # ---------------- Level 3: Advanced (draft: checks not written yet) ----------------
+  # ---------------- Level 3: Advanced ----------------
+  # Access-layer protections against attacks from user ports. "Access ports" are the ports that are
+  # neither links to other switches (trunks, link aggregations, tagged/uplink ports) nor routed
+  # ports, as defined for LYSS-ACC-011; "user VLANs" are the VLANs those access ports belong to.
+  # Each control is not applicable on a switch without access ports (core, aggregation, spine).
 
-  - {id: LYSS-ACC-020, level: 3, title: DHCP snooping is enabled on user VLANs, evidence: [config], mappings: {iso27001_2022: [A.8.20]}}
-  - {id: LYSS-ACC-021, level: 3, title: Dynamic ARP inspection is enabled on user VLANs, evidence: [config], mappings: {iso27001_2022: [A.8.20]}}
-  - {id: LYSS-ACC-022, level: 3, title: Access ports require 802.1X or MAC authentication, evidence: [config], mappings: {iso27001_2022: [A.8.20, A.5.15], cis_v8: ["13.9"]}}
-  - {id: LYSS-ACC-023, level: 3, title: Storm control limits broadcast/multicast on access ports, evidence: [config], mappings: {iso27001_2022: [A.8.20]}}
-  - {id: LYSS-ACC-024, level: 3, title: Neighbor discovery (CDP/LLDP) is disabled on untrusted access ports, evidence: [config], mappings: {iso27001_2022: [A.8.20]}}
+  - id: LYSS-ACC-020
+    level: 3
+    title: DHCP snooping is enabled on user VLANs
+    statement: >-
+      DHCP snooping is enabled globally and on every VLAN used by an access port, so that DHCP
+      server messages are only accepted from trusted (uplink) ports.
+    rationale: >-
+      A rogue DHCP server on a user port can hand out its own gateway and DNS server and intercept
+      traffic; DHCP snooping drops server messages from untrusted ports and builds the binding table
+      that ARP inspection and IP source guard rely on.
+    test_procedure: >-
+      Fail if DHCP snooping is not enabled globally, or if a VLAN used by an access port is not in
+      the snooping VLAN list. Pass if it is enabled and every such VLAN is covered (on platforms
+      where snooping applies to the whole bridge, the bridge setting covers every access port).
+      Not applicable without access ports.
+    evidence: [config]
+    mappings:
+      iso27001_2022: [A.8.20, A.8.22]
+      nist_800_53r5: [SC-7, SI-4]
+
+  - id: LYSS-ACC-021
+    level: 3
+    title: Dynamic ARP inspection is enabled on user VLANs
+    statement: >-
+      ARP packets received on access ports are checked against the DHCP snooping bindings (or static
+      ARP access lists) on every VLAN used by an access port.
+    rationale: >-
+      Without ARP inspection, any user device can claim the gateway's IP address (ARP spoofing) and
+      read or alter the traffic of every host in the VLAN.
+    test_procedure: >-
+      Fail if a VLAN used by an access port is not covered by dynamic ARP inspection, or if the
+      platform offers no ARP inspection (the report names the platform limit). Pass if every such
+      VLAN is covered. Not applicable without access ports.
+    evidence: [config]
+    mappings:
+      iso27001_2022: [A.8.20, A.8.22]
+      nist_800_53r5: [SC-7, SI-4]
+
+  - id: LYSS-ACC-022
+    level: 3
+    title: Access ports require 802.1X or MAC authentication
+    statement: >-
+      Every access port authenticates the connected device (IEEE 802.1X, or MAC authentication
+      bypass for devices without a supplicant) before granting network access.
+    rationale: >-
+      Without port authentication, anyone who can plug a cable into a wall socket is on the internal
+      network.
+    test_procedure: >-
+      Fail if port authentication is not enabled globally where the platform requires it, or if an
+      access port has no 802.1X / MAC authentication setting. Pass if every access port has one.
+      Not applicable without access ports.
+    evidence: [config]
+    mappings:
+      iso27001_2022: [A.8.20, A.5.15]
+      nist_800_53r5: [IA-3, AC-3]
+      cis_v8: ["13.9"]
+
+  - id: LYSS-ACC-023
+    level: 3
+    title: Storm control limits broadcast traffic on access ports
+    statement: Every access port limits the rate of broadcast traffic it accepts (storm control).
+    rationale: >-
+      A loop or a misbehaving device on one user port can flood broadcast traffic to every port of
+      the VLAN and take the network down; a rate limit contains it on the offending port.
+    test_procedure: >-
+      Fail if an access port has no broadcast rate limit. Pass if every access port has one.
+      Unknown when the platform sets it on the switch chip and the setting cannot be read. Not
+      applicable without access ports.
+    evidence: [config]
+    mappings:
+      iso27001_2022: [A.8.20, A.8.6]
+      nist_800_53r5: [SC-5]
+
+  - id: LYSS-ACC-024
+    level: 3
+    title: Neighbor discovery (CDP/LLDP) is not sent on untrusted access ports
+    statement: >-
+      Access ports do not transmit CDP or LLDP advertisements, except ports that serve IP phones
+      (a voice VLAN), which need LLDP-MED or CDP.
+    rationale: >-
+      CDP and LLDP advertisements tell anyone on a user port the switch name, model, software
+      version, management address and VLANs, which helps an attacker choose an exploit.
+    test_procedure: >-
+      Pass if neighbor discovery transmission is disabled globally, or on every access port without
+      a voice VLAN, for each protocol the platform sends by default or that is enabled. Fail
+      otherwise. Not applicable without access ports.
+    evidence: [config]
+    mappings:
+      iso27001_2022: [A.8.20, A.8.9]
+      nist_800_53r5: [CM-7]
+      cis_v8: ["4.8"]

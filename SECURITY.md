@@ -32,6 +32,12 @@ advisory unless they prefer otherwise.
 - `paramiko` is pinned below 4.0 because legacy switches only support SHA-1 key exchanges, which
   paramiko 4 removed. LYSS offers modern algorithms first; the legacy ones are only negotiated
   when the switch supports nothing better, and that weakness is reported (LYSS-MGMT-013).
+  This is also why the low-severity advisory CVE-2026-44405 / GHSA-r374-rxx8-8654 ("paramiko
+  allows SHA-1 in RSA signatures", CVSS 3.4) is accepted rather than fixed by paramiko 5: version 5
+  removes `ssh-rsa` signatures with no opt-in, and legacy switches offer only `ssh-rsa` host keys,
+  so LYSS could no longer audit them. Exploiting it would need a live SHA-1 signature forgery
+  during the handshake from the local network; LYSS also pins host keys and reports `ssh-rsa` as a
+  LYSS-MGMT-013 failure. Revisited when paramiko offers an explicit legacy opt-in.
 - SSH host keys of switches are trusted on first use (TOFU), then pinned: a changed key stops the
   connection before any credential is sent. Verify the first key out of band when it matters.
 - Single administrator account; no role separation yet.

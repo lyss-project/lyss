@@ -26,6 +26,18 @@
   <div class="form-actions span-2"><button class="btn btn-primary" type="submit">Save</button></div>
 </form>
 
+<form method="post" action="/settings/assessment" class="card form-grid" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="span-2">
+    <h2>Assessment</h2>
+    <p class="muted">Levels 1 and 2 are always assessed. Level 3 (Advanced) adds access-layer protections:
+      DHCP snooping, ARP inspection, 802.1X / MAC authentication, storm control and no CDP/LLDP towards users.</p>
+  </div>
+  <label class="span-2 check"><input type="checkbox" name="level3" value="1" {% if level3 %}checked{% endif %}>
+    Assess Level 3 controls (the switches are re-assessed from their last collected configuration)</label>
+  <div class="form-actions span-2"><button class="btn btn-primary" type="submit">Save</button></div>
+</form>
+
 <form method="post" action="/settings/schedule" class="card form-grid" autocomplete="off">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="span-2">

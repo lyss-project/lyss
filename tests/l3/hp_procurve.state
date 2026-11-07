@@ -1,0 +1,7 @@
+===== show interfaces brief =====
+  Port         Type      | Alert     Enabled Status Mode       Mode  Ctrl
+  ------------ --------- + --------- ------- ------ ---------- ----- -----
+  1            100/1000T | No        Yes     Up     1000FDx    MDIX  off
+  2            100/1000T | No        Yes     Up     1000FDx    MDIX  off
+  27-Trk1      SFP+SR    | No        Yes     Up     10GigFD    NA    off
+  28-Trk1      SFP+SR    | No        Yes     Up     10GigFD    NA    off

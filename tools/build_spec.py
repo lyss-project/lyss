@@ -17,7 +17,7 @@ OUT = ROOT / "docs" / "LYSS-Specification.md"
 LEVEL_PROSE = {
     1: "the minimum every managed switch must meet: no cleartext management, no default or recoverable credentials, supported firmware, automatic backups.",
     2: "a hardened management plane: central authentication, restricted and modern management access, remote logging and time, basic access-port hygiene.",
-    3: "access-layer protections against attacks from user ports (draft: no checks yet).",
+    3: "access-layer protections against attacks from user ports: DHCP snooping, ARP inspection, port authentication, storm control, no neighbor discovery towards users.",
 }
 
 

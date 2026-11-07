@@ -6,7 +6,7 @@ so switch-security audits can be run and tracked next to ISO/IEC 27001:2022.
 
 | File | Content |
 |---|---|
-| `lyss-<spec_version>.yaml` | Framework **LYSS — Lyaazale Switch Security**: one requirement per control, grouped by level (L1 Baseline, L2 Hardened, L3 Advanced) and domain. Statement in the description; rationale, test procedure, parameters and informative references (ISO 27001, NIST SP 800-53, CIS v8) in the annotation; expected evidence in *typical evidence*. Levels are also implementation groups (cumulative), so an audit can be limited to Level 1 or Level 2. Level 3 controls are drafts. |
+| `lyss-<spec_version>.yaml` | Framework **LYSS — Lyaazale Switch Security**: one requirement per control, grouped by level (L1 Baseline, L2 Hardened, L3 Advanced) and domain. Statement in the description; rationale, test procedure, parameters and informative references (ISO 27001, NIST SP 800-53, CIS v8) in the annotation; expected evidence in *typical evidence*. Levels are also implementation groups (cumulative), so an audit can be limited to Level 1 or Level 2, or include Level 3 (Advanced, access-layer protection). |
 | `mapping-lyss-and-iso27001-2022-<spec_version>.yaml` | Requirement mapping set LYSS → ISO/IEC 27001:2022 Annex A (each LYSS control is a `subset` of the ISO control it is mapped to). One direction only, on purpose: an ISO control judged compliant proves nothing about a given switch, so it must never mark LYSS controls compliant. |
 
 Both are generated from `spec/lyss-spec.yaml`; do not edit them by hand.
