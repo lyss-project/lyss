@@ -12,6 +12,9 @@ switches?**
 LYSS is an open, vendor-neutral security standard for network switches, and a free, read-only
 tool that checks your switches against it, shows the evidence and gives the fix.
 
+**Try it now, nothing to install:** paste a switch configuration at
+**[lyss.dev/audit.html](https://lyss.dev/audit.html)**. LYSS runs in your browser; nothing is uploaded.
+
 ![LYSS demo: one-click read-only scan, evidence and fix for every finding, topology, control matrix, low-risk fixes verified by a new scan](docs/media/lyss-demo.gif)
 
 <sub>Demo on a fictitious network. Cisco IOS · Cisco Business · HPE Aruba AOS-S · MikroTik RouterOS · SONiC · Website: [lyss.dev](https://lyss.dev) · Try it in your browser: [lyss.dev/audit.html](https://lyss.dev/audit.html)</sub>
