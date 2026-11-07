@@ -120,6 +120,9 @@ verified on a real switch: if you own a GS1900, a sanitized configuration export
 ## What the tool does
 
 - **Read-only collection** over SSH, in parallel, optionally through an SSH jump host.
+- **Works with old switches** that only speak SHA-1 SSH (Cisco SG300, older Catalyst images),
+  without weakening connections to modern ones: SHA-1 is allowed only for a switch that offers
+  nothing else, and the report says so (see [SECURITY.md](SECURITY.md)).
 - **Assessment** with evidence for every verdict (secrets redacted) and recommended fixes.
 - **Discovery** of unmanaged switches from LLDP/CDP neighbours and SSH range scans.
 - **Topology map** built from neighbour tables.
