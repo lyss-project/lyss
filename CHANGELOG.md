@@ -2,7 +2,22 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
-## 0.12.0 (2026-11-08)
+## 0.13.0 (2026-11-07)
+
+Production readiness. Specification unchanged (0.6.0-draft).
+
+- **LYSS health.** Every scan records when it ran and how many switches failed. If scheduled scans
+  stop (no scheduled scan within the longest gap of the schedule plus 2 hours), the dashboard shows
+  a warning, and `GET /health` (no login, no switch data) returns `stale` with HTTP 503 for an
+  uptime monitor. Optional heartbeat: after each scheduled scan, LYSS calls an external
+  dead-man's-switch URL (Settings → Health monitoring). The URL is stored but never shown again.
+- **Load test** `tools/load_test.py`: a full scan of N fictitious switches cloned from the demo lab.
+  Figures in [docs/SCALE.md](docs/SCALE.md): 1,008 switches collected and assessed, no failure,
+  about 110 ms of assessment per switch.
+- **Threat model** [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) and **versioning policy**
+  [docs/VERSIONING.md](docs/VERSIONING.md), including what has to be true for 1.0.
+
+## 0.12.0 (2026-11-07)
 
 Current paramiko, with legacy SSH only where a switch needs it. Specification unchanged
 (0.6.0-draft). Checked on simulated legacy and modern switches, on MikroTik CHR 7.25.1 and on
@@ -18,13 +33,13 @@ Arista cEOS-lab 4.37.0F (which now negotiates the post-quantum mlkem768x25519-sh
   advisory CVE-2026-44405, and SHA-1 is no longer offered on every connection as before.
 - The simulator's modern switches refuse the SHA-1 algorithms, like real modern switches.
 
-## 0.11.1 (2026-11-08)
+## 0.11.1 (2026-11-07)
 
 Same content as 0.11.0, which was never published to PyPI: the release check expected the demo
 to have exactly eight switches. It now compares the installed package with the repository (whole
 demo lab, every adapter).
 
-## 0.11.0 (2026-11-08, not published to PyPI)
+## 0.11.0 (2026-11-07, not published to PyPI)
 
 Arista EOS firmware data and a Level 3 switch in the demo. Specification unchanged (0.6.0-draft).
 
@@ -38,7 +53,7 @@ Arista EOS firmware data and a Level 3 switch in the demo. Specification unchang
 - Web interface and reports: Level 3 has its own colour in the topology map and the level
   badges, and the dashboard / report text says "Levels 1 to 3" when Level 3 is assessed.
 
-## 0.10.0 (2026-11-08)
+## 0.10.0 (2026-11-07)
 
 Level 3 (Advanced) and Zyxel GS1900. Specification 0.6.0-draft.
 - **Level 3 controls written and assessed** (they were drafts): LYSS-ACC-020 DHCP snooping on

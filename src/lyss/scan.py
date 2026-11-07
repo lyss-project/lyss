@@ -10,7 +10,7 @@ import uuid
 from dataclasses import asdict
 from datetime import datetime
 
-from . import collector, discovery, history, inventory, notify
+from . import collector, discovery, health, history, inventory, notify
 from .config import parse
 from .engine import audit, conformance, extract_facts, load_adapter, load_spec
 
@@ -103,6 +103,14 @@ def start(device_ids: list[str], trigger: str = "manual") -> str | None:
             _job["discovered"] = discovered
         # integrations (disabled unless configured in Settings); their errors never break a scan
         notices = notify.after_scan(current_job(), changes, discovered)
+        # LYSS's own health: last finished scan, and the external heartbeat after scheduled scans
+        try:
+            health.record(current_job())
+            ping = health.heartbeat(current_job())
+            if ping:
+                notices.append(ping)
+        except Exception as exc:
+            notices.append(f"Health record failed: {type(exc).__name__}")
         with _lock:
             _job["notices"] = notices
             _job["finished"] = time.time()

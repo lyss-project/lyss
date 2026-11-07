@@ -68,6 +68,11 @@
     <small class="muted">{% if schedule.enabled %}Scheduled {{ schedule.time }}{% else %}<a href="/settings">Schedule scans</a>{% endif %}</small></div>
 </div>
 
+{% if health and health.status == "stale" %}
+<div class="alert alert-warn">No scheduled scan has finished since {{ health.last_scheduled_scan | replace("T", " ") }}
+  ({{ health.hours_since_scheduled }} h ago; expected every {{ health.expected_every_hours }} h). Is {{ project }} running at the
+  scheduled time? <a href="/settings">Schedule and heartbeat</a></div>
+{% endif %}
 {% if discovered %}
 <div class="alert alert-info">{{ discovered }} switch{{ "es" if discovered > 1 }} discovered on the network but not in {{ project }} yet. <a href="/discovery">Review</a></div>
 {% endif %}

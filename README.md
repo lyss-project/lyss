@@ -165,6 +165,12 @@ python -m lyss collect --scheduled     # same, from cron / Task Scheduler (autom
 python -m lyss audit --vendor cisco_sb --level 2 path/to/configs/
 ```
 
+Before production use, read the [threat model](docs/THREAT-MODEL.md), the
+[scale figures](docs/SCALE.md) (1,008 simulated switches collected and assessed by one instance)
+and the [versioning policy](docs/VERSIONING.md) (draft specification until 1.0: pin a version).
+LYSS watches itself: `/health` reports when scheduled scans have stopped, and an optional
+heartbeat URL alerts an external monitor.
+
 ## Repository layout
 
 | Path | Content | Licence |

@@ -38,6 +38,22 @@
   <div class="form-actions span-2"><button class="btn btn-primary" type="submit">Save</button></div>
 </form>
 
+<form method="post" action="/settings/heartbeat" class="card form-grid" autocomplete="off">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="span-2">
+    <h2>Health monitoring</h2>
+    <p class="muted">After every scheduled scan, {{ project }} calls this URL (HTTP GET). Create a "dead man's switch"
+      check in an external monitor (Healthchecks.io, Uptime Kuma push monitor...): it alerts you when the calls stop,
+      even if this PC is off. Monitoring tools can also read <code>/health</code> (no login; HTTP 503 when scheduled
+      scans have stopped).</p>
+  </div>
+  <label class="span-2">Heartbeat URL
+    <input name="url" type="url" maxlength="500" placeholder="{% if heartbeat_set %}configured (hidden) - enter a new URL to replace it{% else %}https://hc-ping.com/your-check-id{% endif %}">
+  </label>
+  {% if heartbeat_set %}<label class="span-2 check"><input type="checkbox" name="remove" value="1"> Remove the heartbeat</label>{% endif %}
+  <div class="form-actions span-2"><button class="btn btn-primary" type="submit">Save</button></div>
+</form>
+
 <form method="post" action="/settings/schedule" class="card form-grid" autocomplete="off">
   <input type="hidden" name="csrf" value="{{ csrf }}">
   <div class="span-2">

@@ -15,6 +15,9 @@ advisory unless they prefer otherwise.
 
 ## Security design
 
+The full threat model (assets, trust boundaries, mitigations, what LYSS does not protect against)
+is in [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md).
+
 - Collection is read-only (`show` commands only) and runs over SSH.
 - The web interface listens on 127.0.0.1 by default. Remote listening requires `LYSS_ALLOW_REMOTE=1`
   and should only be used behind an HTTPS reverse proxy: the interface itself speaks plain HTTP.
@@ -49,3 +52,5 @@ advisory unless they prefer otherwise.
 - SSH host keys of switches are trusted on first use (TOFU), then pinned: a changed key stops the
   connection before any credential is sent. Verify the first key out of band when it matters.
 - Single administrator account; no role separation yet.
+- Single instance, no failover. Set a heartbeat URL (Settings → Health monitoring) or poll
+  `/health` so that an external monitor warns you when scheduled scans stop.

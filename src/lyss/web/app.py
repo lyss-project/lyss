@@ -23,7 +23,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .. import (PROJECT_LONG_NAME, PROJECT_NAME, __version__, changes, collector, discovery, events, firmware,
+from .. import (PROJECT_LONG_NAME, PROJECT_NAME, __version__, changes, collector, discovery, events, firmware, health,
                 history, inventory, notify, remediate, report, scan, sites, topology, vault)
 from ..engine import ADAPTER_DIR, load_spec
 
@@ -192,7 +192,19 @@ def dashboard(request: Request, site: str = ""):
                    trend=history.fleet_trend([r["device"]["id"] for r in rows]),
                    ciso_enabled=notify.ciso_settings().get("enabled"),
                    schedule=inventory.load_settings().get("schedule", {}),
-                   jump_ready=bool(inventory.load_settings().get("jump", {}).get("host")))
+                   jump_ready=bool(inventory.load_settings().get("jump", {}).get("host")),
+                   health=health.status())
+
+
+@app.get("/health")
+def health_endpoint():
+    """For monitoring tools, no login: LYSS's own state only (no switch name, address or result).
+    HTTP 503 when scheduled scans have stopped."""
+    s = health.status()
+    body = {k: s.get(k) for k in ("status", "last_scan", "last_scheduled_scan", "hours_since_scheduled",
+                                  "expected_every_hours", "errors")}
+    body["version"] = __version__
+    return JSONResponse(body, status_code=503 if s["status"] == "stale" else 200)
 
 
 @app.get("/topology", response_class=HTMLResponse)
@@ -446,6 +458,7 @@ def _settings_page(request: Request, session: dict, status: int = 200, **ctx):
     return _render(request, "settings.html", session, status=status, profiles=profiles, sites=site_list,
                    unsited=sum(1 for d in devices if not sites.of(d, all_sites)),
                    organization=settings.get("organization", ""), level3=bool(settings.get("level3")),
+                   heartbeat_set=bool((settings.get("heartbeat") or {}).get("url")),
                    schedule=settings.get("schedule", {"time": "02:30", "days": list(range(7))}),
                    smtp=_public(settings.get("smtp", {})), ciso=_public(settings.get("ciso", {})),
                    siem=settings.get("siem", {}), siem_default_file=str(inventory.PRIVATE / "lyss-events.jsonl"),
@@ -950,6 +963,27 @@ def save_organization(request: Request, csrf: str = Form(""), organization: str 
     settings["organization"] = organization.strip()[:120]
     inventory.save_settings(settings)
     return _settings_page(request, session, saved="Organization saved.")
+
+
+@app.post("/settings/heartbeat")
+def save_heartbeat(request: Request, csrf: str = Form(""), url: str = Form(""), remove: str = Form("")):
+    """External heartbeat URL (dead man's switch). Never echoed back: it carries the monitor's token."""
+    session = _session(request)
+    _check_csrf(session, csrf)
+    settings = inventory.load_settings()
+    url = url.strip()
+    if remove == "1":
+        settings.pop("heartbeat", None)
+        saved = "Heartbeat removed."
+    elif not url:
+        return _settings_page(request, session, saved="Heartbeat unchanged (no URL entered).")
+    elif not health.valid_url(url):
+        return _settings_page(request, session, status=400, errors=["The heartbeat URL must start with https:// or http://."])
+    else:
+        settings["heartbeat"] = {"url": url}
+        saved = "Heartbeat saved: it is called after every scheduled scan."
+    inventory.save_settings(settings)
+    return _settings_page(request, session, saved=saved)
 
 
 @app.post("/settings/assessment")
