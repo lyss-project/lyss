@@ -81,15 +81,20 @@ read-only account ([docs/ACCOUNTS.md](docs/ACCOUNTS.md)), and tell me what you f
 
 ## Platform support
 
-| Platform | Level 1 | Level 2 | Device state | Remediation | Firmware data |
-|---|---|---|---|---|---|
-| Cisco IOS / IOS-XE (Catalyst) | yes | yes | yes | yes | Catalyst 1000 |
-| Cisco Small Business / Business (SG200-550X, CBS) | yes | yes | yes | yes | SG200/300/500, 350, CBS250/350 |
-| HP ProCurve / HPE Aruba AOS-S | yes | yes | yes | basic | AOS-S 16.x |
-| MikroTik RouterOS 6.x / 7.x (CRS, RouterBOARD, CHR), preview | yes | yes | yes | no | RouterOS (CISA KEV + critical) |
-| SONiC (community builds), preview | yes | yes | yes | no | no |
-| Arista EOS (7000 series, cEOS / vEOS), preview | yes | yes | yes | no | no |
-| Zyxel GS1900, preview: **firmware only**, offline | no | no | no | no | GS1900 (CVE-2026-7273, CISA KEV) |
+| Platform | Level 1 | Level 2 | Level 3 | Device state | Remediation | Firmware data |
+|---|---|---|---|---|---|---|
+| Cisco IOS / IOS-XE (Catalyst) | yes | yes | yes | yes | yes | Catalyst 1000 |
+| Cisco Small Business / Business (SG200-550X, CBS) | yes | yes | yes | yes | yes | SG200/300/500, 350, CBS250/350 |
+| HP ProCurve / HPE Aruba AOS-S | yes | yes | yes | yes | basic | AOS-S 16.x |
+| MikroTik RouterOS 6.x / 7.x (CRS, RouterBOARD, CHR), preview | yes | yes | yes (RouterOS 7) | yes | no | RouterOS (CISA KEV + critical) |
+| SONiC (community builds), preview | yes | yes | not applicable | yes | no | no |
+| Arista EOS (7000 series, cEOS / vEOS), preview | yes | yes | yes | yes | no | EOS (critical advisories) |
+| Zyxel GS1900, preview: **firmware only**, offline | no | no | no | no | no | GS1900 (CVE-2026-7273, CISA KEV) |
+
+Level 3 (Advanced: DHCP snooping, ARP inspection, 802.1X / MAC authentication, storm control,
+no CDP/LLDP towards users) is opt-in: `lyss audit --level 3`, or Settings > Assessment in the web
+interface. It is not applicable on SONiC (data-centre fabric, no user ports) nor on any switch
+without access ports.
 
 Cisco IOS and Cisco Small Business are validated on real switches; HPE Aruba AOS-S on the
 simulator and synthetic outputs so far (reports from real AOS-S switches are welcome). MikroTik
@@ -100,9 +105,10 @@ validated on the SONiC-VS 202505 virtual switch: LYSS reads its config_db JSON a
 commands. Two SONiC controls stay "unknown" by design: the sudo account's password hash
 (in /etc/shadow, not readable by a read-only account) and firmware support (no published
 end-of-support data for community builds). Arista EOS is validated on cEOS-lab 4.37.0F
-(default, insecure and hardened configurations, LLDP topology between two switches); its
-firmware check stays "unknown" for now: the one EOS flaw in the CISA KEV catalogue
-(CVE-2026-7473, Security Advisory 0137) has no fixed release, only a mitigation ACL.
+(default, insecure and hardened configurations, LLDP topology between two switches). Its firmware
+check covers the critical EOS advisories with fixed releases (SA-0071, SA-0072); the one EOS flaw
+in the CISA KEV catalogue (CVE-2026-7473, Security Advisory 0137) has no fixed release, only a
+mitigation ACL, which the report explains.
 
 **Zyxel GS1900** (web-managed; Zyxel's CLI is a troubleshooting shell): LYSS checks the firmware
 against CVE-2026-7273, the web-interface flaw exploited on about 1,000 GS1900 switches since
