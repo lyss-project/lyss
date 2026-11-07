@@ -19,7 +19,7 @@ from pathlib import Path
 
 import paramiko
 
-from . import inventory
+from . import inventory, legacy_ssh  # legacy_ssh: SHA-1 algorithms for old switches, opt-in per connection
 
 # Read-only commands per adapter. Nothing here may change configuration.
 COMMANDS = {
@@ -197,7 +197,8 @@ class JumpHost:
                 client.set_missing_host_key_policy(_PinningPolicy())
                 client.connect(self.settings["host"], port=int(self.settings.get("port") or 22),
                                username=self.settings["user"], key_filename=self.settings["key_file"],
-                               timeout=15, allow_agent=False, look_for_keys=False)
+                               timeout=15, allow_agent=False, look_for_keys=False,
+                               disabled_algorithms=legacy_ssh.connect_options(False))  # never legacy
                 self._client = client
             transport = self._client.get_transport()
         if self.source:
@@ -221,14 +222,29 @@ class JumpHost:
             self._client.close()
 
 
+def _start_transport(device: dict, new_sock) -> tuple[paramiko.Transport, bool]:
+    """Key exchange with a switch: modern algorithms only, then (and only if the switch has no
+    algorithm in common) the legacy SHA-1 set of legacy_ssh. Returns (transport, legacy)."""
+    for legacy in (False, True):
+        transport = paramiko.Transport(new_sock() or (device["host"], device["port"]),
+                                       disabled_algorithms=legacy_ssh.connect_options(legacy))
+        try:
+            transport.start_client(timeout=20)
+            return transport, legacy
+        except paramiko.SSHException as exc:
+            transport.close()
+            if legacy or not legacy_ssh.is_incompatible(exc):
+                raise
+    raise AssertionError("unreachable")
+
+
 class NetmikoSession:
-    def __init__(self, device: dict, cmds: dict, sock, probe_sock=None):
+    def __init__(self, device: dict, cmds: dict, new_sock):
         from netmiko import ConnectHandler
         # netmiko authenticates inside ConnectHandler: the host key is checked first on a separate
         # key-exchange-only connection, then netmiko itself refuses any key but the pinned one
-        probe = paramiko.Transport(probe_sock or (device["host"], device["port"]))
+        probe, self.legacy = _start_transport(device, new_sock)
         try:
-            probe.start_client(timeout=20)
             verify_host_key(device["host"], device["port"], probe.get_remote_server_key())
             # host key algorithm negotiated WITHOUT a stored-key bias: paramiko's SSHClient (netmiko)
             # prefers the stored key type ("ssh-rsa"), which would hide rsa-sha2-256/512 support
@@ -251,8 +267,9 @@ class NetmikoSession:
             self.conn = ConnectHandler(
                 device_type=cmds["netmiko"], host=device["host"], port=device["port"],
                 username=username, password=password,
-                sock=sock, conn_timeout=20, auth_timeout=20, fast_cli=True,
+                sock=new_sock(), conn_timeout=20, auth_timeout=20, fast_cli=True,
                 ssh_strict=True, system_host_keys=False, alt_host_keys=True, alt_key_file=snapshot,
+                disabled_algorithms=legacy_ssh.connect_options(self.legacy),
             )
         finally:
             os.unlink(snapshot)
@@ -295,9 +312,8 @@ class ShellSession:
     PROMPT = re.compile(r"(?:^|\n)(?:[^\s#>]+[#>])+ ?$")
     ANSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 
-    def __init__(self, device: dict, cmds: dict, sock):
-        self.transport = paramiko.Transport(sock or (device["host"], device["port"]))
-        self.transport.start_client(timeout=20)
+    def __init__(self, device: dict, cmds: dict, new_sock):
+        self.transport, self.legacy = _start_transport(device, new_sock)
         # pinned host key checked before any credential is sent
         verify_host_key(device["host"], device["port"], self.transport.get_remote_server_key())
         username, password = inventory.device_credentials(device)
@@ -408,8 +424,8 @@ def open_session(device: dict, jump: JumpHost | None):
     def new_sock():
         return jump.channel(device["host"], device["port"]) if device.get("via_jump") and jump else None
     if cmds["netmiko"] == "cisco_s300":
-        return ShellSession(device, cmds, new_sock())
-    return NetmikoSession(device, cmds, new_sock(), probe_sock=new_sock())
+        return ShellSession(device, cmds, new_sock)
+    return NetmikoSession(device, cmds, new_sock)
 
 
 def collect_device(device: dict, jump: JumpHost | None) -> str:
@@ -430,6 +446,9 @@ def collect_device(device: dict, jump: JumpHost | None) -> str:
         hostkey = getattr(session, "probe_hostkey", None) or transport.host_key_type
         negotiated = (f"kex: {getattr(transport, 'lyss_kex', 'unknown')}\ncipher: {transport.remote_cipher}\n"
                       f"mac: {transport.remote_mac}\nhostkey: {hostkey}")
+        if getattr(session, "legacy", False):
+            # the switch had no modern key exchange / host key algorithm: SHA-1 had to be allowed
+            negotiated += "\nlegacy: required (no modern key exchange or host key algorithm offered)"
         config = session.run(cmds["config"], 90)
         sections = [f"===== ssh banner =====\n{banner}", f"===== ssh negotiated =====\n{negotiated}"]
         for command in cmds["state"]:

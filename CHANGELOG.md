@@ -2,6 +2,22 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.12.0 (2026-11-08)
+
+Current paramiko, with legacy SSH only where a switch needs it. Specification unchanged
+(0.6.0-draft). Checked on simulated legacy and modern switches, on MikroTik CHR 7.25.1 and on
+Arista cEOS-lab 4.37.0F (which now negotiates the post-quantum mlkem768x25519-sha256).
+
+- **paramiko 5** (was pinned below 4.0). paramiko 5 dropped the SHA-1 algorithms that old
+  switches still need, so the new `lyss.legacy_ssh` module adds back exactly three of them:
+  `diffie-hellman-group14-sha1`, `diffie-hellman-group-exchange-sha1` and `ssh-rsa` host keys.
+  Every connection first runs modern-only. Only a switch that has no algorithm in common gets a
+  second connection with them allowed, and the scan records it ("legacy: required" in the
+  negotiated algorithms, LYSS-MGMT-013). SHA-1 RSA signatures are accepted only when `ssh-rsa`
+  was negotiated, and the jump host is always modern-only. This closes the low-severity paramiko
+  advisory CVE-2026-44405, and SHA-1 is no longer offered on every connection as before.
+- The simulator's modern switches refuse the SHA-1 algorithms, like real modern switches.
+
 ## 0.11.1 (2026-11-08)
 
 Same content as 0.11.0, which was never published to PyPI: the release check expected the demo

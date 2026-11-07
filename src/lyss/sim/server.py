@@ -15,6 +15,7 @@ import paramiko
 logging.getLogger("lyss.sim.ssh").addHandler(logging.NullHandler())
 logging.getLogger("lyss.sim.ssh").propagate = False
 
+from .. import legacy_ssh
 from . import render
 from .config import submode
 from .lab import Lab, SimSwitch
@@ -335,15 +336,18 @@ class Simulator:
     def _key(self, sw: SimSwitch) -> paramiko.PKey:
         if sw.id in self._keys:
             return self._keys[sw.id]
-        # legacy switches only have an RSA host key (offered as "ssh-rsa"); modern ones ECDSA
-        kind = paramiko.RSAKey if sw.legacy_ssh else paramiko.ECDSAKey
+        # legacy switches only have an RSA host key, signed as "ssh-rsa" (SHA-1): LegacyRSAKey;
+        # modern ones ECDSA
+        kind = legacy_ssh.LegacyRSAKey if sw.legacy_ssh else paramiko.ECDSAKey
 
         def generate():
-            return paramiko.RSAKey.generate(2048) if kind is paramiko.RSAKey else paramiko.ECDSAKey.generate()
+            if kind is legacy_ssh.LegacyRSAKey:
+                return legacy_ssh.LegacyRSAKey.from_rsa_key(paramiko.RSAKey.generate(2048))
+            return paramiko.ECDSAKey.generate()
 
         key = None
         if self.keys_dir:
-            path = self.keys_dir / f"{sw.id}.{'rsa' if kind is paramiko.RSAKey else 'ecdsa'}.key"
+            path = self.keys_dir / f"{sw.id}.{'rsa' if kind is legacy_ssh.LegacyRSAKey else 'ecdsa'}.key"
             if path.exists():
                 key = kind(filename=str(path))
             else:
@@ -393,7 +397,8 @@ class Simulator:
             threading.Thread(target=self._serve, args=(sw, conn), daemon=True).start()
 
     def _serve(self, sw: SimSwitch, conn: socket.socket) -> None:
-        transport = paramiko.Transport(conn)
+        # a modern simulated switch refuses the legacy SHA-1 algorithms, as real modern switches do
+        transport = paramiko.Transport(conn, disabled_algorithms=legacy_ssh.connect_options(sw.legacy_ssh))
         # server-side noise (clients probing the host key and disconnecting) stays out of the console
         transport.set_log_channel("lyss.sim.ssh")
         self._transports.append(transport)
