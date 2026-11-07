@@ -2,7 +2,13 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
-## 0.11.0 (2026-11-08)
+## 0.11.1 (2026-11-08)
+
+Same content as 0.11.0, which was never published to PyPI: the release check expected the demo
+to have exactly eight switches. It now compares the installed package with the repository (whole
+demo lab, every adapter).
+
+## 0.11.0 (2026-11-08, not published to PyPI)
 
 Arista EOS firmware data and a Level 3 switch in the demo. Specification unchanged (0.6.0-draft).
 

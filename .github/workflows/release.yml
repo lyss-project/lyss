@@ -32,7 +32,20 @@ jobs:
           /tmp/lyss-venv/bin/pip install dist/*.whl
           cd /tmp
           /tmp/lyss-venv/bin/lyss audit --vendor mikrotik --level 2 "$GITHUB_WORKSPACE/tests/cases/mikrotik-weak/config.cfg"
-          /tmp/lyss-venv/bin/python -c "from lyss import engine; assert engine.INSTALLED; from lyss.sim import load_lab; assert len(load_lab('demo').switches) == 8"
+          # the installed package carries the whole demo lab and every adapter of the repository
+          /tmp/lyss-venv/bin/python - "$GITHUB_WORKSPACE" <<'EOF'
+          import sys
+          from pathlib import Path
+          import yaml
+          from lyss import engine
+          from lyss.sim import load_lab
+          repo = Path(sys.argv[1])
+          assert engine.INSTALLED
+          expected = yaml.safe_load((repo / "src/lyss/sim/labs/demo/lab.yaml").read_text(encoding="utf-8"))["switches"]
+          assert set(load_lab("demo").switches) == set(expected), "demo lab incomplete in the wheel"
+          assert {p.stem for p in engine.ADAPTER_DIR.glob("*.yaml")} == {p.stem for p in (repo / "adapters").glob("*.yaml")}
+          print("demo switches:", len(expected), "| adapters:", len(list(engine.ADAPTER_DIR.glob("*.yaml"))))
+          EOF
       - uses: actions/upload-artifact@v4
         with:
           name: dist
