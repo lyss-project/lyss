@@ -236,18 +236,28 @@ def save_settings(settings: dict) -> None:
         if base is None:
             data = dict(settings)   # a plain dict replaces the whole file (explicit full write)
         else:
-            data = dict(_read(SETTINGS_FILE, {"jump": {}, "admin": None}))
-            for key in set(base) | set(settings):
-                if key not in settings:
-                    data.pop(key, None)
-                elif base.get(key, _MISSING) != settings[key]:
-                    data[key] = settings[key]
+            data = _merge(dict(_read(SETTINGS_FILE, {"jump": {}, "admin": None})), base, dict(settings))
         _write(SETTINGS_FILE, data)
         if base is not None:
             settings._base = json.loads(json.dumps(dict(settings)))
 
 
 _MISSING = object()
+
+
+def _merge(current: dict, base: dict, mine: dict) -> dict:
+    """Apply onto current only what changed between base (as loaded) and mine (as saved), key by
+    key and also inside nested sections (e.g. remediation.firmware vs remediation.syslog)."""
+    out = dict(current)
+    for key in set(base) | set(mine):
+        if key not in mine:
+            if key in base:
+                out.pop(key, None)
+        elif isinstance(mine[key], dict) and isinstance(base.get(key), dict) and isinstance(current.get(key), dict):
+            out[key] = _merge(current[key], base[key], mine[key])
+        elif base.get(key, _MISSING) != mine[key]:
+            out[key] = mine[key]
+    return out
 
 
 def hash_password(password: str, salt: bytes | None = None) -> dict:

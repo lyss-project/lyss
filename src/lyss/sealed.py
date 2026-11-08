@@ -74,6 +74,7 @@ def data_files(data_dir: Path | None = None) -> list[Path]:
         files += sorted((root / vendor).glob("*.cfg")) + sorted((root / vendor).glob("*.state.txt"))
     files += sorted((root / "history").glob("*/configs/*.cfg"))
     files += sorted((root / "results").glob("*.json"))
+    files += [root / "reachability.json"]
     return [f for f in files if f.is_file()]
 
 

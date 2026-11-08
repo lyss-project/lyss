@@ -2,6 +2,57 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.15.0 (2026-11-08)
+
+- **Management reachability.** `lyss probe`, run on a PC of the network to test, opens and closes
+  TCP connections to the management ports of the switches. It sends nothing else. Its result is
+  imported in the new **Reachability** page or with `lyss reachability import`. Probes of the last
+  90 days are evidence:
+  - a management port answering from a network not allowed to manage fails LYSS-MGMT-010;
+  - Telnet answering fails LYSS-MGMT-001;
+  - plain HTTP answering fails LYSS-MGMT-003.
+
+  A probe never makes a control pass. See [docs/REACHABILITY.md](docs/REACHABILITY.md).
+- **Exploited-vulnerability backlog reviewed.** The 43 CISA KEV entries the first watch run
+  listed for Cisco IOS (and one for Zyxel) were checked against Cisco's and CISA's descriptions,
+  and each is now recorded as not applicable with its reason in `data/kev-watch.yaml`:
+  - 12 concern other products: IOS XE only, Catalyst 4500/6800, industrial switches, routers,
+    email appliances, Zyxel firewalls;
+  - one needs GET VPN to be enabled;
+  - the others were published in 2018 or earlier, before the first Catalyst 1000 software
+    (15.2(7)E1).
+
+  No firmware verdict changes.
+- **Second security review.** Fresh reviewers tried to bypass the 0.14.0 fixes; each finding has a
+  regression test.
+  - **Incomplete changes:** a switch whose last change may be incomplete stays blocked until a real
+    new scan. A re-assessment of the stored files no longer clears it, a long change log no longer
+    hides it, and refused attempts keep it.
+  - **Banners and macros:**
+    - a delimiter inside the banner text (`Press ^C to quit`) no longer ends the banner;
+    - IOS `macro name` bodies are not read as configuration.
+  - **Hand-made files (offline, CI)** are refused, not read with a guess, when they contain:
+    - a banner that never ends;
+    - indented block headers;
+    - device state with repeated sections;
+    - (under the gate) almost no configuration.
+  - **Speed:** section headers are parsed without a regular expression, so a crafted state line can
+    no longer stall an assessment.
+  - **Redaction** now also covers IOS passwords and keys containing spaces, `priv aes256` / `des56`,
+    `snmp-server host ... vrf X`, escaped quotes in RouterOS, HSRP/VRRP/GLBP keys, IKEv2
+    `pre-shared-key local|remote`, and `Password:` / `community:` forms in device output.
+  - **Retention "no time limit"** keeps every distinct version; two versions archived in the same
+    second no longer overwrite each other.
+  - **Settings:** saving merges nested sections too, so a concurrent save can no longer turn
+    firmware upgrades back on.
+  - **Smaller fixes:**
+    - Host headers need a numeric port;
+    - remediation refuses 0.0.0.0, loopback, broadcast and multicast servers;
+    - the NTP verification ignores banner text;
+    - the CI audit refuses a path that goes through a linked folder.
+- **Reachability** (reviewed too): see above; the import keeps only the open management ports of
+  inventory switches, caps future dates, and runs off the web server's main loop.
+
 ## 0.14.0 (2026-11-07)
 
 Switch configurations checked in CI, encryption at rest of configurations and results, NIS2

@@ -62,8 +62,13 @@ def validate_params(syslog: str, ntp: list[str], banner: str) -> list[str]:
     banner of plain characters."""
     errors = []
     for value, name in [(syslog, "Syslog server")] + [(n, "NTP server") for n in ntp]:
-        if value and inventory.strict_ip(value, version=4) is None:
+        if not value:
+            continue
+        ip = inventory.strict_ip(value, version=4)
+        if ip is None:
             errors.append(f"{name}: {value!r} is not an IPv4 address.")
+        elif (a := ipaddress.ip_address(ip)).is_unspecified or a.is_loopback or a.is_multicast or ip == "255.255.255.255":
+            errors.append(f"{name}: {value} is not the address of a server.")
     if banner and (not BANNER_TEXT.fullmatch(banner) or "#" in banner):
         errors.append("Banner: 3-200 characters, letters, digits and basic punctuation only (no #).")
     return errors
@@ -294,18 +299,27 @@ def _log_file():
 
 def log_change(entry: dict) -> None:
     entry.setdefault("ended", datetime.now().isoformat(timespec="seconds"))
+    # explicit flag: never derived again from a (possibly truncated) outcome text
+    entry.setdefault("unclean", any(u in entry.get("outcome", "") for u in UNCLEAN))
     path = _log_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def load_changes(limit: int = 100) -> list[dict]:
+def load_changes(limit: int | None = 100) -> list[dict]:
+    """Change log, newest first (limit None: all of it)."""
     path = _log_file()
     if not path.exists():
         return []
-    rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
-    return list(reversed(rows))[:limit]
+    rows = []
+    for l in path.read_text(encoding="utf-8").splitlines():
+        try:
+            rows.append(json.loads(l))
+        except ValueError:
+            continue   # a torn line never hides the others
+    rows.reverse()
+    return rows if limit is None else rows[:limit]
 
 
 # ---------------- apply ----------------
@@ -316,27 +330,29 @@ def _verified(fix: Fix, result: dict, state_text: str, config_text: str = "") ->
         lines = parse_state(state_text).get(fix.verify_section)
         return lines is not None and not any(re.search(fix.verify_state, l) for l in lines)
     if fix.verify_config:
-        lines = [l.strip() for l in config_text.splitlines()]
+        lines = parse(config_text).lines   # banner text never counts as the new configuration
         return all(any(re.search(p, l) for l in lines) for p in fix.verify_config)
     return any(f["control_id"] == fix.control_id and f["verdict"] == "pass" for f in result["findings"])
 
 
 UNCLEAN = ("ROLLBACK FAILED", "connection lost", "verification failed", "error:")
+# results that come from a NEW collection by a scan (a re-assessment of the stored files, or the
+# verification inside a change, proves nothing about the switch's current state)
+FRESH_TRIGGERS = ("manual", "schedule", "cli")
 
 
 def unclean_change(device_id: str) -> str:
     """The outcome of the last change on this device if it may have left the running
-    configuration half-changed and no scan has looked at the switch since; "" otherwise. Firmware
+    configuration half-changed and no scan has collected the switch since; "" otherwise. Firmware
     staging/activation and new fixes are refused meanwhile: they save the running configuration,
     which would make the leftovers permanent."""
-    last = next((c for c in load_changes(500) if c.get("device") == device_id), None)
-    if not last or not any(u in last.get("outcome", "") for u in UNCLEAN):
+    last = next((c for c in load_changes(None) if c.get("device") == device_id), None)
+    if not last or not last.get("unclean", any(u in last.get("outcome", "") for u in UNCLEAN)):
         return ""
     result = inventory.load_result(device_id) or {}
-    scanned = result.get("scanned_at", "")
-    if scanned > last.get("ended", last.get("ts", "")) and result.get("trigger") not in ("change", "pre-change"):
+    if result.get("scanned_at", "") > last.get("ended", last.get("ts", "")) and result.get("trigger") in FRESH_TRIGGERS:
         return ""
-    return last["outcome"]
+    return last.get("unclean_outcome") or last["outcome"]
 
 
 CONNECTION_ERRORS = (EOFError, ConnectionError, TimeoutError, OSError)
@@ -412,6 +428,8 @@ def apply_device(device: dict, control_ids: list[str], jump, step) -> dict:
     if previous:
         entry["outcome"] = ("refused: the last change on this switch may be incomplete (" + previous[:120]
                             + "). Check the switch, run a scan, then try again.")
+        entry["unclean"] = True                 # the switch is still in that state
+        entry["unclean_outcome"] = previous
         log_change(entry)
         return entry
     step("fresh collection and backup before the change", 5)

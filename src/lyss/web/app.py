@@ -13,6 +13,7 @@ Security model (local, single administrator):
 
 import hmac
 import ipaddress
+import json
 import os
 import re
 import secrets
@@ -24,9 +25,10 @@ from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from .. import (PROJECT_LONG_NAME, PROJECT_NAME, __version__, changes, collector, discovery, events, firmware, health,
-                history, inventory, notify, remediate, report, scan, sealed, sites, topology, vault)
+                history, inventory, notify, reachability, remediate, report, scan, sealed, sites, topology, vault)
 from ..engine import ADAPTER_DIR, load_spec
 
 HERE = Path(__file__).parent
@@ -65,10 +67,18 @@ def allowed_hosts() -> set[str]:
 
 
 def _host_name(host: str) -> str:
+    """The name of a Host header ("127.0.0.1:8765" -> "127.0.0.1"); "" if it is not name[:port]."""
     host = host.strip().lower()
     if host.startswith("["):
-        return host[:host.find("]") + 1] if "]" in host else host
-    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+        name, _, port = host.partition("]")           # port keeps its ":" ("[::1]:8765")
+        name += "]"
+    elif host.count(":") == 1:
+        name, port = host.split(":")[0], ":" + host.split(":")[1]
+    else:
+        name, port = host, ""
+    if port and not re.fullmatch(r":\d{1,5}", port):
+        return ""
+    return name
 
 SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
@@ -100,7 +110,8 @@ async def _security(request: Request, call_next):
         return PlainTextResponse("Unknown host name (set LYSS_ALLOWED_HOSTS to allow it)", status_code=421)
     if request.method == "POST":
         size = request.headers.get("content-length", "")
-        limit = firmware.MAX_IMAGE + MAX_BODY if request.url.path == "/firmware/upload" else MAX_BODY
+        limit = (firmware.MAX_IMAGE + MAX_BODY if request.url.path == "/firmware/upload"
+                 else 16 * MAX_BODY if request.url.path == "/reachability/import" else MAX_BODY)
         if size and (not size.isdigit() or int(size) > limit):
             return PlainTextResponse("Request too large", status_code=413)
         if request.url.path not in PUBLIC_POSTS and not _valid_session(request.cookies.get(SESSION_COOKIE, "")):
@@ -504,11 +515,12 @@ def revoke_backup(request: Request, device_id: str, csrf: str = Form("")):
 
 
 def _reaudit(device_id: str) -> None:
-    """Re-evaluate the last collection (no new connection) after the backup evidence changed."""
+    """Re-evaluate the last collection (no new connection) after the evidence changed. Its own
+    trigger: it is not a new look at the switch (remediate.unclean_change)."""
     device = inventory.get_device(device_id)
     cfg_path, _ = collector.config_paths(device)
     if cfg_path.exists():
-        scan.audit_device(device, "manual", archive=False)
+        scan.audit_device(device, "reaudit", archive=False)
 
 
 # ---------------- settings ----------------
@@ -1064,6 +1076,76 @@ def save_heartbeat(request: Request, csrf: str = Form(""), url: str = Form(""), 
         saved = "Heartbeat saved: it is called after every scheduled scan."
     inventory.save_settings(settings)
     return _settings_page(request, session, saved=saved)
+
+
+# ---------------- management reachability ----------------
+
+def _reaudit_all() -> int | None:
+    """Re-assess every collected switch (no connection). None while a scan, remediation or firmware
+    job runs: they write the same results; the next scan takes the change into account."""
+    job = scan.current_job()
+    if (job and not job.get("finished")) or remediate.running() or firmware.running():
+        return None
+    done = 0
+    for device in inventory.load_devices():
+        if collector.config_paths(device)[0].exists():
+            _reaudit(device["id"])
+            done += 1
+    return done
+
+
+def _reassessed(done: int | None) -> str:
+    return "the next scan takes it into account (a job is running)" if done is None else f"{done} switch(es) re-assessed"
+
+
+def _reachability_page(request: Request, session: dict, status: int = 200, **ctx):
+    try:
+        stored = reachability.load()
+    except Exception:
+        stored = []
+        ctx.setdefault("errors", ["The stored probe results cannot be read (another key or user?)."])
+    imports = [{**i, **reachability.summary(i)} for i in reversed(stored)]
+    return _render(request, "reachability.html", session, status=status, imports=imports,
+                   max_age=reachability.MAX_AGE_DAYS, ports=reachability.PORTS, **ctx)
+
+
+@app.get("/reachability", response_class=HTMLResponse)
+def reachability_page(request: Request):
+    return _reachability_page(request, _session(request))
+
+
+@app.post("/reachability/import")
+async def reachability_import(request: Request):
+    session = _session(request)
+    form = await request.form()
+    _check_csrf(session, str(form.get("csrf", "")))
+    upload = form.get("file")
+    if upload is None or not hasattr(upload, "read"):
+        return _reachability_page(request, session, status=400, errors=["Choose the file written by lyss probe."])
+    raw = await upload.read(16 * MAX_BODY + 1)
+    label, authorized = str(form.get("label", "")), str(form.get("authorized", "")) == "1"
+
+    def work():   # decryption, import and re-assessment run in a worker thread, not the event loop
+        if len(raw) > 16 * MAX_BODY:
+            raise ValueError("file too large")
+        entry = reachability.import_report(json.loads(raw.decode("utf-8-sig")), label, authorized)
+        return entry, _reaudit_all()
+    try:
+        entry, redone = await run_in_threadpool(work)
+    except (ValueError, UnicodeDecodeError, RecursionError) as exc:
+        return _reachability_page(request, session, status=400, errors=[f"Not imported: {str(exc)[:200]}"])
+    s = reachability.summary(entry)
+    return _reachability_page(request, session, saved=f"Imported: {s['open']} open management port(s) on "
+                                                       f"{s['open_switches']} switch(es); {_reassessed(redone)}.")
+
+
+@app.post("/reachability/{import_id}/delete")
+def reachability_delete(request: Request, import_id: str, csrf: str = Form("")):
+    session = _session(request)
+    _check_csrf(session, csrf)
+    if re.fullmatch(r"[0-9a-f]{8}", import_id) and reachability.delete(import_id):
+        _reaudit_all()
+    return RedirectResponse("/reachability", status_code=303)
 
 
 @app.post("/settings/data")

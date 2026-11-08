@@ -11,7 +11,60 @@ reviewed_until: 2026-11-07
 #   - cve: CVE-YYYY-NNNNN
 #     reason: what the vendor advisory says is affected
 #     checked: YYYY-MM-DD
-not_applicable: []
+#
+# For Cisco IOS, data/firmware.yaml covers the Catalyst 1000 only. Its documented software starts
+# with 15.2(7)E1: the release notes "Cisco IOS Release 15.2(7)Ex" were first published 2019-12-25
+# (cisco.com, catalyst1000 release notes). Advisories published in 2018 or earlier are fixed in
+# the 15.2E releases that came before it. In doubt, the Cisco Software Checker gives the answer
+# for an exact release.
+not_applicable:
+  # --- not Cisco IOS on a Catalyst 1000 (product named by CISA) ---
+  - {cve: CVE-2017-12232, reason: "ISR G2 routers only", checked: 2026-11-08}
+  - {cve: CVE-2017-12235, reason: "Industrial Ethernet switches (PROFINET) only", checked: 2026-11-08}
+  - {cve: CVE-2017-12238, reason: "Catalyst 6800 (VPLS) only", checked: 2026-11-08}
+  - {cve: CVE-2017-12319, reason: "IOS XE only (BGP over EVPN); the Catalyst 1000 runs IOS", checked: 2026-11-08}
+  - {cve: CVE-2018-0154, reason: "Integrated Services Module for VPN (routers) only", checked: 2026-11-08}
+  - {cve: CVE-2018-0155, reason: "Catalyst 4500 / 4500-X (BFD offload) only", checked: 2026-11-08}
+  - {cve: CVE-2018-0174, reason: "listed by CISA for IOS XE; published 2018, before the Catalyst 1000 software", checked: 2026-11-08}
+  - {cve: CVE-2023-20198, reason: "IOS XE web UI only; the Catalyst 1000 runs IOS", checked: 2026-11-08}
+  - {cve: CVE-2023-20273, reason: "IOS XE web UI only; the Catalyst 1000 runs IOS", checked: 2026-11-08}
+  - {cve: CVE-2025-20393, reason: "Cisco Secure Email / Web Manager appliances (AsyncOS), not IOS", checked: 2026-11-08}
+  - {cve: CVE-2023-20109, reason: "affects only devices with GET VPN (GDOI or G-IKEv2) enabled (cisco-sa-getvpn-rce-g8qR68sx); check with show running-config | include crypto gdoi|gkm group", checked: 2026-11-08}
+  - {cve: CVE-2020-29583, reason: "Zyxel firewalls (ATP, USG, VPN) and AP controllers (NXC2500/5500), not GS1900 switches", checked: 2026-11-08}
+  # --- published 2018 or earlier: fixed before the first Catalyst 1000 software (see above) ---
+  - {cve: CVE-2004-1464, reason: &before_c1000 "published 2018 or earlier, fixed before the first Catalyst 1000 software (15.2(7)E1, release notes 2019-12-25)", checked: 2026-11-08}
+  - {cve: CVE-2008-4128, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2016-6415, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-3881, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6627, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6663, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6736, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6737, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6738, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6739, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6740, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6742, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6743, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-6744, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-12231, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-12233, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-12234, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-12237, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2017-12240, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0151, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0156, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0158, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0159, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0161, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0167, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0172, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0173, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0175, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0179, reason: *before_c1000, checked: 2026-11-08}
+  - {cve: CVE-2018-0180, reason: *before_c1000, checked: 2026-11-08}
+  # Smart Install (cisco-sa-20180328-smi2, 2018-03-28): fixed releases auto-disable Smart Install
+  # when it is not used; still exploited against old, unpatched switches of other families
+  - {cve: CVE-2018-0171, reason: *before_c1000, checked: 2026-11-08}
 
 # Which KEV entries concern a platform LYSS knows. Regular expressions, case-insensitive, on the
 # KEV "vendorProject" and "product" fields; "exclude" removes products that are not switches.

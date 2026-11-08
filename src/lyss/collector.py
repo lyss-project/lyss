@@ -79,7 +79,7 @@ COMMANDS = {
 # a configuration command was rejected (Cisco IOS "% Invalid input", Cisco SB "% Unrecognized command")
 CLI_ERROR = re.compile(r"(?m)^\s*%|Invalid input|Unrecognized command|Incomplete command|Wrong number of parameters|bad parameter")
 # the only multi-line command LYSS sends: the Cisco SB login banner (delimiter line, text, delimiter)
-BANNER_BLOCK = re.compile(r"banner (?:login|motd) #\n[^\n#]{1,200}\n#")
+BANNER_BLOCK = re.compile(r"banner (?:login|motd) #\n[^\x00-\x1f\x7f#]{1,200}\n#")
 
 
 def check_commands(commands: list[str], banner_block: bool = False) -> None:

@@ -6,6 +6,8 @@
   python -m lyss collect [--only id ...]                     collect + audit inventory devices
   python -m lyss oxidized --url http://oxidized:8888         assess the configs backed up by Oxidized
   python -m lyss data status|seal|unseal|config <device>     encryption at rest, stored configurations
+  python -m lyss probe <ip> ... | --targets-file F             management reachability test from this PC
+  python -m lyss reachability import|list|targets            use probe results in the assessment
   python -m lyss import-legacy <inventory.csv> <cred-dir>    import devices + PowerShell cred files
   python -m lyss ui [--port 8765]                            start the local web interface
   python -m lyss sim [--lab demo] [--base-port 2201]         simulated switches over SSH (127.0.0.1)
@@ -67,6 +69,7 @@ def config_files(path: Path, pattern: str | None = None, recursive: bool = False
 
 
 MAX_CONFIG_BYTES = 20 * 1024 * 1024
+MIN_CONFIG_LINES = 5     # with --require-level: fewer configuration lines is not a switch configuration
 
 
 def _readable(path: Path) -> str:
@@ -87,8 +90,10 @@ def cmd_audit(args) -> int:
     if not args.path.exists():
         print(f"{args.path}: no such file or folder", file=sys.stderr)
         return 2
-    if args.path.is_symlink():   # in CI, a pull request could turn the audited folder into a link
-        print(f"{args.path}: symbolic link, not followed: give the real path", file=sys.stderr)
+    absolute = args.path.absolute()
+    if any(p.is_symlink() for p in (absolute, *absolute.parents)):
+        # in CI, a pull request could turn the audited folder (or a folder above it) into a link
+        print(f"{args.path}: goes through a symbolic link, not followed: give the real path", file=sys.stderr)
         return 2
     files = config_files(args.path, args.pattern, args.recursive)
     results, problems = [], []
@@ -114,7 +119,22 @@ def cmd_audit(args) -> int:
                 problems.append(f"{name}: platform not recognised")
                 status = 2
             continue
-        from .config import structure_problems
+        from .config import parse, state_problems, structure_problems
+        repeated = state_problems(state_text)
+        if repeated:
+            # a hand-made state file in which a section appears twice: text inside one command's
+            # output may imitate a header; refused rather than read with a guess
+            print(f"{name}: device state with repeated sections ({', '.join(repeated[:3])}): "
+                  "save each command once", file=sys.stderr)
+            problems.append(f"{name}: device state with repeated sections")
+            status = 2
+            continue
+        if args.require_level and len(parse(text, "", vendor).lines) < MIN_CONFIG_LINES:
+            # the CI gate never vouches for an (almost) empty file
+            print(f"{name}: too short to be a switch configuration", file=sys.stderr)
+            problems.append(f"{name}: too short to be a switch configuration")
+            status = 2
+            continue
         odd = structure_problems(text, vendor)
         if odd:
             # not a configuration printed by the device: a line outside its block could hide a failure
@@ -247,6 +267,84 @@ def cmd_data(args) -> int:
     except FileNotFoundError as exc:
         print(f"no such stored version: {exc}", file=sys.stderr)
         return 2
+    return 0
+
+
+def _read_list(path: Path) -> str:
+    """A text file written by any shell: UTF-8 with or without BOM, or UTF-16 (Windows PowerShell 5.1 ">")."""
+    raw = path.read_bytes()
+    if raw[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return raw.decode("utf-16")
+    return raw.decode("utf-8-sig")
+
+
+def cmd_probe(args) -> int:
+    """Management reachability probe, to run on a PC of the network to test (no LYSS data needed)."""
+    from . import reachability
+    targets = list(args.targets)
+    if args.targets_file:
+        try:
+            targets += [l.split("#")[0].strip() for l in _read_list(args.targets_file).splitlines()]
+        except (OSError, UnicodeDecodeError) as exc:
+            print(f"cannot read {args.targets_file}: {exc}", file=sys.stderr)
+            return 2
+    targets = [t for t in targets if t]
+    if not targets:
+        print("give switch addresses, or --targets-file (one address per line)", file=sys.stderr)
+        return 2
+    ports = [int(p) for p in args.ports.split(",")] if args.ports else None
+    try:
+        report = reachability.probe(targets, ports, args.timeout, args.workers)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    opened = [r for r in report["results"] if r["state"] == "open"]
+    for r in opened:
+        print(f"OPEN   {r['target']:<40} TCP {r['port']:<5} {r['service']}")
+    print(f"{len(report['results'])} test(s), {len(opened)} open, on {len({r['target'] for r in report['results']})} switch(es)")
+    args.out.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print(f"written {args.out}: import it in LYSS (Reachability page, or lyss reachability import)")
+    return 0
+
+
+def cmd_reachability(args) -> int:
+    from . import inventory, reachability
+    if args.action == "targets":
+        # the switch addresses only (no name, no credential): to copy to the PC that will probe;
+        # switches added by host name are left out (the probe takes addresses only)
+        hosts = [d["host"] for d in inventory.load_devices() if inventory.strict_ip(d.get("host", ""))]
+        if args.out:
+            args.out.write_text("\n".join(hosts) + "\n", encoding="utf-8")
+            print(f"written {args.out}: {len(hosts)} address(es)")
+        else:
+            print("\n".join(hosts))
+        return 0
+    if args.action == "delete":
+        if not args.file or not reachability.delete(str(args.file)):
+            print("give the id of an import (lyss reachability list)", file=sys.stderr)
+            return 2
+        print("deleted; the next scan takes it into account")
+        return 0
+    if args.action == "list":
+        for imp in reachability.load():
+            s = reachability.summary(imp)
+            print(f"{imp['id']}  {imp['date'][:16].replace('T', ' ')}  {imp['label']!r:30} "
+                  f"{'authorised' if imp['authorized'] else 'NOT authorised'}  {s['open']} open port(s) on "
+                  f"{s['open_switches']}/{s['targets']} switch(es)")
+        return 0
+    if not args.file:
+        print("give the file written by lyss probe", file=sys.stderr)
+        return 2
+    try:
+        if args.file.stat().st_size > 16 * 1024 * 1024:
+            raise ValueError("file too large")
+        entry = reachability.import_report(json.loads(_read_list(args.file)), args.label or "", args.authorized)
+    except (ValueError, OSError, UnicodeDecodeError, RecursionError) as exc:
+        print(f"not imported: {exc}", file=sys.stderr)
+        return 2
+    s = reachability.summary(entry)
+    print(f"imported {entry['id']}: {s['open']} open port(s) on {s['open_switches']} switch(es); "
+          "the next scan (or a re-assessment) takes it into account")
     return 0
 
 
@@ -394,6 +492,24 @@ def main(argv=None) -> int:
     dt.add_argument("--list", action="store_true", help="list the stored versions (config)")
     dt.add_argument("--yes", action="store_true", help="confirm unseal")
     dt.set_defaults(func=cmd_data)
+
+    pr = sub.add_parser("probe", help="test from this PC which switch management ports answer (TCP connect only)")
+    pr.add_argument("targets", nargs="*", help="switch IP addresses")
+    pr.add_argument("--targets-file", type=Path, help="file with one IP address per line (lyss reachability targets)")
+    pr.add_argument("--ports", help="comma-separated TCP ports (default: the management ports of every platform)")
+    pr.add_argument("--timeout", type=float, default=2.0, help="seconds per connection (default 2)")
+    pr.add_argument("--workers", type=int, default=32, help="parallel connections (default 32, max 64)")
+    pr.add_argument("--out", type=Path, default=Path("lyss-reachability.json"), help="result file")
+    pr.set_defaults(func=cmd_probe)
+
+    rc = sub.add_parser("reachability", help="probe results: import a file, list imports, or print the switch addresses")
+    rc.add_argument("action", choices=("import", "list", "targets", "delete"))
+    rc.add_argument("file", nargs="?", type=Path, help="file written by lyss probe (import), or an import id (delete)")
+    rc.add_argument("--out", type=Path, help="targets: write the addresses to this file (UTF-8)")
+    rc.add_argument("--label", help='where the probe ran, e.g. "User VLAN 20, 2nd floor"')
+    rc.add_argument("--authorized", action="store_true",
+                    help="that network is allowed to reach switch management (default: it is not)")
+    rc.set_defaults(func=cmd_reachability)
 
     i = sub.add_parser("import-legacy", help="import devices from CSV + PowerShell cred files")
     i.add_argument("csv", type=Path)

@@ -1,0 +1,70 @@
+{# SPDX-License-Identifier: AGPL-3.0-only
+   Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE. -#}
+{% extends "base.html" %}
+{% block title %}Reachability{% endblock %}
+{% block nav_reachability %}active{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Management reachability</h1>
+    <p class="muted">The configuration says who may manage a switch; a probe from a real network shows whether it is true.
+      Results of the last {{ max_age }} days are part of the assessment. A probe can only make a control fail, never pass.</p>
+  </div>
+</div>
+
+{% if errors %}<div class="alert alert-error"><ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul></div>{% endif %}
+{% if saved %}<div class="alert alert-ok">{{ saved }}</div>{% endif %}
+
+<div class="grid-main">
+  <section class="card table-card">
+    <div class="table-tools"><strong>Imported probes ({{ imports|length }})</strong></div>
+    {% if imports %}
+    <table class="table">
+      <thead><tr><th>Network</th><th>Tested</th><th>Management allowed</th><th>Open ports</th><th></th></tr></thead>
+      <tbody>
+        {% for i in imports %}
+        <tr>
+          <td><strong>{{ i.label }}</strong>{% if i.source_hostname %}<div class="sub mono">from {{ i.source_hostname }}</div>{% endif %}</td>
+          <td class="sub">{{ i.date.replace("T", " ")[:16] }}</td>
+          <td>{% if i.authorized %}<span class="tag">yes</span>{% else %}<span class="tag">no</span>{% endif %}</td>
+          <td>{{ i.open }} on {{ i.open_switches }} / {{ i.targets }} switch(es)
+            {% set opened = i.results|selectattr("state", "equalto", "open")|list %}
+            {% if opened %}<div class="sub mono">{% for r in opened[:8] %}{{ r.target }}:{{ r.port }} {{ r.service }}{% if not loop.last %} · {% endif %}{% endfor %}{% if opened|length > 8 %} …{% endif %}</div>{% endif %}
+          </td>
+          <td class="row-actions">
+            <form method="post" action="/reachability/{{ i.id }}/delete">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button class="btn btn-sm btn-ghost" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">
+      <h2>No probe yet</h2>
+      <p class="muted">Run a probe from a network that should not reach switch management (a user VLAN, the Wi-Fi), then import it here.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  <aside class="card side">
+    <h2>1. Probe from a PC of the network to test</h2>
+    <p class="muted small">On this machine, <code>python -m lyss reachability targets --out switches.txt</code> lists the switch
+      addresses (no name, no credential). On the PC to test, with LYSS 0.15 or later (<code>pip install --upgrade lyss</code>):</p>
+    <pre class="code">lyss probe --targets-file switches.txt</pre>
+    <p class="muted small">It opens and closes TCP connections to the management ports
+      ({% for p, s in ports.items() %}{{ p }} {{ s }}{% if not loop.last %}, {% endif %}{% endfor %}) and sends nothing else.
+      Only probe networks and switches you are responsible for.</p>
+    <h2>2. Import the result</h2>
+    <form method="post" action="/reachability/import" enctype="multipart/form-data" class="stack">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>File written by lyss probe <input type="file" name="file" accept=".json" required></label>
+      <label>Network where the probe ran <input name="label" maxlength="80" placeholder="User VLAN 20, 2nd floor" required></label>
+      <label class="check"><input type="checkbox" name="authorized" value="1"> This network is allowed to manage the switches (admin network)</label>
+      <button class="btn btn-primary" type="submit">Import</button>
+    </form>
+  </aside>
+</div>
+{% endblock %}

@@ -10,7 +10,7 @@ import uuid
 from dataclasses import asdict
 from datetime import datetime
 
-from . import collector, discovery, health, history, inventory, notify, sealed
+from . import collector, discovery, health, history, inventory, notify, reachability, sealed
 from .config import parse
 from .engine import audit, conformance, extract_facts, load_adapter, load_spec
 
@@ -33,7 +33,11 @@ def audit_device(device: dict, trigger: str = "manual", archive: bool = True) ->
     state = sealed.read_text(state_path, errors="replace") if state_path.exists() else ""
     if archive:
         history.archive_config(device["id"], config, trigger)
-    context = {"backup": history.backup_status(device["id"])}
+    try:
+        seen = reachability.for_device(device)
+    except Exception:   # an unreadable probe file never stops an assessment
+        seen = []
+    context = {"backup": history.backup_status(device["id"]), "reachability": seen}
     max_level = 3 if inventory.load_settings().get("level3") else MAX_LEVEL
     findings = audit(config, device["vendor"], max_level, state, context)
     facts = extract_facts(parse(config, state, device["vendor"]), load_adapter(device["vendor"]))

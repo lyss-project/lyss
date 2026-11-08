@@ -4,6 +4,7 @@
 older entries, escaped report. Synthetic catalog (CVE-2099-*: fictitious identifiers)."""
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -62,6 +63,15 @@ def test_new_older_reviewed_and_exit_code(tmp_path):
     assert "CVE\\-2099\\-0001" in summary.read_text(encoding="utf-8")
     path.write_text(json.dumps({"vulnerabilities": kev["vulnerabilities"][1:3]}), encoding="utf-8")
     assert kev_watch.main(["--kev", str(path)]) == 0                                # only older / irrelevant
+
+
+def test_every_not_applicable_entry_says_why_and_when():
+    import datetime
+    seen = set()
+    for n in WATCH["not_applicable"]:
+        assert re.fullmatch(r"CVE-\d{4}-\d{4,}", n["cve"]) and n["cve"] not in seen, n
+        assert len(n["reason"]) >= 15 and isinstance(n["checked"], datetime.date), n
+        seen.add(n["cve"])
 
 
 def test_report_escapes_catalog_text():

@@ -31,7 +31,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   ARP inspection, 802.1X / MAC authentication, storm control, no CDP/LLDP towards users
   (opt-in: `lyss audit --level 3`, or Settings > Assessment).
 
-> Status: **0.14, draft specification 0.6, preview.** The specification and the tool may still change
+> Status: **0.15, draft specification 0.6, preview.** The specification and the tool may still change
 > before 1.0. Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
@@ -171,6 +171,9 @@ python -m lyss collect                 # collect and assess every switch (read-o
 python -m lyss collect --scheduled     # same, from cron / Task Scheduler (automatic backup)
 python -m lyss audit --vendor cisco_sb --level 2 path/to/configs/
 ```
+
+Is management really unreachable from user networks? Run `lyss probe` on a user PC and import the
+result: see [docs/REACHABILITY.md](docs/REACHABILITY.md).
 
 Configurations in Git (Oxidized, or kept by hand)? The **GitHub Action** checks them at every push
 or pull request and fails the job on a weakening change: see [docs/CI.md](docs/CI.md).

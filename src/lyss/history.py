@@ -70,17 +70,26 @@ def archive_config(device_id: str, config: str, trigger: str) -> dict:
         changed = last is None or last["sha256"] != digest
         now = _now()
         name = f"{now:%Y%m%d-%H%M%S}.cfg" if changed else last["file"]
+        n = 2
+        while changed and (folder / name).exists():   # two versions in the same second: never overwritten
+            name = f"{now:%Y%m%d-%H%M%S}-{n}.cfg"
+            n += 1
         if changed or not (folder / name).exists():   # also rewrites a version file that went missing
             sealed.write_text(folder / name, config)
         entry = {"ts": now.isoformat(), "sha256": digest, "file": name, "changed": changed or last is None,
                  "trigger": trigger}
-        index = (old_index + [entry])[-KEEP_INDEX:]
+        entries = old_index + [entry]
+        recent = {id(e) for e in entries[-KEEP_INDEX:]}   # unchanged collections: the last KEEP_INDEX only
         cutoff = _cutoff(now)
         if cutoff:
-            recent_versions = {e["file"] for e in index if e["changed"]}
-            recent_versions = set(sorted(recent_versions)[-KEEP_VERSIONS:]) | {entry["file"]}
-            index = [e for e in index if e["ts"] >= cutoff or e is entry
-                     or (e["changed"] and e["file"] in recent_versions)]
+            # time limit: what is recent enough, plus the last KEEP_VERSIONS distinct versions
+            last_versions = {e["file"] for e in entries if e["changed"]}
+            last_versions = set(sorted(last_versions)[-KEEP_VERSIONS:]) | {entry["file"]}
+            index = [e for e in entries if e is entry or (e["changed"] and e["file"] in last_versions)
+                     or (e["ts"] >= cutoff and id(e) in recent)]
+        else:
+            # no time limit: every distinct version stays; only repeated unchanged collections go
+            index = [e for e in entries if e["changed"] or id(e) in recent]
         if not any(e["changed"] and e["file"] == entry["file"] for e in index):
             # the current version was archived long ago: keep its "changed" entry so it stays listed
             first = next((e for e in old_index if e["changed"] and e["file"] == entry["file"]), None)

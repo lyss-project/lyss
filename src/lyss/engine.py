@@ -61,25 +61,37 @@ def load_adapter(vendor: str) -> dict:
 # Every pattern is linear on long lines (configurations are untrusted input), and lines are
 # capped before matching.
 MAX_EVIDENCE_LINE = 2000
-# a value: a quoted string (spaces allowed) or one token
-_VALUE = r'("[^"\n]*"|[^\s"]+)'
-# type tokens before the value: "7", "level 15", "1 md5" (key id + algorithm), EOS "sha512" / "8a", "ascii 0"
-_TYPE = r"(?:\d{1,2}|level \d+|sha512|sha\d*|md5|8a|ascii|hex)"
+# a value: a quoted string (spaces and escaped quotes allowed) or one token
+_QUOTED = r'"(?:[^"\\\n]|\\.)*"'
+_VALUE = rf'({_QUOTED}|[^\s"]+)'
+# type tokens before the value: "7", "level 15", "1 md5" (key id + algorithm), EOS "sha512" / "8a",
+# "ascii 0", IKEv2 "local" / "remote"
+_TYPE = r"(?:\d{1,2}|level \d+|sha512|sha\d*|md5|8a|ascii|hex|local|remote)"
 SECRET_VALUE = re.compile(
-    r'(?i)\b(secret|password|key-string|key|sha1|sha256|plaintext|encrypted|passphrase|psk|pre-shared-key|wpa-psk)(:?)'
-    rf'((?:\s+{_TYPE}(?=\s)){{0,3}})\s+(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level|auth|priv)\b)'
+    r'(?i)\b(secret|password|key-string|key|sha1|sha256|plaintext|encrypted|passphrase|psk|pre-shared-key|wpa-psk)'
+    # "Password: x", "Password : x", "password:x" in device output
+    r'((?:[ \t]*:)?)'
+    rf'((?:\s+{_TYPE}(?=\s)){{0,3}})(?:\s+|(?<=:))(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level|auth|priv)\b)'
     rf'(?![^\s"]+\s+<masked>){_VALUE}')
+# IOS commands whose secret is the rest of the line (IOS accepts spaces in it):
+# "username bob privilege 15 password 0 correct horse battery", "radius-server key my shared key"
+EOL_SECRET = re.compile(
+    r"(?i)^([+\- ]?\s*(?:username\s+\S+\s.*?\b(?:password|secret)|enable\s+(?:password|secret)"
+    r"|(?:radius|tacacs)-server\s(?:.*\s)?key|key|server-private\s+\S+\s(?:.*\s)?key)"
+    r"(?:\s+(?:\d{1,2}|level\s+\d+|encrypted|sha512|sha256|md5|8a)){0,3}\s+)(?!<redacted>)(\S.*)$")
 # SNMPv3 users: "auth sha <pw> priv aes 128 <pw>" (Cisco), 'auth sha "<hash>" priv aes "<hash>"' (HP),
-# "auth-sha <pw>" / "priv-aes <pw>" variants
+# "auth-sha <pw>" / "priv-aes <pw>" / "priv aes256 <pw>" (Arista) variants
 SNMP_SECRET = re.compile(
-    rf'(?i)\b(auth[\s-]+(?:sha\d*|md5)|priv(?:[\s-]+(?:aes|des|3des)(?:\s+\d{{3}})?)?)\s+(?!<redacted>){_VALUE}')
+    rf'(?i)\b(auth[\s-]+(?:sha\d*|md5)|priv(?:[\s-]+(?:aes|des|3des)\d*(?:\s+\d{{3}})?)?)\s+(?!<redacted>){_VALUE}')
 # SNMPv3 user lines, also as diff lines ("+snmp-server user ...") and Cisco SB "encrypted snmp-server user"
 SNMP_USER_LINE = re.compile(r"(?i)^[+\- ]?\s*(?:encrypted\s+)?(?:snmp-server user|snmpv3 user)\b")
-# "snmp-server host 192.0.2.1 [informs|traps] [version 1|2c|3 <level>] <community>": no keyword before it
-SNMP_HOST = re.compile(r"(?i)^([+\- ]?\s*snmp-server host\s+\S+(?:\s+(?:informs|traps))?"
-                       r"(?:\s+version\s+(?:1|2c|3\s+\w+))?\s+)(?!<redacted>)(?!(?:public|private|informs|traps|version)\b)(\S+)")
-WEAK_COMMUNITY_OK = re.compile(r'(?i)\bcommunity\s+"?(public|private)"?(\s|$)')
-COMMUNITY_VALUE = re.compile(r'(?i)\b(community)\s+("?)[^\s"]+("?)')
+# "snmp-server host 192.0.2.1 [vrf X] [informs|traps] [version 1|2c|3 <level>] <community>"
+SNMP_HOST = re.compile(r"(?i)^([+\- ]?\s*snmp-server host\s+\S+(?:\s+vrf\s+\S+)?(?:\s+(?:informs|traps))?"
+                       r"(?:\s+version\s+(?:1|2c|3\s+\w+))?\s+)(?!<redacted>)(?!(?:public|private|informs|traps|version|vrf)\b)(\S+)")
+# first-hop redundancy keys: "standby 1 authentication [text] X", "vrrp 1 authentication text X"
+FHRP_SECRET = re.compile(r"(?i)\b((?:standby|vrrp|glbp)\s+\d+\s+authentication(?:\s+text)?\s+)(?!<redacted>|md5\b)(\S+)")
+WEAK_COMMUNITY_OK = re.compile(r'(?i)\bcommunity(?:\s+name)?(?:[ \t]*:[ \t]*|\s+)"?(public|private)"?(\s|$)')
+COMMUNITY_VALUE = re.compile(r'(?i)\b(community(?:\s+name)?)([ \t]*:[ \t]*|\s+)("?)(?!<redacted>)[^\s"]+("?)')
 
 
 # "name=value" fields: JSON configurations flattened by config.flatten_json (SONiC: "passkey=",
@@ -87,14 +99,14 @@ COMMUNITY_VALUE = re.compile(r'(?i)\b(community)\s+("?)[^\s"]+("?)')
 # ("secret=", "wpa2-pre-shared-key="). "key_encrypt=true" is a flag, not a secret.
 # a field name starts the line or follows a space, "/" or "|" (never inside a quoted base64 value
 # such as encrypted-key "QUJD==")
-FIELD = re.compile(r'(?i)(?<![^\s/|])([\w-]{1,64}=)("[^"\n]*"|\S*)')
+FIELD = re.compile(rf'(?i)(?<![^\s/|])([\w-]{{1,64}}=)({_QUOTED}|\S*)')
 SECRET_FIELD_NAME = re.compile(r"(?i)passkey|password|secret|key|psk|passphrase|token|pre-shared")
 # SNMP community names used as table keys ("SNMP_COMMUNITY|<name>")
 JSON_COMMUNITY = re.compile(r"(?i)(SNMP_COMMUNITY\|)(?!(?:public|private)(?:[\s/]|$))(?!<redacted>)[^\s/]+")
 # RouterOS SNMP communities ("/snmp community add name=..." and "print terse" with "security="):
 # the community name is the v1/v2c secret
 ROS_COMMUNITY_LINE = re.compile(r"(?i)/snmp community\b|\bsecurity=")
-ROS_COMMUNITY = re.compile(r'(?i)(\bname=)(?!"?(?:public|private)"?(?:\s|$))(?!<redacted>)("[^"\n]*"|\S+)')
+ROS_COMMUNITY = re.compile(rf'(?i)(\bname=)(?!"?(?:public|private)"?(?:\s|$))(?!<redacted>)({_QUOTED}|\S+)')
 
 
 def _field(m: re.Match) -> str:
@@ -120,10 +132,12 @@ def redact(line: str) -> str:
     if SNMP_USER_LINE.search(line):   # before the generic rule, which would take "encrypted" as a keyword
         line = SNMP_SECRET.sub(lambda m: f"{m.group(1)} " + ('"<redacted>"' if m.group(2).startswith('"') else "<redacted>"), line)
     line = SNMP_HOST.sub(r"\1<redacted>", line)
+    line = FHRP_SECRET.sub(r"\1<redacted>", line)
+    line = EOL_SECRET.sub(r"\1<redacted>", line)
     line = SECRET_VALUE.sub(_secret, line)
     if not WEAK_COMMUNITY_OK.search(line):
         # well-known defaults stay visible (they are the finding); real communities are secrets
-        line = COMMUNITY_VALUE.sub(r"\1 \2<redacted>\3", line)
+        line = COMMUNITY_VALUE.sub(r"\1\2\3<redacted>\4", line)
     return line
 
 
@@ -483,6 +497,24 @@ def backup_verdict(backup: dict | None, max_age_days: int) -> tuple[str | None, 
     return "fail", evidence or ["no configuration backup recorded"]
 
 
+def observed_failures(control_id: str, context: dict | None) -> list[str]:
+    """Evidence from reachability probes (context "reachability"): a management port that answers
+    from a network that must not reach it, Telnet or plain HTTP answering at all. A probe can only
+    make a control fail, never pass."""
+    seen = [o for o in (context or {}).get("reachability") or [] if o.get("state") == "open"]
+    if control_id == "LYSS-MGMT-010":
+        hits = [o for o in seen if not o.get("authorized")]
+    elif control_id == "LYSS-MGMT-001":
+        hits = [o for o in seen if o.get("port") == 23]
+    elif control_id == "LYSS-MGMT-003":
+        hits = [o for o in seen if o.get("port") in (80, 8080)]
+    else:
+        hits = []
+    return [f"probe: {o['service']} (TCP {o['port']}) answers from {o.get('source_ip') or 'the tested network'} "
+            f"({o['label']}{', not authorised for management' if not o.get('authorized') else ''}), "
+            f"tested {o['date'][:10]}" for o in hits]
+
+
 def evaluate_control(cfg: Config, control: dict, check: dict | None, facts: dict | None = None,
                      context: dict | None = None) -> Finding:
     def finding(verdict: str, evidence: list[str], from_default: bool = False) -> Finding:
@@ -508,10 +540,12 @@ def evaluate_control(cfg: Config, control: dict, check: dict | None, facts: dict
         if matched:
             return finding("not_applicable", evidence)
 
-    # every failing rule contributes evidence, so the report shows all the reasons at once
+    # every failing rule contributes evidence, so the report shows all the reasons at once;
+    # what a probe saw from a real network counts as well (reachability.py)
     failed = [ev for matched, ev in (evaluate_rule(cfg, r) for r in check.get("fail_if_any", [])) if matched]
-    if failed:
-        return finding("fail", [e for ev in failed for e in ev])
+    observed = observed_failures(control["id"], context)
+    if failed or observed:
+        return finding("fail", [e for ev in failed for e in ev] + observed)
 
     if check.get("backup") and (context or {}).get("backup") is not None:
         max_age = (control.get("parameters") or {}).get("max_age_days", 7)

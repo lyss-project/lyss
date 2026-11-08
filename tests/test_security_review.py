@@ -252,11 +252,12 @@ def test_forged_state_sections_inside_command_output_are_plain_text():
     assert honest["LYSS-VULN-001"] != "pass"
 
 
-def test_duplicated_sections_in_hand_made_state_are_dropped():
-    from lyss.config import parse_state
+def test_repeated_sections_in_hand_made_state_are_reported_never_replaced():
+    from lyss.config import parse_state, state_problems
     state = "===== show version =====\nVersion 15.2(7)E1\n===== show cdp =====\n" + FORGED
     sections = parse_state(state)
-    assert "show version" not in sections and "ssh banner" in sections
+    assert sections["show version"] == ["Version 15.2(7)E1"]                 # the first one is kept
+    assert state_problems(state) == ["show version"]                          # and the file is reported
 
 
 def test_ambiguous_text_is_not_assigned_a_platform():
@@ -399,7 +400,7 @@ def test_ci_gate_does_not_vouch_for_a_file_it_could_not_assess(tmp_path):
     from lyss.__main__ import main
     (tmp_path / "version.txt").write_text("Model Name : GS1900-24E\nFirmware Version : V2.90(AAHK.2) | 10/01/2026\n",
                                           encoding="utf-8")
-    assert main(["audit", "--require-level", "1", str(tmp_path)]) == 1     # firmware only: not vouched for
+    assert main(["audit", "--require-level", "1", str(tmp_path)]) in (1, 2)   # firmware only: never vouched for
     assert main(["audit", str(tmp_path)]) == 0                              # report-only still works
 
 
@@ -503,6 +504,142 @@ def test_discovered_switches_are_not_scanned_by_default():
     template = (Path(webapp.__file__).parent / "templates" / "discovery.html").read_text(encoding="utf-8")
     box = re.search(r'<input type="checkbox" name="scan_now"[^>]*>', template).group(0)
     assert "checked" not in box and "not verified" in template and "outside your sites" in template
+
+
+# ---------------- second review (bypasses of the first fixes) ----------------
+
+def test_reaudit_never_clears_an_incomplete_change(lab, monkeypatch):
+    from lyss.web import app as web
+    device, log = lab
+    monkeypatch.setattr(collector, "open_session", lambda d, j: FakeSession(log, reject="no logging host 192.0.2.60"))
+    passing_after(monkeypatch, {"LYSS-MGMT-001"})
+    remediate.apply_device(device, ["LYSS-MGMT-001", "LYSS-LOG-010"], None, lambda *a: None)
+    monkeypatch.undo()
+    import time
+    time.sleep(1.1)
+    web._reaudit("lab")                                                    # no connection to the switch
+    assert remediate.unclean_change("lab")
+    for _ in range(3):                                                     # refused attempts keep the state
+        assert remediate.apply_device(device, ["LYSS-MGMT-001"], None, lambda *a: None)["outcome"].startswith("refused")
+    for i in range(600):                                                   # many other changes in the log
+        remediate.log_change({"device": f"other-{i}", "outcome": "applied and saved"})
+    assert remediate.unclean_change("lab")
+
+
+@pytest.mark.parametrize("banner", [
+    "banner login ^C\nAuthorized only. Press ^C to disconnect.\nlogging host 192.0.2.60\nip ssh version 2\n^C",
+    "banner motd ^CPress ^C to quit\nlogging host 192.0.2.60\nip ssh version 2\n^C",
+])
+def test_a_delimiter_inside_the_banner_text_does_not_end_it(banner):
+    config = _ios_hardened([("logging host 192.0.2.60\n", ""), ("ip ssh version 2\n", ""),
+                            ("banner login ^CAuthorized access only. Activity is logged.^C", banner)])
+    v = _verdicts(config, "cisco_ios")
+    assert v["LYSS-LOG-010"] != "pass" and v["LYSS-MGMT-002"] != "pass"
+
+
+def test_unclosed_banner_and_indented_headers_are_refused_in_ci():
+    from conftest import load_case
+    from lyss.config import structure_problems
+    weak = load_case("ios-weak")["config"]
+    assert "a banner or macro that never ends" in structure_problems("banner motd ^C\n" + weak, "cisco_ios")
+    indented = weak.replace("\nline vty 0 4", "\n line vty 0 4")
+    assert any("line vty" in p for p in structure_problems(indented, "cisco_ios"))
+
+
+def test_macro_bodies_are_not_configuration():
+    from lyss.config import structure_problems
+    config = _ios_hardened([("logging host 192.0.2.60\n", "")],
+                           extra="macro name EDGE\nlogging host 192.0.2.60\nswitchport mode access\n@")
+    assert _verdicts(config, "cisco_ios")["LYSS-LOG-010"] != "pass"
+    assert structure_problems(config, "cisco_ios") == []                   # device output stays accepted
+
+
+def test_section_header_parsing_is_linear():
+    import time
+    from lyss.config import parse_state
+    start = time.monotonic()
+    parse_state(("=====" + " " * 4090 + "x\n") * 200)
+    assert time.monotonic() - start < 1.0
+
+
+@pytest.mark.parametrize("line, secret", [
+    ("username bob privilege 15 password 0 correct horse battery", "horse battery"),
+    ("radius-server key my shared radius key", "shared radius key"),
+    ("snmp-server user u G v3 auth sha AUTHX priv aes256 PRIVZ", "PRIVZ"),
+    ("snmp-server user u G v3 auth md5 AUTHX priv des56 PRIVY", "PRIVY"),
+    ("snmp-server host 192.0.2.1 vrf MGMT REALCOMM4", "REALCOMM4"),
+    ('/user add name=u password="x\\" LEAKME"', "LEAKME"),
+    ("standby 1 authentication HSRPTXT1", "HSRPTXT1"),
+    ("vrrp 1 authentication text VRRPTXT1", "VRRPTXT1"),
+    ("pre-shared-key local IKEPSK1", "IKEPSK1"),
+    ("Password : STATEPW1", "STATEPW1"),
+    ("password:STATEPW2", "STATEPW2"),
+    ("community: STATECOMM1", "STATECOMM1"),
+    ("Community name: STATECOMM2", "STATECOMM2"),
+])
+def test_more_secret_formats(line, secret):
+    from lyss.engine import redact
+    assert secret not in redact(line), redact(line)
+
+
+def test_ci_refuses_repeated_state_sections_and_empty_files(tmp_path, capsys):
+    from conftest import load_case
+    from lyss.__main__ import main
+    case = load_case("ios-weak")
+    (tmp_path / "sw.cfg").write_text(case["config"], encoding="utf-8")
+    (tmp_path / "sw.state.txt").write_text("===== show version =====\nx\n===== show version =====\ny\n", encoding="utf-8")
+    assert main(["audit", "--vendor", "cisco_ios", str(tmp_path)]) == 2
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    (empty / "s.json").write_text('{"PORT": {}}', encoding="utf-8")
+    assert main(["audit", "--require-level", "1", str(empty)]) != 0
+
+
+def test_retention_without_limit_keeps_every_version(data_dir, monkeypatch):
+    from datetime import datetime, timedelta
+    from lyss import history
+    device, _, _ = add_switch_plain()
+    clock = {"now": datetime(2026, 1, 1, 0, 0, 0)}
+    monkeypatch.setattr(history, "_now", lambda: clock["now"])
+    for i, text in enumerate(("hostname v1\n", "hostname v2\n", "hostname v3\n")):
+        clock["now"] += timedelta(minutes=1)
+        history.archive_config(device["id"], text, "schedule")
+    for _ in range(history.KEEP_INDEX + 5):
+        clock["now"] += timedelta(minutes=1)
+        history.archive_config(device["id"], "hostname v3\n", "schedule")
+    assert len(history.versions(device["id"])) == 3
+    clock["now"] += timedelta(minutes=1)
+    history.archive_config(device["id"], "hostname v4\n", "schedule")
+    history.archive_config(device["id"], "hostname v5\n", "schedule")          # same second
+    assert {history.read_version(device["id"], v["file"]) for v in history.versions(device["id"])} >= {"hostname v4\n", "hostname v5\n"}
+
+
+def test_nested_settings_changes_are_both_kept(data_dir):
+    inventory.save_settings({**inventory.load_settings(), "remediation": {"enabled": True, "firmware": True, "syslog": ""}})
+    a, b = inventory.load_settings(), inventory.load_settings()
+    a["remediation"]["firmware"] = False
+    inventory.save_settings(a)
+    b["remediation"]["syslog"] = "192.0.2.60"
+    inventory.save_settings(b)
+    assert inventory.load_settings()["remediation"] == {"enabled": True, "firmware": False, "syslog": "192.0.2.60"}
+
+
+def test_host_header_needs_a_numeric_port(client):
+    assert client.get("/health", headers={"host": "localhost:8765@evil.example"}).status_code == 421
+    assert client.get("/health", headers={"host": "[::1]evil.example"}).status_code == 421
+    assert client.get("/health", headers={"host": "127.0.0.1:8765"}).status_code in (200, 503)
+
+
+def test_remediation_servers_must_be_real_servers():
+    for bad in ("0.0.0.0", "127.0.0.1", "255.255.255.255", "224.0.0.1"):
+        assert remediate.validate_params(bad, [], "")
+
+
+def add_switch_plain():
+    inventory.save_device({"id": "lab-sw", "host": "192.0.2.10", "port": "22", "vendor": "cisco_ios",
+                           "username": "ro", "via_jump": False}, "x")
+    d = inventory.get_device("lab-sw")
+    return d, None, None
 
 
 # ---------------- offline audit / CI ----------------
