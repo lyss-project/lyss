@@ -2,7 +2,7 @@
 services:
   lyss:
     build: .
-    image: lyss:0.3.0
+    image: lyss:local              # built from this folder by "docker compose up --build"
     restart: unless-stopped
     ports:
       - "127.0.0.1:8765:8765"     # local only; use an HTTPS reverse proxy for remote access
