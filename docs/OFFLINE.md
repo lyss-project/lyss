@@ -26,7 +26,7 @@ Content-Security-Policy (`connect-src 'self'`) forbids it from contacting any ot
 
 | Platform | Command on the device | Notes |
 |---|---|---|
-| MikroTik RouterOS 7 | `/export file=router` then download `router.rsc` (Winbox/WebFig: Files) | secrets are left out by default; plain or `terse` export both work |
+| MikroTik RouterOS 7 | `/export verbose file=router` then download `router.rsc` (Winbox/WebFig: Files) | recommended: `verbose` writes every setting, defaults included; a plain or `terse` export works too; secrets are left out by default |
 | MikroTik RouterOS 6 | `/export hide-sensitive file=router` | without `hide-sensitive`, RouterOS 6 exports passwords and keys |
 | Cisco IOS / IOS-XE | `show running-config` (terminal capture, or `copy running-config tftp:`) | |
 | Cisco Small Business / Business | `show running-config` | |
@@ -42,10 +42,12 @@ keep it as carefully as the device itself.
 
 ## What a configuration alone can and cannot tell
 
-Most controls are settled by the configuration. For RouterOS this works especially well: an
+Most controls are settled by the configuration. For RouterOS this works especially well. A plain
 export lists every setting that differs from the factory defaults, so a missing
-`/ip service set telnet disabled=yes` means Telnet is still on. On a test router, 13 of the 20
-Level 1 + 2 controls are decided from the export alone.
+`/ip service set telnet disabled=yes` means Telnet is still on. A `verbose` export writes every
+value, defaults included, so nothing has to be inferred. Tested on CHR 7.25.1: identical verdicts
+on all 25 controls, Levels 1 to 3. (Thanks to the MikroTik forum for the suggestion.) On a test
+router, 13 of the 20 Level 1 + 2 controls are decided from the export alone.
 
 What only the running device knows stays **unknown**, never guessed: which ports are actually up
 or unused, services really listening, the SSH algorithms offered, NTP synchronization, per-user

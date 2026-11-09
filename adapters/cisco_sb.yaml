@@ -6,7 +6,7 @@
 # families and firmware versions, so config-only checks often end as "unknown";
 # device state (tools/Collect-State.ps1) resolves them.
 adapter: cisco_sb
-spec_version: "0.6.0-draft"
+spec_version: "0.6.1-draft"
 platform: Cisco Small Business / Business switches
 status: draft, validated on SG300 1.4.11.5, SRW2024P, SG350 2.5.0.83 (real devices, 2026-11)
 

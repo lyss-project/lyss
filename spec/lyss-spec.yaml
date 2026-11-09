@@ -2,7 +2,7 @@
 # This file is the normative source: docs/LYSS-Specification.md is generated from it
 # (python tools/build_spec.py). It says WHAT must be true; HOW to check it on each platform
 # lives in adapters/. Licensed CC BY 4.0 (see LICENSE-SPEC).
-spec_version: "0.6.0-draft"
+spec_version: "0.6.1-draft"
 status: draft
 levels:
   1: Baseline
@@ -131,7 +131,7 @@ controls:
     test_procedure: Fail if any local account credential is stored in cleartext or a reversible encoding.
     evidence: [config]
     mappings:
-      iso27001_2022: [A.5.17]
+      iso27001_2022: [A.5.17, A.8.5]
       nist_800_53r5: [IA-5(1)]
       cis_v8: ["3.11"]
       nis2_art21: [h, i]
@@ -271,7 +271,7 @@ controls:
       ("authorized", "authorised", "unauthorized" or "unauthorised"). Fail otherwise.
     evidence: [config]
     mappings:
-      iso27001_2022: [A.5.10]
+      iso27001_2022: [A.8.5]
       nist_800_53r5: [AC-8]
       cis_v8: []
       nis2_art21: []
@@ -454,7 +454,7 @@ controls:
       otherwise. Not applicable without access ports.
     evidence: [config]
     mappings:
-      iso27001_2022: [A.8.20, A.8.9]
+      iso27001_2022: [A.8.20]
       nist_800_53r5: [CM-7]
       cis_v8: ["4.8"]
       nis2_art21: [g]

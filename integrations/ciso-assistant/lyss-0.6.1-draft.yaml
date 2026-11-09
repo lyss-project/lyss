@@ -1,8 +1,8 @@
 urn: urn:lyss:risk:library:lyss
 locale: en
 ref_id: LYSS
-name: "LYSS \u2014 Lyaazale Switch Security (draft 0.6.0)"
-description: 'LYSS (Lyaazale Switch Security) specification 0.6.0-draft (draft): vendor-neutral
+name: "LYSS \u2014 Lyaazale Switch Security (draft 0.6.1)"
+description: 'LYSS (Lyaazale Switch Security) specification 0.6.1-draft (draft): vendor-neutral
   security controls for managed network switches, in three cumulative conformance
   levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is one control (LYSS-<DOMAIN>-<NNN>);
   its annotation gives the rationale, vendor-neutral test procedure and informative
@@ -11,16 +11,16 @@ description: 'LYSS (Lyaazale Switch Security) specification 0.6.0-draft (draft):
   change before LYSS 1.0. Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml
   by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss).'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
-version: 60000
-publication_date: 2026-11-07
+version: 60010
+publication_date: 2026-11-09
 provider: Mouad Lyaazale
 packager: LYSS project
 objects:
   framework:
     urn: urn:lyss:risk:framework:lyss
     ref_id: LYSS
-    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.6.0)"
-    description: 'LYSS (Lyaazale Switch Security) specification 0.6.0-draft (draft):
+    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.6.1)"
+    description: 'LYSS (Lyaazale Switch Security) specification 0.6.1-draft (draft):
       vendor-neutral security controls for managed network switches, in three cumulative
       conformance levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is
       one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, vendor-neutral
@@ -260,8 +260,8 @@ objects:
         or a reversible encoding.
 
 
-        Informative references: ISO/IEC 27001:2022 A.5.17; NIST SP 800-53 r5 IA-5(1);
-        CIS Controls v8 3.11.'
+        Informative references: ISO/IEC 27001:2022 A.5.17, A.8.5; NIST SP 800-53 r5
+        IA-5(1); CIS Controls v8 3.11.'
       typical_evidence: '- Running configuration of the switch
 
         - LYSS assessment report showing the verdict and evidence for LYSS-AUTH-003'
@@ -469,7 +469,7 @@ objects:
         or "unauthorised"). Fail otherwise.
 
 
-        Informative references: ISO/IEC 27001:2022 A.5.10; NIST SP 800-53 r5 AC-8.'
+        Informative references: ISO/IEC 27001:2022 A.8.5; NIST SP 800-53 r5 AC-8.'
       typical_evidence: '- Running configuration of the switch
 
         - LYSS assessment report showing the verdict and evidence for LYSS-MGMT-012'
@@ -835,8 +835,8 @@ objects:
         access ports.
 
 
-        Informative references: ISO/IEC 27001:2022 A.8.20, A.8.9; NIST SP 800-53 r5
-        CM-7; CIS Controls v8 4.8.'
+        Informative references: ISO/IEC 27001:2022 A.8.20; NIST SP 800-53 r5 CM-7;
+        CIS Controls v8 4.8.'
       typical_evidence: '- Running configuration of the switch
 
         - LYSS assessment report showing the verdict and evidence for LYSS-ACC-024'

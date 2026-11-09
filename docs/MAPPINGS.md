@@ -2,7 +2,7 @@
 
 # Crosswalk: frameworks to LYSS controls
 
-Specification 0.6.0-draft. For each requirement of a framework, the LYSS controls
+Specification 0.6.1-draft. For each requirement of a framework, the LYSS controls
 whose results can serve as **part** of the evidence for it.
 
 **Informative only.**
@@ -38,14 +38,13 @@ No direct reference: LYSS-MGMT-012.
 
 | Reference | LYSS controls |
 |---|---|
-| A.5.10 | LYSS-MGMT-012 (L2) |
 | A.5.15 | LYSS-ACC-022 (L3) |
 | A.5.16 | LYSS-AUTH-010 (L2) |
 | A.5.17 | LYSS-AUTH-001 (L1), LYSS-AUTH-002 (L1), LYSS-AUTH-003 (L1), LYSS-AUTH-004 (L1) |
-| A.8.5 | LYSS-MGMT-004 (L1), LYSS-AUTH-002 (L1), LYSS-AUTH-010 (L2) |
+| A.8.5 | LYSS-MGMT-004 (L1), LYSS-AUTH-002 (L1), LYSS-AUTH-003 (L1), LYSS-AUTH-010 (L2), LYSS-MGMT-012 (L2) |
 | A.8.6 | LYSS-ACC-023 (L3) |
 | A.8.8 | LYSS-VULN-001 (L1) |
-| A.8.9 | LYSS-BKP-001 (L1), LYSS-ACC-024 (L3) |
+| A.8.9 | LYSS-BKP-001 (L1) |
 | A.8.13 | LYSS-BKP-001 (L1) |
 | A.8.15 | LYSS-LOG-010 (L2) |
 | A.8.16 | LYSS-LOG-010 (L2) |

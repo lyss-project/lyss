@@ -21,7 +21,7 @@
 # Per control: fail_if_any -> fail; firmware -> data/firmware.yaml; pass_if_all / pass_if_any -> pass;
 # else `otherwise`. A state rule never matches when that state was not collected.
 adapter: cisco_ios
-spec_version: "0.6.0-draft"
+spec_version: "0.6.1-draft"
 platform: Cisco IOS / IOS-XE
 status: draft, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
 

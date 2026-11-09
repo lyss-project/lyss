@@ -2,6 +2,25 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.15.1 (2026-11-09)
+
+**Specification 0.6.1-draft:** three informative ISO/IEC 27001:2022 references corrected after the
+CISO Assistant maintainers' review. No requirement or verdict changes. These references matter
+because a failed LYSS control marks the mapped ISO control non-compliant in a mapped audit.
+- LYSS-MGMT-012 (login banner): A.5.10 → **A.8.5** Secure authentication. ISO/IEC 27002 includes
+  the pre-login notice in secure log-on procedures.
+- LYSS-AUTH-003 (local passwords not stored in cleartext): **A.8.5** added, next to A.5.17, like
+  LYSS-AUTH-002.
+- LYSS-ACC-024 (no CDP/LLDP towards users): A.8.9 Configuration management removed; A.8.20 kept.
+
+The CISO Assistant library is regenerated (version 60010, 43 mappings). VERSIONING.md now says
+explicitly that control IDs are never renamed or renumbered, as the specification's versioning
+rules already did.
+
+- **MikroTik offline audit:** `/export verbose` is now the recommended export. It writes every
+  value, defaults included, so nothing has to be inferred. LYSS already reads it, with identical
+  verdicts on all 25 controls (tested on CHR 7.25.1). Suggested on the MikroTik forum.
+
 ## 0.15.0 (2026-11-08)
 
 - **Management reachability.** `lyss probe`, run on a PC of the network to test, opens and closes

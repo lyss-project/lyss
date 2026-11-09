@@ -8,7 +8,7 @@
 #     3     name=telnet port=23 proto=tcp available-from= vrf=main max-sessions=20
 #     5  X  name=www-ssl port=443 ...                 (flag X = disabled, R = running, D = dynamic)
 adapter: mikrotik
-spec_version: "0.6.0-draft"
+spec_version: "0.6.1-draft"
 platform: MikroTik RouterOS
 status: preview, validated on CHR 7.25.1 (2026-11)
 

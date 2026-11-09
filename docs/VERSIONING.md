@@ -12,12 +12,14 @@ a support agreement or a schedule: LYSS is provided without warranty (see [LICEN
 - **The specification is a draft** (`0.x.y-draft`). Controls can still be added, reworded,
   re-levelled or removed, and a verdict can change between versions when a test procedure becomes
   stricter. Every change is listed in [CHANGELOG.md](../CHANGELOG.md), with the reason.
-- **Control IDs are never reused.** If a control is removed, its ID (`LYSS-MGMT-001`, …) stays
-  retired, so an old report never means something different.
+- **Control IDs are never reused, renamed or renumbered.** A new control gets a new ID. If a control
+  is removed, its ID (`LYSS-MGMT-001`, …) stays retired and the control is marked withdrawn, so an
+  old report never means something different, and tools that store answers per control (such as
+  CISO Assistant audits) keep them.
 - **Every result records the specification version** it was assessed against (`spec_version`
   in each switch result, in exported reports and in JSON output). A conformance level is only
-  meaningful together with that version: "Level 2 against 0.6.0-draft".
-- **Pin a version** for a stable baseline: `pip install "lyss==0.15.0"`. Upgrade on purpose,
+  meaningful together with that version: "Level 2 against 0.6.1-draft".
+- **Pin a version** for a stable baseline: `pip install "lyss==0.15.1"`. Upgrade on purpose,
   read the changelog, then rescan. The history keeps the previous results for comparison.
 
 ## Planned from 1.0

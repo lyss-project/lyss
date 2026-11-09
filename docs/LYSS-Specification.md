@@ -2,7 +2,7 @@
 
 # LYSS Specification: security controls for network switches
 
-**Version 0.6.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
+**Version 0.6.1-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
 
 ## 1. Scope
 
@@ -46,7 +46,7 @@ A device is **LYSS Level N conformant** when every control of levels 1 to N is `
 `not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.6.0-draft), assessed 2026-11-03 with LYSS 0.3.0.
+> core-sw-01 is LYSS Level 1 conformant (specification 0.6.1-draft), assessed 2026-11-03 with LYSS 0.3.0.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
 
@@ -151,7 +151,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** Configuration backups circulate (backup servers, tickets, e-mail); stored passwords must not be recoverable.
 - **Test procedure.** Fail if any local account credential is stored in cleartext or a reversible encoding.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.5.17 · NIST SP 800-53 r5 IA-5(1) · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h), 21(2)(i)
+- **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.5 · NIST SP 800-53 r5 IA-5(1) · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h), 21(2)(i)
 
 #### LYSS-AUTH-004
 
@@ -234,7 +234,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** The warning supports legal action against intruders and informs users that activity is monitored.
 - **Test procedure.** Pass if a banner displayed before authentication (login or message-of-the-day, not a post-login exec banner) is configured and its text states the authorized-use restriction ("authorized", "authorised", "unauthorized" or "unauthorised"). Fail otherwise.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.5.10 · NIST SP 800-53 r5 AC-8 · CIS Controls v8 — · NIS2 Art. —
+- **References (informative).** ISO/IEC 27001:2022 A.8.5 · NIST SP 800-53 r5 AC-8 · CIS Controls v8 — · NIS2 Art. —
 
 #### LYSS-MGMT-013
 
@@ -336,7 +336,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 - **Rationale.** CDP and LLDP advertisements tell anyone on a user port the switch name, model, software version, management address and VLANs, which helps an attacker choose an exploit.
 - **Test procedure.** Pass if neighbor discovery transmission is disabled globally, or on every access port without a voice VLAN, for each protocol the platform sends by default or that is enabled. Fail otherwise. Not applicable without access ports.
 - **Evidence.** config
-- **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.9 · NIST SP 800-53 r5 CM-7 · CIS Controls v8 4.8 · NIS2 Art. 21(2)(g)
+- **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 CM-7 · CIS Controls v8 4.8 · NIS2 Art. 21(2)(g)
 
 ## 6. Requirements for adapters
 
