@@ -135,8 +135,10 @@ verified on a real switch: if you own a GS1900, a sanitized configuration export
   ([integrations/wazuh](integrations/wazuh/README.md)).
 - **Oxidized**: assess the configurations Oxidized already backs up, without SSH
   ([integrations/oxidized](integrations/oxidized/README.md)).
-- **CISO Assistant library**: the LYSS framework and its ISO 27001:2022 mapping, ready to import
-  ([integrations/ciso-assistant](integrations/ciso-assistant/README.md)).
+- **CISO Assistant library**: the LYSS framework and its ISO 27001:2022 mapping are
+  [part of CISO Assistant](https://github.com/intuitem/ciso-assistant-community/pull/5246) (merged
+  2026-11-09, in its built-in library store from the release after v4.2.2), and ready to import into
+  older versions ([integrations/ciso-assistant](integrations/ciso-assistant/README.md)).
 - **Reports**: standalone HTML (printable to PDF) and JSON, with ISO 27001 / NIST / CIS mappings.
 - **Framework crosswalk** ([docs/MAPPINGS.md](docs/MAPPINGS.md)): which LYSS controls support
   each point of NIS2 Article 21(2), each ISO/IEC 27001:2022 Annex A control, NIST SP 800-53 and

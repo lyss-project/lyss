@@ -11,6 +11,12 @@ so switch-security audits can be run and tracked next to ISO/IEC 27001:2022.
 
 Both are generated from `spec/lyss-spec.yaml`; do not edit them by hand.
 
+**Included in CISO Assistant:** the LYSS framework and its ISO/IEC 27001:2022 mapping (library
+version 1, specification 0.7.0-draft) were merged into CISO Assistant on 2026-11-09
+([intuitem/ciso-assistant-community#5246](https://github.com/intuitem/ciso-assistant-community/pull/5246)).
+From the CISO Assistant release that follows v4.2.2, load them from the built-in libraries store
+(search "LYSS"); the manual import below is only needed for older versions or newer LYSS drafts.
+
 ## Import into CISO Assistant (v4.x)
 
 1. **Governance > Libraries** (sidebar of v4.1; the upstream docs say *Catalog > Libraries*), click

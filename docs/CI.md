@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4            # in production, pin actions to a full commit SHA
         with:
           persist-credentials: false         # the audit needs no token
-      - uses: lyss-project/lyss@v0.16.0     # same here: the commit SHA of that tag
+      - uses: lyss-project/lyss@v0.16.1     # same here: the commit SHA of that tag
         with:
           path: configs
           level: "2"
@@ -72,7 +72,7 @@ give its platform with `vendor`.
 ## Any other CI (GitLab, Jenkins, ...)
 
 ```sh
-pip install "lyss==0.16.0"
+pip install "lyss==0.16.1"
 lyss audit --recursive --level 2 --require-level 2 --summary lyss-summary.md --json-file lyss.json configs/
 ```
 

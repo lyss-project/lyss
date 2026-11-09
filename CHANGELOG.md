@@ -2,8 +2,12 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
-## Unreleased
+## 0.16.1 (2026-11-09)
 
+- **LYSS is part of CISO Assistant.** The framework and its ISO/IEC 27001:2022 mapping were merged
+  into CISO Assistant on 2026-11-09
+  ([#5246](https://github.com/intuitem/ciso-assistant-community/pull/5246)), and LYSS is listed among
+  its community frameworks. From the release after v4.2.2, load it from the built-in library store.
 - **CISO Assistant library version is now a plain counter** starting at 1 (`LIBRARY_VERSIONS` in
   tools/build_ciso_library.py), as the CISO Assistant maintainers asked, instead of a number
   derived from `spec_version` (70000). Version 1 = specification 0.7.0-draft.
