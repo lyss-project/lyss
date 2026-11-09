@@ -231,10 +231,11 @@ def build_mapping_library(spec: dict, date) -> dict:
     description = (
         f"Mapping between LYSS (Lyaazale Switch Security) specification {version} and ISO/IEC "
         "27001:2022 Annex A, from the informative references of the specification. Each LYSS control "
-        "is a specific, testable part (subset) of the ISO control it maps to: a compliant LYSS "
-        "requirement gives at most partial coverage of the ISO control, a non-compliant one makes it "
-        "non-compliant. One direction only: an ISO control judged compliant proves nothing about a "
-        "given switch. " + (DRAFT_NOTE if spec_is_draft(spec) else "")
+        "is a specific, testable part (subset) of the ISO control it maps to. Compliant LYSS "
+        "requirements give at most partial coverage of the ISO control. Non-compliant ones make it "
+        "non-compliant when no other mapped LYSS requirement is compliant; if some are compliant and "
+        "some are not, the ISO control is partially compliant. One direction only: an ISO control "
+        "judged compliant proves nothing about a given switch. " + (DRAFT_NOTE if spec_is_draft(spec) else "")
         + "Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss)."
     )
     name = f"{display_name(spec).replace(NAME, 'LYSS')} -> ISO/IEC 27001:2022"

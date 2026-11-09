@@ -8,7 +8,7 @@
 # Device state: SONiC "show" commands, plus "ss -tlnH" (listening TCP ports; read-only, no sudo).
 # Local account password hashes live in /etc/shadow, which a read-only account cannot read.
 adapter: sonic
-spec_version: "0.6.1-draft"
+spec_version: "0.7.0-draft"
 platform: SONiC (community)
 status: preview, validated on SONiC-VS 202505 (virtual switch, 2026-11)
 
@@ -187,10 +187,12 @@ checks:
   LYSS-LOG-011:
     fail_if_any:
       - {state: '(?i)^Leap status\s*:\s*Not synchroni[sz]ed', section: show ntp}
-    pass_if_any:
+      - {line: '^NTP_SERVER\|', absent: true, say: 'no NTP server configured'}
+    pass_if_all:
       - {line: '^NTP_SERVER\|'}
-    otherwise: fail
-    note: Synchronization is read from "show ntp" (chrony); without device state, a configured server passes.
+      - {state: '(?i)^Leap status\s*:\s*Not synchroni[sz]ed', section: show ntp, absent: true}
+    otherwise: unknown
+    note: Synchronization is read from "show ntp" (chrony); without device state the verdict is unknown.
     remediation: |
       sudo config ntp add <ntp-ip>
 

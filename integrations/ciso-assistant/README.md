@@ -33,9 +33,11 @@ version: bump `spec_version` before re-importing.
 Tested on a clean CISO Assistant 4.1.1 with the fictitious LYSS demo lab: a LYSS audit (Level 2)
 answered from LYSS results, then an ISO/IEC 27001:2022 audit created with the LYSS audit as baseline.
 
-- CISO Assistant treats `subset` (and `intersect`) the same way: a **non-compliant** LYSS requirement
-  makes the mapped ISO control **non-compliant**; a compliant one makes it at most **partially
-  compliant**; when several LYSS requirements map to one ISO control, the most restrictive wins.
+- CISO Assistant treats `subset` (and `intersect`) the same way: a compliant LYSS requirement makes
+  the mapped ISO control at most **partially compliant**; non-compliant ones make it
+  **non-compliant** when none of the LYSS requirements mapped to it is compliant. In 4.1.1 the most
+  restrictive result won when several LYSS requirements map to one ISO control; the current mapping
+  engine (November 2026) gives **partially compliant** when some are compliant and some are not.
   This comes from CISO Assistant's mapping engine, not from the library.
 - Evidence attached to LYSS requirements is carried over to the ISO controls, and every ISO result
   links to the LYSS requirements it was inferred from. Observations are not copied.

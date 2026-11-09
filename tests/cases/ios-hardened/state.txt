@@ -23,6 +23,9 @@ Prot               Local Address             Foreign Address                  Se
 Port      Name               Status       Vlan       Duplex  Speed Type
 Gi1/0/1   desk               connected    10         a-full a-1000 10/100/1000BaseTX
 Gi1/0/2                      disabled     1            auto   auto 10/100/1000BaseTX
+===== show ntp status =====
+Clock is synchronized, stratum 3, reference is 192.0.2.123
+nominal freq is 286.1023 Hz, actual freq is 286.1023 Hz, precision is 2**21
 ===== show lldp neighbors =====
 Capability codes:
     (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device

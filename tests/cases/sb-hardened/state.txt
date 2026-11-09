@@ -42,6 +42,8 @@ gi1      1G-Copper    Full    1000   Enabled     Off     Up        Disabled Auto
 gi2      1G-Copper    Full    1000   Enabled     Off     Up        Disabled Auto
 gi3      1G-Copper    Full    1000   Enabled     Off     Up        Disabled Auto
 gi4      1G-Copper    Full    1000   Enabled     Off     Down      Disabled Auto
+===== show sntp status =====
+Clock is synchronized, stratum 2, reference is 192.0.2.123, unicast
 ===== show lldp neighbors =====
 System capability legend:
 B - Bridge; R - Router; W - Wlan Access Point; T - telephone;

@@ -124,8 +124,19 @@ def test_log_010_fails_when_logging_is_disabled_globally(case, edit):
     ("sb-hardened", SNTP_STATE, "Clock is synchronized, stratum 2, reference is 192.0.2.123, unicast", "pass"),
 ])
 def test_log_011_checks_clock_synchronization_when_state_is_collected(case, section, text, expected):
-    state = load_case(case)["state"] + section.format(text)
+    # the hardened cases already hold a synchronized status: replace that section
+    header = section.split("\n", 1)[0]
+    base = re.sub(rf"(?ms)^{re.escape(header)}\n.*?(?=^===== |\Z)", "", load_case(case)["state"])
+    state = base + section.format(text)
     assert verdict(case, "LYSS-LOG-011", state=state) == expected
+
+
+@pytest.mark.parametrize("case, section", [("ios-hardened", "===== show ntp status ====="),
+                                           ("sb-hardened", "===== show sntp status =====")])
+def test_log_011_is_unknown_without_device_state(case, section):
+    """A configured server alone does not show that the clock is synchronized (CISO Assistant review)."""
+    base = re.sub(rf"(?ms)^{re.escape(section)}\n.*?(?=^===== |\Z)", "", load_case(case)["state"])
+    assert verdict(case, "LYSS-LOG-011", state=base) == "unknown"
 
 
 def test_acc_011_neighbour_discovery_never_exempts_a_port():

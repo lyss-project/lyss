@@ -11,7 +11,7 @@
 #   username lyss-audit privilege 15 role network-operator secret <password>
 #   aaa authorization commands all default local      ! roles are enforced only with this
 adapter: arista_eos
-spec_version: "0.6.1-draft"
+spec_version: "0.7.0-draft"
 platform: Arista EOS
 status: preview, validated on cEOS-lab 4.37.0F (container, 2026-11)
 
@@ -151,10 +151,12 @@ checks:
   LYSS-AUTH-010:
     fail_if_any:
       - {line: '^aaa authentication login default (?!group\b)\S'}
+      # local accounts are the only accepted fallback (not "none")
+      - {line: '^aaa authentication login default(?: \S+)*? (?<!group )none\b'}
     pass_if_all:
       - {line: '^aaa authentication login default group \S+'}
     otherwise: fail
-    note: Without "aaa authentication login default group ...", EOS authenticates with local accounts only.
+    note: Without "aaa authentication login default group ...", EOS authenticates with local accounts only; "local" must be the only fallback. Console lists are not assessed.
     remediation: |
       tacacs-server host <tacacs-ip> key <key>
       aaa group server tacacs+ TACACS
@@ -242,10 +244,12 @@ checks:
   LYSS-LOG-011:
     fail_if_any:
       - {state: '(?i)\bunsynchroni[sz]ed\b', section: show ntp status}
-    pass_if_any:
+      - {line: '^ntp server (vrf \S+ )?\S+', absent: true, say: 'no NTP server configured'}
+    pass_if_all:
       - {line: '^ntp server (vrf \S+ )?\S+'}
-    otherwise: fail
-    note: Synchronization is checked with "show ntp status"; without device state, a configured server passes.
+      - {state: '(?i)\bunsynchroni[sz]ed\b', section: show ntp status, absent: true}
+    otherwise: unknown
+    note: Synchronization is checked with "show ntp status"; without device state the verdict is unknown.
     remediation: |
       ntp server <ntp-ip>
 
@@ -263,7 +267,9 @@ checks:
   LYSS-ACC-011:
     pass_if_any:
       - {line: '^spanning-tree edge-port bpduguard default'}
-      - {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b', every_contains: '^spanning-tree bpduguard enable'}
+      # a Port-Channel that is not a trunk (e.g. to a server) is an edge port, checked on the
+      # Port-Channel itself; its members ("channel-group") are not checked one by one
+      - {block: '^interface (Ethernet|Port-Channel)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b', every_contains: '^spanning-tree bpduguard enable'}
     otherwise: fail
     remediation: |
       spanning-tree edge-port bpduguard default
@@ -301,6 +307,8 @@ checks:
   LYSS-ACC-021:
     not_applicable_if_any: *eos_no_access
     fail_if_any:
+      # a trusted access port skips ARP inspection
+      - {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|shutdown)\b', line: '^ip arp inspection trust\b'}
       - uncovered: &eos_dai
           what: access VLANs without ARP inspection
           used: *eos_access_vlans
@@ -334,6 +342,8 @@ checks:
   LYSS-ACC-023:
     not_applicable_if_any: *eos_no_access
     fail_if_any:
+      # a 100 % threshold limits nothing
+      - {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|shutdown)\b', line: '^storm-control broadcast level 100(?:\.0+)?(?:\s|$)'}
       - uncovered: &eos_storm
           what: access ports without broadcast storm control
           used: *eos_access_ports

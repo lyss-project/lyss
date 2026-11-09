@@ -2,6 +2,38 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## Unreleased
+
+**Specification 0.7.0-draft: stricter test procedures**, after the automated reviews (CodeRabbit,
+Qodo) of the CISO Assistant pull request. Control IDs are unchanged. Some verdicts can change from
+pass to fail or unknown, so rescan after upgrading.
+
+- **LYSS-AUTH-010:** local accounts are the only accepted fallback after the AAA server. A
+  list such as `group radius none` (no authentication when the server does not answer) now
+  fails, as do `line`/`enable` fallbacks (Cisco IOS, Cisco Business, Arista; `none`/`authorized`
+  on HPE). Console logins are explicitly out of scope: the console is the recovery path.
+- **LYSS-LOG-010:** Cisco IOS `no logging trap` (forwarding to syslog hosts turned off) fails.
+- **LYSS-LOG-011:** a configured time server without device state is now **unknown**, not pass.
+  This matches the offline guide. On HPE AOS-S, synchronization is not collected yet, so the
+  control stays unknown there.
+- **LYSS-BKP-001:** the gap between the last two automatic backups must not exceed the
+  parameter (7 days). A monthly schedule no longer passes in the days after a run.
+- **LYSS-ACC-011:** a link aggregation that is not a trunk (e.g. towards a server) is an edge
+  port, checked on its port-channel interface (Cisco IOS, Arista). Not yet checked on Cisco
+  Business, HPE and RouterOS (stated in the adapters).
+- **LYSS-ACC-020 / 021:** an access port trusted for DHCP snooping or ARP inspection fails
+  (Cisco IOS, Cisco Business, Arista ARP, RouterOS `trusted=yes` / `trusted-arp=yes`).
+- **LYSS-ACC-022:** Cisco IOS `authentication open` (traffic before authentication) fails.
+- **LYSS-ACC-023:** a 100 % broadcast threshold limits nothing and fails (Cisco IOS, Cisco
+  Business, Arista; RouterOS `storm-rate=100` no longer counts).
+- **Wording only:** LYSS-AUTH-002 names salted hashes and unsalted SHA-256 (Cisco type 4);
+  LYSS-AUTH-004 explains why a reversible encoding still passes Level 1.
+- **CISO Assistant mapping description:** with mixed results, CISO Assistant's current mapping
+  engine gives *partially compliant* (one compliant and one non-compliant LYSS requirement on the
+  same ISO control). The description and integrations/ciso-assistant/README.md now say so. Library
+  version 70000.
+- The demo simulator answers `show ntp status` (Cisco IOS) and `show sntp status` (Cisco Business).
+
 ## 0.15.1 (2026-11-09)
 
 **Specification 0.6.1-draft:** three informative ISO/IEC 27001:2022 references corrected after the

@@ -6,7 +6,7 @@
 # "spanning-tree 1-24 bpdu-protection"): edge-port rules use uplink_lists / require_lists.
 # Credentials only appear in the config when "include-credentials" is enabled.
 adapter: hp_procurve
-spec_version: "0.6.1-draft"
+spec_version: "0.7.0-draft"
 platform: HP ProCurve / HPE Aruba AOS-S
 status: draft, validated on synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
 
@@ -130,11 +130,14 @@ checks:
   # ---------------- Level 2 ----------------
 
   LYSS-AUTH-010:
+    fail_if_any:
+      # the secondary method must be "local": "none" or "authorized" let anyone in when the server does not answer
+      - {line: '^aaa authentication ssh login (radius|tacacs)\b.*\b(none|authorized)\b'}
     pass_if_all:
       - {line: '^aaa authentication ssh login (radius|tacacs)\b'}
       - {line: '^(radius|tacacs)-server host '}
     otherwise: fail
-    note: SSH logins must try RADIUS/TACACS+ first, with the local account as fallback only.
+    note: SSH logins must try RADIUS/TACACS+ first, with the local account as the only fallback. Console logins are not assessed.
     remediation: |
       radius-server host <nps-ip> key <key>
       aaa authentication ssh login radius local
@@ -211,11 +214,10 @@ checks:
       logging severity info
 
   LYSS-LOG-011:
-    pass_if_any:
-      - {line: '^sntp server (priority \d+ )?\S+'}
-      - {line: '^ntp server \S+'}
-    otherwise: fail
-    note: Synchronization itself is not collected on AOS-S yet; a configured time server passes.
+    fail_if_any:
+      - {line: '^(sntp server (priority \d+ )?\S+|ntp server \S+)', absent: true, say: 'no SNTP/NTP server configured'}
+    otherwise: unknown
+    note: Synchronization itself is not collected on AOS-S yet, so a configured time server gives unknown.
     remediation: |
       timesync sntp
       sntp unicast
@@ -253,6 +255,8 @@ checks:
   # ---------------- Level 3 ----------------
   # Syntax from the AOS-S 16.x guides; simulator and synthetic outputs only so far. User VLANs =
   # VLANs with untagged access ports (as for LYSS-MGMT-011); edge ports as for LYSS-ACC-011.
+  # Not yet checked on AOS-S (port lists): access ports listed in "dhcp-snooping trust" /
+  # "arp-protect trust", 100 % broadcast limits, and trunk groups towards servers (LYSS-ACC-011).
 
   LYSS-ACC-020:
     not_applicable_if_any: &hp_no_access

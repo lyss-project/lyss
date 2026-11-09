@@ -164,6 +164,8 @@ def backup_status(device_id: str) -> dict:
     return {
         "last": index[-1]["ts"] if index else None,
         "last_automatic": automatic[-1]["ts"] if automatic else None,
+        # the one before: the gap between them shows how often backups really run
+        "previous_automatic": automatic[-2]["ts"] if len(automatic) > 1 else None,
         "versions": sum(1 for e in index if e["changed"]),
         "attestation": att,
     }

@@ -8,7 +8,7 @@
 #     3     name=telnet port=23 proto=tcp available-from= vrf=main max-sessions=20
 #     5  X  name=www-ssl port=443 ...                 (flag X = disabled, R = running, D = dynamic)
 adapter: mikrotik
-spec_version: "0.6.1-draft"
+spec_version: "0.7.0-draft"
 platform: MikroTik RouterOS
 status: preview, validated on CHR 7.25.1 (2026-11)
 
@@ -273,10 +273,8 @@ checks:
       - {line: '^/system ntp client set .*\benabled=yes', absent: true, say: 'NTP client not enabled in the configuration (off by factory default)'}
     pass_if_any:
       - {state: '^\s*status: synchronized\b', section: /system ntp client print}
-      - all:   # configuration only: a server is configured (synchronization needs device state)
-          - {line: '^/system ntp client set .*\benabled=yes'}
-          - {line: '^/system ntp client (?:servers add .*\baddress=|set .*\bservers=)\S'}
     otherwise: unknown
+    note: Synchronization is read from "/system ntp client print"; from the configuration alone the verdict is unknown.
     remediation: |
       /system ntp client set enabled=yes servers=<ntp-ip>
 
@@ -306,10 +304,14 @@ checks:
   # "/interface dot1x server add interface=etherN", "/ip neighbor discovery-settings set
   # discover-interface-list=none". Access ports = bridge ports admitting untagged frames only or
   # marked edge (as for LYSS-ACC-011). Snooping and ARP inspection are bridge-wide settings.
+  # Not yet checked: bonding interfaces towards servers (LYSS-ACC-011).
 
   LYSS-ACC-020:
     not_applicable_if_any: &ros_no_access
       - {not: {captured: &ros_access_ports {line: '^/interface bridge port (?:add|set) (?=.*(?:\bframe-types=admit-only-untagged|\bedge=yes\b))(?=.*\binterface=(\S+))'}}, say: 'no access bridge port (frame-types=admit-only-untagged... or edge=yes)'}
+    fail_if_any:
+      # a trusted access port accepts DHCP server messages
+      - {line: '^/interface bridge port (?:add|set) (?=.*(?:\bframe-types=admit-only-untagged|\bedge=yes\b))(?=.*\btrusted=yes\b)', say: 'an access bridge port is trusted for DHCP (trusted=yes)'}
     pass_if_any:
       - {line: '^/interface bridge (?:add|set) .*\bdhcp-snooping=yes\b'}
     otherwise: fail
@@ -321,6 +323,9 @@ checks:
 
   LYSS-ACC-021:
     not_applicable_if_any: *ros_no_access
+    fail_if_any:
+      # a trusted access port skips ARP inspection
+      - {line: '^/interface bridge port (?:add|set) (?=.*(?:\bframe-types=admit-only-untagged|\bedge=yes\b))(?=.*\btrusted-arp=yes\b)', say: 'an access bridge port is trusted for ARP inspection (trusted-arp=yes)'}
     pass_if_any:
       - all:
           - {line: '^/interface bridge (?:add|set) .*\barp-inspection=yes\b'}
@@ -354,7 +359,8 @@ checks:
       - uncovered: &ros_storm
           what: access ports without storm control
           used: *ros_access_ports
-          covered: {line: '^/interface ethernet switch port set (?:\[ find name=)?"?([\w.-]+)"?\]? .*\bstorm-rate=\d'}
+          # storm-rate=100 (percent) limits nothing
+          covered: {line: '^/interface ethernet switch port set (?:\[ find name=)?"?([\w.-]+)"?\]? .*\bstorm-rate=(?!100\b)\d'}
         absent: true
     otherwise: unknown
     note: Storm control is a switch-chip setting (CRS3xx "/interface ethernet switch port set <port> storm-rate=<percent>"); routers and CHR have none.

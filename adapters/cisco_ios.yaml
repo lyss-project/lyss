@@ -21,7 +21,7 @@
 # Per control: fail_if_any -> fail; firmware -> data/firmware.yaml; pass_if_all / pass_if_any -> pass;
 # else `otherwise`. A state rule never matches when that state was not collected.
 adapter: cisco_ios
-spec_version: "0.6.1-draft"
+spec_version: "0.7.0-draft"
 platform: Cisco IOS / IOS-XE
 status: draft, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
 
@@ -158,6 +158,12 @@ checks:
       - captures_in_both:
           - {block: '^line vty', line: '^login authentication (\S+)'}
           - {line: '^aaa authentication login (\S+) (?!group\b)\S'}
+      # local accounts are the only accepted fallback: not "none" (no authentication at all when
+      # the server does not answer), nor a line or enable password
+      - {line: '^aaa authentication login default(?: \S+)*? (?<!group )(?:none|line|enable)\b'}
+      - captures_in_both:
+          - {block: '^line vty', line: '^login authentication (\S+)'}
+          - {line: '^aaa authentication login (\S+)(?: \S+)*? (?<!group )(?:none|line|enable)\b'}
     pass_if_all:
       - {line: '^aaa new-model'}
       # the list the vty lines really use: the default one, or a named list on every vty line
@@ -166,7 +172,7 @@ checks:
           - {line: '^aaa authentication login default group \S+'}
           - {block: '^line vty', every_contains: '^login authentication \S+'}
     otherwise: fail
-    note: Every login list used for remote access must start with "group <radius/tacacs>"; local only after it.
+    note: Every login list used for remote access must start with "group <radius/tacacs>", with "local" as the only fallback (not "none", "line" or "enable"); console lists are not assessed.
     remediation: |
       aaa new-model
       aaa authentication login default group <radius-group> local
@@ -239,6 +245,7 @@ checks:
   LYSS-LOG-010:
     fail_if_any:
       - {line: '^no logging on\b', say: 'logging is disabled globally ("no logging on"): nothing reaches the syslog hosts'}
+      - {line: '^no logging trap\b', say: 'forwarding to the syslog hosts is turned off ("no logging trap")'}
     pass_if_any:
       - {line: '^logging (host )?\d+\.\d+\.\d+\.\d+'}
     otherwise: fail
@@ -249,10 +256,12 @@ checks:
   LYSS-LOG-011:
     fail_if_any:
       - {state: '(?i)\bunsynchroni[sz]ed\b', section: show ntp status}
-    pass_if_any:
+      - {line: '^ntp server ', absent: true, say: 'no NTP server configured'}
+    pass_if_all:
       - {line: '^ntp server '}
-    otherwise: fail
-    note: Synchronization is checked with "show ntp status"; without device state, a configured server passes.
+      - {state: '(?i)\bunsynchroni[sz]ed\b', section: show ntp status, absent: true}
+    otherwise: unknown
+    note: Synchronization is checked with "show ntp status"; without device state the verdict is unknown.
     remediation: |
       ntp server <ntp-ip>
 
@@ -271,7 +280,9 @@ checks:
   LYSS-ACC-011:
     pass_if_any:
       - {line: '^spanning-tree portfast (edge )?bpduguard default'}
-      - {block: '^interface \S*Ethernet', where: '^switchport mode access', every_contains: '^spanning-tree bpduguard enable'}
+      # an access-mode port-channel (e.g. to a server) is an edge port, checked on the port-channel
+      # itself; its members ("channel-group") are not checked one by one
+      - {block: '^interface (\S*Ethernet|Port-channel)', where: '^switchport mode access', where_not: '^channel-group\b', every_contains: '^spanning-tree bpduguard enable'}
     otherwise: fail
     remediation: |
       spanning-tree portfast edge bpduguard default
@@ -285,6 +296,8 @@ checks:
       - {not: {block: '^interface \S*Ethernet', where: '^switchport mode access', where_not: '^shutdown$'}, say: 'no enabled access port ("switchport mode access") in the configuration'}
     fail_if_any:
       - {not: {line: '^ip dhcp snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("ip dhcp snooping")'}
+      # a trusted access port accepts DHCP server messages: a rogue server there is not blocked
+      - {block: '^interface \S*Ethernet', where: '^switchport mode access', where_not: '^shutdown$', line: '^ip dhcp snooping trust\b'}
       - uncovered: &ios_snooping
           what: access VLANs without DHCP snooping
           used: &ios_access_vlans {block: '^interface \S*Ethernet', where: '^switchport mode access', where_not: '^shutdown$', line: '^switchport access vlan (\d+)', default: 1}
@@ -302,6 +315,8 @@ checks:
   LYSS-ACC-021:
     not_applicable_if_any: *ios_no_access
     fail_if_any:
+      # a trusted access port skips ARP inspection
+      - {block: '^interface \S*Ethernet', where: '^switchport mode access', where_not: '^shutdown$', line: '^ip arp inspection trust\b'}
       - uncovered: &ios_dai
           what: access VLANs without ARP inspection
           used: *ios_access_vlans
@@ -320,6 +335,8 @@ checks:
     not_applicable_if_any: *ios_no_access
     fail_if_any:
       - {not: {line: '^dot1x system-auth-control'}, say: '802.1X is not enabled globally ("dot1x system-auth-control")'}
+      # open mode forwards traffic before (and without) successful authentication
+      - {block: '^interface \S*Ethernet', where: '^switchport mode access', where_not: '^shutdown$', line: '^authentication open\b'}
       - uncovered: &ios_nac
           what: access ports without 802.1X / MAB
           used: &ios_access_ports {block: '^interface (\S*Ethernet\S+)', where: '^switchport mode access', where_not: '^shutdown$'}
@@ -339,6 +356,8 @@ checks:
   LYSS-ACC-023:
     not_applicable_if_any: *ios_no_access
     fail_if_any:
+      # a 100 % threshold limits nothing
+      - {block: '^interface \S*Ethernet', where: '^switchport mode access', where_not: '^shutdown$', line: '^storm-control broadcast level 100(?:\.0+)?(?:\s|$)'}
       - uncovered: &ios_storm
           what: access ports without broadcast storm control
           used: *ios_access_ports

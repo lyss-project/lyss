@@ -200,6 +200,13 @@ def ios_show(sw: SimSwitch, command: str) -> str | None:
                     "advertisement version: 2",
                     ""]
         return "\n".join(out)
+    if command == "show ntp status":
+        # the simulated clock is synchronized as soon as a server is configured
+        servers = [m.group(1) for l in sw.running.top() if (m := re.match(r"^ntp server (?:vrf \S+ )?(\S+)", l))]
+        if not servers:
+            return "%NTP is not enabled."
+        return (f"Clock is synchronized, stratum 3, reference is {servers[0]}\n"
+                "nominal freq is 286.1023 Hz, actual freq is 286.1023 Hz, precision is 2**21")
     return None
 
 
@@ -320,6 +327,11 @@ def sb_show(sw: SimSwitch, command: str) -> str | None:
                     p["version_line"],
                     ""]
         return "\n".join(out)
+    if command == "show sntp status":
+        servers = [m.group(1) for l in sw.running.top() if (m := re.match(r"^sntp server (\S+)", l))]
+        if not servers:
+            return "Clock is not synchronized"
+        return f"Clock is synchronized, stratum 2, reference is {servers[0]}, unicast"
     return None
 
 

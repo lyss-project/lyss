@@ -2,7 +2,7 @@
 
 # LYSS Specification: security controls for network switches
 
-**Version 0.6.1-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
+**Version 0.7.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
 
 ## 1. Scope
 
@@ -46,7 +46,7 @@ A device is **LYSS Level N conformant** when every control of levels 1 to N is `
 `not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.6.1-draft), assessed 2026-11-03 with LYSS 0.3.0.
+> core-sw-01 is LYSS Level 1 conformant (specification 0.7.0-draft), assessed 2026-11-03 with LYSS 0.3.0.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
 
@@ -137,9 +137,9 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Privileged-mode password is stored as a strong hash**
 
-- **Requirement.** The privileged (enable) credential is stored with a one-way hash based on SHA-256 or a stronger algorithm (e.g. scrypt, PBKDF2-SHA-256, SHA-256/SHA-512 crypt). Cleartext, reversible encodings, MD5- and SHA-1-based hashes and Cisco type 4 are not accepted.
+- **Requirement.** The privileged (enable) credential is stored with a salted one-way hash based on SHA-256 or a stronger algorithm (e.g. scrypt, PBKDF2-SHA-256, SHA-256/SHA-512 crypt). Cleartext, reversible encodings, MD5- and SHA-1-based hashes and unsalted SHA-256 (Cisco type 4) are not accepted.
 - **Rationale.** Reversible encodings (e.g. Cisco type 7) are decoded instantly by public tools from any configuration backup, and MD5- or SHA-1-based hashes (e.g. Cisco type 5) are cracked quickly on commodity hardware.
-- **Test procedure.** Fail if the privileged credential, or a local account with full privileges, is stored in cleartext, a reversible form, or with MD5, SHA-1 or Cisco type 4 (e.g. Cisco "enable password", type 4 or 5, a 40-hex-digit SHA-1 value, HPE "sha1"). Pass if it uses an accepted algorithm, or if there is no privileged credential and privileged access is only granted through central AAA. Unknown if the algorithm cannot be identified.
+- **Test procedure.** Fail if the privileged credential, or a local account with full privileges, is stored in cleartext, a reversible form, or with MD5, SHA-1 or unsalted SHA-256 (e.g. Cisco "enable password", type 4 or 5, a 40-hex-digit SHA-1 value, HPE "sha1"). Pass if it uses an accepted salted algorithm (e.g. Cisco type 8 or 9), or if there is no privileged credential and privileged access is only granted through central AAA. Unknown if the algorithm cannot be identified.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.5 · NIST SP 800-53 r5 IA-5(1) · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h), 21(2)(i)
 
@@ -158,8 +158,8 @@ A claim is valid for the configuration and firmware assessed; any change require
 **AAA shared secrets (RADIUS/TACACS+) are not stored in cleartext**
 
 - **Requirement.** Keys shared with RADIUS or TACACS+ servers are never stored in cleartext in the configuration.
-- **Rationale.** A cleartext RADIUS key in a backup lets an attacker impersonate the AAA server or decrypt authentication traffic.
-- **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding is not cleartext and passes this control; storing keys irreversibly or with a device-specific encryption key is planned as a separate Level 2 control.
+- **Rationale.** A cleartext RADIUS key in a backup can be read by anyone who sees the file, and lets an attacker impersonate the AAA server or decrypt authentication traffic. Level 1 only removes the cleartext key: many switches can only store these keys in a reversible form, which is weaker protection and is addressed separately.
+- **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding (e.g. Cisco type 7) is not cleartext and passes this Level 1 control; it gives only weak protection, and storing keys with a device-specific encryption key is planned as a separate Level 2 control.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.24 · NIST SP 800-53 r5 IA-5, SC-28 · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h)
 
@@ -179,7 +179,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** The running configuration is collected automatically, so that a copy at most 7 days old exists at any time.
 - **Rationale.** Without a recent backup, recovery after failure or compromise is slow and error-prone.
-- **Test procedure.** Pass if the most recent automatic (scheduled) collection of the running configuration is at most the parameter old at the time of assessment; a schedule less frequent than the parameter therefore fails between runs. Otherwise pass on an external backup system only with evidence of its last successful backup for this device, at most the parameter old (for example from the backup system's records), or with an administrator attestation, renewed at least every 90 days, that the external system backs the device up at least as often as the parameter and alerts on failure. Fail if the last automatic backup is older, or only manual collections exist.
+- **Test procedure.** Pass if the most recent automatic (scheduled) collection of the running configuration is at most the parameter old at the time of assessment, and the gap between the last two automatic collections is not longer than the parameter; a schedule less frequent than the parameter therefore fails. Otherwise pass on an external backup system only with evidence of its last successful backup for this device, at most the parameter old (for example from the backup system's records), or with an administrator attestation, renewed at least every 90 days, that the external system backs the device up at least as often as the parameter and alerts on failure. Fail if the last automatic backup is older, or only manual collections exist.
 - **Parameters.** `max_age_days` = 7
 - **Evidence.** backup_system
 - **References (informative).** ISO/IEC 27001:2022 A.8.9, A.8.13 · NIST SP 800-53 r5 CP-9, CM-2(3) · CIS Controls v8 11.2 · NIS2 Art. 21(2)(c)
@@ -190,9 +190,9 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Administrative logins use central AAA (RADIUS/TACACS+) with local fallback only**
 
-- **Requirement.** Administrator logins are authenticated by a RADIUS or TACACS+ server first; local accounts are only a fallback.
+- **Requirement.** Remote administrator logins (SSH, Telnet, web, API) are authenticated by a RADIUS or TACACS+ server first; local accounts are the only fallback. Logins on the local serial console are out of scope: the console is the recovery path when the AAA server cannot be reached.
 - **Rationale.** Central AAA gives individual accounts, immediate revocation and an audit trail; shared local passwords do not.
-- **Test procedure.** Pass if an AAA server is defined and every login method list used for remote administrative access starts with the AAA server, local accounts coming only after it. Fail if any such list starts with a local account, a line password or no authentication.
+- **Test procedure.** Pass if an AAA server is defined and every login method list used for remote administrative access starts with the AAA server, with local accounts as the only fallback after it. Fail if any such list starts with a local account, a line password or no authentication, or falls back to anything other than local accounts (e.g. "none", a line or enable password). Console login lists are not assessed.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.16, A.8.5 · NIST SP 800-53 r5 IA-2, AC-2 · CIS Controls v8 12.5 · NIS2 Art. 21(2)(i)
 
@@ -252,7 +252,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** The switch forwards its logs to at least one remote syslog or SIEM collector.
 - **Rationale.** Local logs are lost on reboot and can be erased by an intruder; remote logs support detection and investigation.
-- **Test procedure.** Fail if logging is disabled globally (e.g. "no logging on"). Pass if at least one remote syslog destination is configured and logging is enabled.
+- **Test procedure.** Fail if logging is disabled globally (e.g. "no logging on"), or if forwarding to remote servers is turned off (e.g. Cisco IOS "no logging trap"). Pass if at least one remote syslog destination is configured and logging to it is enabled.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.15, A.8.16 · NIST SP 800-53 r5 AU-4(1), AU-6 · CIS Controls v8 8.2, 8.9 · NIS2 Art. 21(2)(b)
 
@@ -262,7 +262,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** The switch clock is synchronized with at least one configured time server.
 - **Rationale.** Without a reliable clock, logs cannot be correlated and certificates and schedules misbehave.
-- **Test procedure.** Fail if no NTP or SNTP server is configured, or if the device state reports the clock as not synchronized. Pass if a time server is configured and the clock is reported synchronized; without device state, a configured time server passes and the report says that synchronization was not verified.
+- **Test procedure.** Fail if no NTP or SNTP server is configured, or if the device state reports the clock as not synchronized. Pass if a time server is configured and the device state does not report the clock as unsynchronized. Unknown without device state: a configured server alone does not show that the clock is synchronized.
 - **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.17 · NIST SP 800-53 r5 AU-8, SC-45 · CIS Controls v8 8.4 · NIS2 Art. 21(2)(b)
 
@@ -282,7 +282,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Every edge port disables itself when it receives a spanning-tree BPDU. Links to other switches are configured as such (trunks or link aggregations); every other port is an edge port.
 - **Rationale.** A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
-- **Test procedure.** Edge ports are all ports minus uplinks, and uplinks are only the ports configured as trunks or link-aggregation members (tagged on HPE AOS-S). Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
+- **Test procedure.** Edge ports are all ports minus uplinks, and uplinks are only the ports configured as trunks or link-aggregation members (tagged on HPE AOS-S). A link aggregation that is not a trunk (for example towards a server) is itself an edge port: it is checked on its logical interface, while its member ports are not checked one by one. Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
 - **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 SC-5, CM-6 · CIS Controls v8 12.2 · NIS2 Art. 21(2)(g)
 
@@ -294,7 +294,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** DHCP snooping is enabled globally and on every VLAN used by an access port, so that DHCP server messages are only accepted from trusted (uplink) ports.
 - **Rationale.** A rogue DHCP server on a user port can hand out its own gateway and DNS server and intercept traffic; DHCP snooping drops server messages from untrusted ports and builds the binding table that ARP inspection and IP source guard rely on.
-- **Test procedure.** Fail if DHCP snooping is not enabled globally, or if a VLAN used by an access port is not in the snooping VLAN list. Pass if it is enabled and every such VLAN is covered (on platforms where snooping applies to the whole bridge, the bridge setting covers every access port). Not applicable without access ports.
+- **Test procedure.** Fail if DHCP snooping is not enabled globally, if a VLAN used by an access port is not in the snooping VLAN list, or if an access port is trusted for DHCP (it would accept server messages). Pass if it is enabled, every such VLAN is covered (on platforms where snooping applies to the whole bridge, the bridge setting covers every access port) and no access port is trusted. Not applicable without access ports.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 — · NIS2 Art. 21(2)(g)
 
@@ -304,7 +304,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** ARP packets received on access ports are checked against the DHCP snooping bindings (or static ARP access lists) on every VLAN used by an access port.
 - **Rationale.** Without ARP inspection, any user device can claim the gateway's IP address (ARP spoofing) and read or alter the traffic of every host in the VLAN.
-- **Test procedure.** Fail if a VLAN used by an access port is not covered by dynamic ARP inspection, or if the platform offers no ARP inspection (the report names the platform limit). Pass if every such VLAN is covered. Not applicable without access ports.
+- **Test procedure.** Fail if a VLAN used by an access port is not covered by dynamic ARP inspection, if an access port is trusted for ARP inspection (its ARP packets would not be checked), or if the platform offers no ARP inspection (the report names the platform limit). Pass if every such VLAN is covered and no access port is trusted. Not applicable without access ports.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 — · NIS2 Art. 21(2)(g)
 
@@ -314,7 +314,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Every access port authenticates the connected device (IEEE 802.1X, or MAC authentication bypass for devices without a supplicant) before granting network access.
 - **Rationale.** Without port authentication, anyone who can plug a cable into a wall socket is on the internal network.
-- **Test procedure.** Fail if port authentication is not enabled globally where the platform requires it, or if an access port has no 802.1X / MAC authentication setting. Pass if every access port has one. Not applicable without access ports.
+- **Test procedure.** Fail if port authentication is not enabled globally where the platform requires it, if an access port has no 802.1X / MAC authentication setting, or if an access port forwards traffic before authentication succeeds (open mode, e.g. Cisco "authentication open"). Pass if every access port enforces one. Not applicable without access ports.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.20, A.5.15 · NIST SP 800-53 r5 IA-3, AC-3 · CIS Controls v8 13.9 · NIS2 Art. 21(2)(i)
 
@@ -324,7 +324,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Every access port limits the rate of broadcast traffic it accepts (storm control).
 - **Rationale.** A loop or a misbehaving device on one user port can flood broadcast traffic to every port of the VLAN and take the network down; a rate limit contains it on the offending port.
-- **Test procedure.** Fail if an access port has no broadcast rate limit. Pass if every access port has one. Unknown when the platform sets it on the switch chip and the setting cannot be read. Not applicable without access ports.
+- **Test procedure.** Fail if an access port has no broadcast rate limit, or a limit of 100 % (which limits nothing). Pass if every access port has an effective one. Unknown when the platform sets it on the switch chip and the setting cannot be read. Not applicable without access ports.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.6 · NIST SP 800-53 r5 SC-5 · CIS Controls v8 — · NIS2 Art. 21(2)(g)
 

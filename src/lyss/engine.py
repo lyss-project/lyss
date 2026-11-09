@@ -5,7 +5,7 @@
 import os
 import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import yaml
@@ -487,6 +487,13 @@ def backup_verdict(backup: dict | None, max_age_days: int) -> tuple[str | None, 
     auto = backup.get("last_automatic")
     if auto:
         age = (now - datetime.fromisoformat(auto)).days
+        previous = backup.get("previous_automatic")
+        if previous:
+            # a backup taken yesterday by a monthly schedule is fresh today but not most of the month
+            gap = datetime.fromisoformat(auto) - datetime.fromisoformat(previous)
+            if gap > timedelta(days=max_age_days):
+                return "fail", [f"automatic backups run too rarely: the last two were {gap.days} days apart "
+                                f"({previous.replace('T', ' ')} and {auto.replace('T', ' ')}; max {max_age_days})"]
         if age <= max_age_days:
             return "pass", [f"automatic configuration backup by scheduled scan on {auto.replace('T', ' ')} "
                             f"({backup.get('versions', 0)} versions kept)"]
