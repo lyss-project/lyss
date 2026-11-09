@@ -282,7 +282,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Every edge port disables itself when it receives a spanning-tree BPDU. Links to other switches are configured as such (trunks or link aggregations); every other port is an edge port.
 - **Rationale.** A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
-- **Test procedure.** Edge ports are all ports minus uplinks, and uplinks are only the ports configured as trunks or link-aggregation members (tagged on HPE AOS-S). A link aggregation that is not a trunk (for example towards a server) is itself an edge port: it is checked on its logical interface, while its member ports are not checked one by one. Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
+- **Test procedure.** Edge ports are all ports minus uplinks. Uplinks are only trunk ports (tagged on HPE AOS-S) and the member ports of link aggregations that are trunks. A link aggregation that is not a trunk (for example towards a server) is an edge port. Spanning tree runs on its logical interface, so BPDU protection is checked there, and that check covers its member ports. Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
 - **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 SC-5, CM-6 · CIS Controls v8 12.2 · NIS2 Art. 21(2)(g)
 
@@ -304,7 +304,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** ARP packets received on access ports are checked against the DHCP snooping bindings (or static ARP access lists) on every VLAN used by an access port.
 - **Rationale.** Without ARP inspection, any user device can claim the gateway's IP address (ARP spoofing) and read or alter the traffic of every host in the VLAN.
-- **Test procedure.** Fail if a VLAN used by an access port is not covered by dynamic ARP inspection, if an access port is trusted for ARP inspection (its ARP packets would not be checked), or if the platform offers no ARP inspection (the report names the platform limit). Pass if every such VLAN is covered and no access port is trusted. Not applicable without access ports.
+- **Test procedure.** Fail if a VLAN used by an access port is not covered by dynamic ARP inspection, or if an access port is trusted for ARP inspection (its ARP packets would not be checked). A platform that offers no ARP inspection also fails; this is not an exception, and the report names the platform limit so that the reason is clear. Pass if every such VLAN is covered and no access port is trusted. Not applicable without access ports.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 SC-7, SI-4 · CIS Controls v8 — · NIS2 Art. 21(2)(g)
 

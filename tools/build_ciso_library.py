@@ -71,15 +71,20 @@ EVIDENCE_TEXT = {
 }
 
 
+# CISO Assistant library version for each published specification: a plain counter starting at 1
+# (as the CISO Assistant maintainers asked), +1 for every specification that changes the library.
+# Add the new spec_version here before building; never change or remove an existing entry.
+LIBRARY_VERSIONS = {
+    "0.7.0-draft": 1,
+}
+
+
 def library_version(spec_version: str) -> int:
-    """CISO Assistant library versions are integers and must grow for an update to be offered.
-    MAJOR.MINOR.PATCH[-pre] -> ((MAJOR*1000 + MINOR)*1000 + PATCH)*10, +1 for a final release,
-    so 0.4.0-draft = 40000 < 0.4.0 = 40001 < 0.4.1-draft = 40010."""
-    m = re.match(r"^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.]+)?$", spec_version)
-    if not m:
-        raise ValueError(f"spec_version {spec_version!r} is not MAJOR.MINOR.PATCH[-pre]")
-    major, minor, patch = (int(x) for x in m.groups()[:3])
-    return ((major * 1000 + minor) * 1000 + patch) * 10 + (0 if m.group(4) else 1)
+    """CISO Assistant library versions are integers and must grow for an update to be offered."""
+    if spec_version not in LIBRARY_VERSIONS:
+        raise ValueError(f"spec_version {spec_version!r} has no CISO Assistant library version: "
+                         "add it to LIBRARY_VERSIONS (previous highest + 1)")
+    return LIBRARY_VERSIONS[spec_version]
 
 
 def urn_suffix(ref_id: str) -> str:

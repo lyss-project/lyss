@@ -23,10 +23,11 @@ Both are generated from `spec/lyss-spec.yaml`; do not edit them by hand.
    Because the relationship is `subset`, a compliant LYSS requirement gives at most partial
    coverage of the ISO control.
 
-Library URNs carry no version (`urn:lyss:risk:library:lyss`). The library `version` is derived from
-`spec_version` (0.4.0-draft → 40000, 0.4.0 → 40001, 0.4.1-draft → 40010), so a newer specification
-is offered as an update of the loaded library. Two builds of the same `spec_version` have the same
-version: bump `spec_version` before re-importing.
+Library URNs carry no version (`urn:lyss:risk:library:lyss`). The library `version` is a plain
+counter, as in the other CISO Assistant libraries: 1 for specification 0.7.0-draft, then +1 for each
+specification that changes the library (table `LIBRARY_VERSIONS` in tools/build_ciso_library.py), so
+a newer specification is offered as an update of the loaded library. Two builds of the same
+`spec_version` have the same version: bump `spec_version` before re-importing.
 
 ## What CISO Assistant does with the mapping
 

@@ -129,11 +129,15 @@ def test_iso_mappings_match_the_specification(generated):
         assert 1 <= number <= ANNEX_A[theme], target
 
 
-def test_library_version_grows_with_the_specification():
-    v = load_tool().library_version
-    assert v("0.4.0-draft") < v("0.4.0") < v("0.4.1-draft") < v("0.5.0") < v("1.0.0")
+def test_library_version_is_a_counter_that_grows_with_the_specification():
+    tool = load_tool()
+    versions = list(tool.LIBRARY_VERSIONS.values())
+    # starts at 1 and goes up by one per published specification (CISO Assistant convention)
+    assert versions == list(range(1, len(versions) + 1))
+    spec = tool.yaml.safe_load(tool.SPEC.read_text(encoding="utf-8"))
+    assert tool.library_version(spec["spec_version"]) == versions[-1]
     with pytest.raises(ValueError):
-        v("1.0")
+        tool.library_version("9.9.9-unknown")
 
 
 def test_validation_catches_errors(generated):

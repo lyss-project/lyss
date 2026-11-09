@@ -2,6 +2,18 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## Unreleased
+
+- **CISO Assistant library version is now a plain counter** starting at 1 (`LIBRARY_VERSIONS` in
+  tools/build_ciso_library.py), as the CISO Assistant maintainers asked, instead of a number
+  derived from `spec_version` (70000). Version 1 = specification 0.7.0-draft.
+- **Wording only (specification 0.7.0-draft, no verdict change), after the Qodo review:**
+  - LYSS-ACC-011: uplinks are trunk ports and the members of trunk link aggregations; a
+    non-trunk aggregation is an edge port checked on its logical interface, which covers its
+    members.
+  - LYSS-ACC-021: a platform without ARP inspection fails; naming the platform limit in the
+    report is not an exception.
+
 ## 0.16.0 (2026-11-09)
 
 **Specification 0.7.0-draft: stricter test procedures**, after the automated reviews (CodeRabbit,
