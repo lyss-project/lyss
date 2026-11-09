@@ -2,7 +2,7 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
-## Unreleased
+## 0.16.0 (2026-11-09)
 
 **Specification 0.7.0-draft: stricter test procedures**, after the automated reviews (CodeRabbit,
 Qodo) of the CISO Assistant pull request. Control IDs are unchanged. Some verdicts can change from
