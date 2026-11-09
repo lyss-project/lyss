@@ -7,9 +7,10 @@ description: 'Mapping between LYSS (Lyaazale Switch Security) specification 0.6.
   Each LYSS control is a specific, testable part (subset) of the ISO control it maps
   to: a compliant LYSS requirement gives at most partial coverage of the ISO control,
   a non-compliant one makes it non-compliant. One direction only: an ISO control judged
-  compliant proves nothing about a given switch. DRAFT: controls, identifiers and
-  mappings may still change before LYSS 1.0. Generated from spec/lyss-spec.yaml by
-  tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss).'
+  compliant proves nothing about a given switch. DRAFT: controls and mappings may
+  still change before LYSS 1.0, but control identifiers are stable: never renamed,
+  renumbered or reused. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py
+  in the LYSS repository (https://github.com/lyss-project/lyss).'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
 version: 60010
 publication_date: 2026-11-09
@@ -29,9 +30,9 @@ objects:
       maps to: a compliant LYSS requirement gives at most partial coverage of the
       ISO control, a non-compliant one makes it non-compliant. One direction only:
       an ISO control judged compliant proves nothing about a given switch. DRAFT:
-      controls, identifiers and mappings may still change before LYSS 1.0. Generated
-      from spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository
-      (https://github.com/lyss-project/lyss).'
+      controls and mappings may still change before LYSS 1.0, but control identifiers
+      are stable: never renamed, renumbered or reused. Generated from spec/lyss-spec.yaml
+      by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss).'
     source_framework_urn: urn:lyss:risk:framework:lyss
     target_framework_urn: urn:intuitem:risk:framework:iso27001-2022
     requirement_mappings:

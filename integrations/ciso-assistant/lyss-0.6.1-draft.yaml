@@ -7,9 +7,10 @@ description: 'LYSS (Lyaazale Switch Security) specification 0.6.1-draft (draft):
   levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is one control (LYSS-<DOMAIN>-<NNN>);
   its annotation gives the rationale, vendor-neutral test procedure and informative
   references. A device is LYSS Level N conformant when every control of levels 1 to
-  N is met or not applicable. DRAFT: controls, identifiers and mappings may still
-  change before LYSS 1.0. Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml
-  by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss).'
+  N is met or not applicable. DRAFT: controls and mappings may still change before
+  LYSS 1.0, but control identifiers are stable: never renamed, renumbered or reused.
+  Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py
+  in the LYSS repository (https://github.com/lyss-project/lyss).'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
 version: 60010
 publication_date: 2026-11-09
@@ -25,10 +26,10 @@ objects:
       conformance levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is
       one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, vendor-neutral
       test procedure and informative references. A device is LYSS Level N conformant
-      when every control of levels 1 to N is met or not applicable. DRAFT: controls,
-      identifiers and mappings may still change before LYSS 1.0. Author: Mouad Lyaazale.
-      Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS
-      repository (https://github.com/lyss-project/lyss).'
+      when every control of levels 1 to N is met or not applicable. DRAFT: controls
+      and mappings may still change before LYSS 1.0, but control identifiers are stable:
+      never renamed, renumbered or reused. Author: Mouad Lyaazale. Generated from
+      spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss).'
     implementation_groups_definition:
     - ref_id: L1
       name: Level 1 - Baseline

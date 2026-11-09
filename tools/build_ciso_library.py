@@ -134,7 +134,8 @@ def typical_evidence(control: dict) -> str:
     return "\n".join(lines)
 
 
-DRAFT_NOTE = "DRAFT: controls, identifiers and mappings may still change before LYSS 1.0. "
+DRAFT_NOTE = ("DRAFT: controls and mappings may still change before LYSS 1.0, but control identifiers "
+              "are stable: never renamed, renumbered or reused. ")
 
 
 def spec_is_draft(spec: dict) -> bool:
