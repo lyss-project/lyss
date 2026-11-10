@@ -59,8 +59,106 @@ def failing(results: list[dict], required: int | None) -> list[dict]:
     if not required:
         return []
     return [r for r in results
-            if any(f["verdict"] == "fail" and f["level"] <= required for f in r["findings"])
+            if any(f["verdict"] == "fail" and f["level"] <= required and not f.get("accepted") for f in r["findings"])
             or not_assessable(r, required)]
+
+
+def accepted_count(results: list[dict]) -> int:
+    return sum(1 for r in results for f in r["findings"] if f["verdict"] == "fail" and f.get("accepted"))
+
+
+def locate(text: str, evidence: list[str]) -> int | None:
+    """Line number (1-based) of the first evidence line found in the configuration file. Evidence is
+    "line", "block header / line" or a sentence; redacted parts ("<redacted>") match anything."""
+    lines = [l.strip() for l in text.splitlines()]
+    for item in evidence:
+        part = item.rsplit(" / ", 1)[-1].strip()
+        if not part:
+            continue
+        pieces = [re.escape(p) for p in part.split("<redacted>")]
+        pattern = re.compile("^" + ".*".join(pieces) + "$")
+        for n, line in enumerate(lines, 1):
+            if line and pattern.match(line):
+                return n
+    return None
+
+
+SEVERITY = {1: ("error", "8.0", "critical"), 2: ("warning", "5.0", "major"), 3: ("note", "3.0", "minor")}
+MAX_RESULTS = 5000
+
+
+def _failures(results: list[dict]):
+    count = 0
+    for r in results:
+        for f in r["findings"]:
+            if f["verdict"] == "fail":
+                count += 1
+                if count > MAX_RESULTS:
+                    return
+                yield r, f
+
+
+def sarif(results: list[dict], spec: dict, uri_of) -> dict:
+    """SARIF 2.1.0 for GitHub code scanning: one result per failed control, on the configuration
+    line that proves it (line 1 when it is a missing setting). Accepted risks are suppressions.
+    uri_of(result) gives the file path relative to the repository root."""
+    rules = []
+    for c in spec["controls"]:
+        level, score, _ = SEVERITY[int(c["level"])]
+        rules.append({
+            "id": c["id"], "name": c["id"].replace("-", ""),
+            "shortDescription": {"text": c["title"]},
+            "fullDescription": {"text": " ".join(str(c.get("statement", c["title"])).split())},
+            "help": {"text": " ".join(str(c.get("test_procedure", "")).split())
+                     + f" Fix: lyss explain {c['id']} --vendor <platform>"},
+            "helpUri": "https://lyss.dev",
+            "defaultConfiguration": {"level": level},
+            "properties": {"tags": ["security", "network-switch", f"lyss-level-{c['level']}"],
+                           "security-severity": score, "precision": "high"},
+        })
+    out = []
+    for r, f in _failures(results):
+        level, _, _ = SEVERITY[int(f["level"])]
+        evidence = f["evidence"][0] if f.get("evidence") else "setting missing from the configuration"
+        result = {
+            "ruleId": f["control_id"], "level": level,
+            "message": {"text": f"{f['title']}: {evidence}"[:1000]},
+            "locations": [{"physicalLocation": {
+                "artifactLocation": {"uri": uri_of(r)},
+                "region": {"startLine": f.get("line") or 1}}}],
+            "partialFingerprints": {"lyssFinding/v1": f"{uri_of(r)}:{f['control_id']}"},
+        }
+        if f.get("accepted"):
+            a = f["accepted"]
+            result["suppressions"] = [{"kind": "external", "status": "accepted",
+                                       "justification": f"{a['reason']} (approved by {a['approved_by']}, until {a['expires']})"[:1000]}]
+        out.append(result)
+    return {"$schema": "https://json.schemastore.org/sarif-2.1.0.json", "version": "2.1.0",
+            "runs": [{"tool": {"driver": {"name": PROJECT_NAME, "version": __version__,
+                                          "semanticVersion": __version__, "informationUri": "https://lyss.dev",
+                                          "rules": rules}},
+                      "properties": {"specification": spec["spec_version"]},
+                      "results": out}]}
+
+
+def codequality(results: list[dict], uri_of) -> list[dict]:
+    """GitLab Code Quality report (Code Climate format): shown in merge requests on every GitLab
+    tier. Accepted risks are left out (GitLab has no suppression field); they stay in the JSON."""
+    import hashlib
+    out = []
+    for r, f in _failures(results):
+        if f.get("accepted"):
+            continue
+        evidence = f["evidence"][0] if f.get("evidence") else "setting missing from the configuration"
+        path = uri_of(r)
+        out.append({
+            "type": "issue", "check_name": f["control_id"],
+            "description": f"{f['control_id']} {f['title']}: {evidence}"[:1000],
+            "categories": ["Security"], "severity": SEVERITY[int(f["level"])][2],
+            "fingerprint": hashlib.sha256(f"{path}:{f['control_id']}".encode()).hexdigest(),
+            "location": {"path": path, "lines": {"begin": f.get("line") or 1}},
+        })
+    return out
 
 
 def summary_markdown(results: list[dict], spec_version: str, level: int, required: int | None = None,
@@ -73,6 +171,9 @@ def summary_markdown(results: list[dict], spec_version: str, level: int, require
     if required:
         facts.insert(0, f"**required: no failed control up to Level {required}, {len(bad)} configuration(s) fail it**")
     out += [" · ".join(facts), ""]
+    if accepted_count(results):
+        out += [f"{accepted_count(results)} failed control(s) are accepted risks: they still count as failed for "
+                "the level, and do not fail the job until their expiry date.", ""]
     if any(r["summary"]["unknown"] for r in results):
         out += ["Level = the level the saved file alone proves. Unknown controls (for example automatic "
                 "backups, which a file cannot show) are listed but never fail the job.", ""]
@@ -95,7 +196,7 @@ def summary_markdown(results: list[dict], spec_version: str, level: int, require
         mark = ""
         if id(r) in bad_ids:
             mark = (f" **not assessable at Level {required}**" if not any(
-                f["verdict"] == "fail" and f["level"] <= required for f in r["findings"])
+                f["verdict"] == "fail" and f["level"] <= required and not f.get("accepted") for f in r["findings"])
                 else f" **fails Level {required}**")
         out.append(f"| {md_text(r['device'], MAX_NAME)}{mark} | {md_text(r['vendor'])} | {s['achieved_level']} "
                    f"| {s['pass']} | {s['fail']} | {s['unknown']} |")
@@ -112,7 +213,10 @@ def summary_markdown(results: list[dict], spec_version: str, level: int, require
         block = [f"### {md_text(r['device'], MAX_NAME)}: {len(fails)} failed control(s)", ""]
         for f in fails:
             evidence = md_code(f["evidence"][0]) if f.get("evidence") else ""
-            block.append(f"- **{md_text(f['control_id'])}** {md_text(f['title'])}" + (f": {evidence}" if evidence else ""))
+            a = f.get("accepted")
+            accepted = (f" _(accepted risk until {md_text(a['expires'])}, {md_text(a['approved_by'], 120)}: "
+                        f"{md_text(a['reason'], 300)})_") if a else ""
+            block.append(f"- **{md_text(f['control_id'])}** {md_text(f['title'])}" + (f": {evidence}" if evidence else "") + accepted)
         block.append("")
         block_size = sum(len(l.encode()) + 1 for l in block)
         if size + block_size > MAX_SUMMARY:

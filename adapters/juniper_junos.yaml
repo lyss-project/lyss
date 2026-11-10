@@ -21,6 +21,8 @@ adapter: juniper_junos
 spec_version: "0.7.1-draft"
 platform: Juniper EX (Junos)
 status: preview, written from the Junos documentation and synthetic configurations; not yet validated on a device
+support: preview          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
+tested_on: synthetic
 
 facts:
   model:
@@ -288,13 +290,101 @@ checks:
       ! or: set protocols layer2-control bpdu-block interface <access-port>
 
   # ---------------- Level 3 ----------------
-  # Junos EX Level 3 checks (DHCP security, ARP inspection, 802.1X, storm control, LLDP) are not
-  # written yet: their syntax changed across Junos releases and needs a lab to verify.
+  # Written from the Junos documentation for EX switches with ELS (Junos 15.1 and later), not yet
+  # checked on a device: DHCP snooping and ARP inspection are per VLAN under "vlans <name>
+  # forwarding-options dhcp-security" (access ports are untrusted by default; a port is trusted by a
+  # group with "overrides trusted"); 802.1X / MAC RADIUS under "protocols dot1x authenticator";
+  # storm control is a profile ("forwarding-options storm-control-profiles") attached to the port,
+  # and most EX models apply 80 % by default (not EX9200); LLDP runs unless disabled; Junos does not
+  # send CDP. VLANs are compared by the name used in "vlan members" (the usual form).
 
-  LYSS-ACC-020: &junos_l3
+  LYSS-ACC-020:
+    not_applicable_if_any: &junos_no_access
+      - {not: *junos_access_ports, say: 'no enabled access port (every switching interface is a trunk, disabled or a LAG member)'}
+    fail_if_any:
+      # an access port in a group that is itself trusted ("<vlan> ... group <name>" is the key):
+      # that port may answer as a DHCP server; groups with other overrides do not count
+      - captures_in_both: &junos_trusted_access
+          - {line: '^set vlans (\S+ forwarding-options dhcp-security group \S+) overrides trusted$'}
+          - {line: '^set vlans (\S+ forwarding-options dhcp-security group \S+) interface ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+)(?:\.\d+)?$', value_in: {group: 2, source: *junos_access_ports}}
+      - uncovered: &junos_snooping
+          what: access VLANs without DHCP snooping
+          used: &junos_access_vlans {block: '^interfaces ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+)$', where: '^unit 0 family ethernet-switching\b', where_not: '^(unit 0 family ethernet-switching (interface|port)-mode trunk|disable$|ether-options 802\.3ad )', line: '^unit 0 family ethernet-switching vlan members (\S+)$', default: default}
+          covered: {line: '^set vlans (\S+) forwarding-options dhcp-security\b'}
+    pass_if_any:
+      - {uncovered: *junos_snooping, absent: true}
+    otherwise: fail
+    note: On ELS, "dhcp-security" on a VLAN enables DHCP snooping there; a group with "overrides trusted" makes its ports trusted.
+    remediation: |
+      set vlans <access-vlan> forwarding-options dhcp-security
+
+  LYSS-ACC-021:
+    not_applicable_if_any: *junos_no_access
+    fail_if_any:
+      - captures_in_both: *junos_trusted_access
+      - uncovered: &junos_dai
+          what: access VLANs without ARP inspection
+          used: *junos_access_vlans
+          covered: {line: '^set vlans (\S+) forwarding-options dhcp-security arp-inspection$'}
+    pass_if_any:
+      - {uncovered: *junos_dai, absent: true}
+    otherwise: fail
+    remediation: |
+      set vlans <access-vlan> forwarding-options dhcp-security arp-inspection
+
+  LYSS-ACC-022:
+    not_applicable_if_any: *junos_no_access
+    fail_if_any:
+      - {not: {line: '^set protocols dot1x authenticator authentication-profile-name \S+$'}, say: '802.1X is not configured ("protocols dot1x authenticator authentication-profile-name")'}
+      - uncovered: &junos_nac
+          what: access ports without 802.1X / MAC RADIUS
+          used: *junos_access_ports
+          covered: {line: '^set protocols dot1x authenticator interface ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+)(?:\.\d+)? (?!disable\b)\S'}
+          all_covered: {line: '^set protocols dot1x authenticator interface (all) (?!disable\b)\S'}
+    pass_if_any:
+      - {uncovered: *junos_nac, absent: true}
+    otherwise: fail
+    remediation: |
+      set access profile <profile> authentication-order radius
+      set protocols dot1x authenticator authentication-profile-name <profile>
+      set protocols dot1x authenticator interface <access-port> supplicant multiple
+      set protocols dot1x authenticator interface <access-port> mac-radius
+
+  LYSS-ACC-023:
+    not_applicable_if_any: *junos_no_access
+    fail_if_any:
+      # a profile that limits nothing (100 %) or leaves broadcast out, attached to an access port
+      - captures_in_both:
+          - {line: '^set forwarding-options storm-control-profiles (\S+) all (?:bandwidth-percentage 100|no-broadcast)$'}
+          - {block: '^interfaces ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+)$', where: '^unit 0 family ethernet-switching\b', where_not: '^(unit 0 family ethernet-switching (interface|port)-mode trunk|disable$|ether-options 802\.3ad )', line: '^unit 0 family ethernet-switching storm-control (\S+)$'}
+    pass_if_any:
+      - uncovered:
+          what: access ports without a storm control profile
+          used: *junos_access_ports
+          covered: {block: '^interfaces ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+)$', where: '^unit 0 family ethernet-switching storm-control \S+$'}
+        absent: true
     otherwise: unknown
-    note: Level 3 checks for Junos are not written yet (help welcome, see CONTRIBUTING.md).
-  LYSS-ACC-021: *junos_l3
-  LYSS-ACC-022: *junos_l3
-  LYSS-ACC-023: *junos_l3
-  LYSS-ACC-024: *junos_l3
+    note: >-
+      Most EX switches with ELS apply storm control at 80 % by default (not the EX9200), which the
+      configuration does not show: without an explicit profile on every access port the verdict is
+      unknown. Attach a profile with a low bandwidth percentage.
+    remediation: |
+      set forwarding-options storm-control-profiles USER-SC all bandwidth-percentage 5
+      set interfaces <access-port> unit 0 family ethernet-switching storm-control USER-SC
+
+  LYSS-ACC-024:
+    not_applicable_if_any: *junos_no_access
+    fail_if_any:
+      - all:
+          - {not: {line: '^set protocols lldp (disable|interface all disable)$'}}
+          - uncovered:
+              what: access ports sending LLDP
+              used: *junos_access_ports
+              # IP phone ports (a voice VLAN) keep LLDP-MED
+              covered:
+                - {line: '^set protocols lldp interface ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+) disable$'}
+                - {line: '^set switch-options voip interface ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+)(?:\.\d+)? '}
+    otherwise: pass
+    note: Junos does not send CDP; IP phone ports ("switch-options voip interface") are exempt.
+    remediation: |
+      set protocols lldp interface <user-access-port> disable

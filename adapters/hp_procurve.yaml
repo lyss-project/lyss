@@ -8,7 +8,9 @@
 adapter: hp_procurve
 spec_version: "0.7.1-draft"
 platform: HP ProCurve / HPE Aruba AOS-S
-status: draft, validated on the LYSS simulator and synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
+status: preview, validated on the LYSS simulator and synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
+support: preview          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
+tested_on: synthetic
 
 facts:
   model:

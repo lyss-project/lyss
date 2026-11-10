@@ -19,7 +19,7 @@ a support agreement or a schedule: LYSS is provided without warranty (see [LICEN
 - **Every result records the specification version** it was assessed against (`spec_version`
   in each switch result, in exported reports and in JSON output). A conformance level is only
   meaningful together with that version: "Level 2 against 0.7.1-draft".
-- **Pin a version** for a stable baseline: `pip install "lyss==0.17.0"`. Upgrade on purpose,
+- **Pin a version** for a stable baseline: `pip install "lyss==0.18.0"`. Upgrade on purpose,
   read the changelog, then rescan. The history keeps the previous results for comparison.
 
 ## Planned from 1.0
@@ -38,14 +38,30 @@ a support agreement or a schedule: LYSS is provided without warranty (see [LICEN
 - **No breaking change of the specification within a MAJOR version.** A switch that conforms to
   1.x Level 2 still conforms to every later 1.y Level 2, unless its configuration changed.
 
+## Platform support labels
+
+Each platform is labelled in its adapter (`support`, `tested_on`), in the README and in
+[VALIDATION.md](VALIDATION.md):
+
+- **Stable**: the Level 1 and 2 checks were verified on the vendor's own software, on real switches
+  (`real`) or on the vendor's official virtual image (`virtual`: MikroTik CHR, SONiC-VS, Arista
+  cEOS-lab, the AOS-CX simulator). A virtual image can still differ from hardware (models,
+  defaults, switch-chip features), and the validation matrix says what was not covered.
+- **Preview**: written from the vendor's documentation, or verified only on the LYSS simulator.
+  Its verdicts may change in any release. A preview platform becomes stable in a normal release
+  once its outputs are confirmed on the vendor's software; reports from owners are welcome.
+
 ## Goals before calling it 1.0 (no date)
 
-- Every advertised platform validated on real hardware, not only simulators or virtual
-  appliances. HPE Aruba AOS-S and AOS-CX, MikroTik switch chips, SONiC, Arista, Juniper EX and
-  Huawei still need this: reports from
-  owners are welcome.
-- The specification has been reviewed by people other than its author, and stays unchanged for one
-  full release cycle.
+1.0 is about the **specification**: the controls and their test procedures stop changing in
+incompatible ways. It does not wait for every platform to be stable; the labels say which are.
+
+- Level 3 assessed on every platform where it applies, or reported as not applicable with the
+  reason.
+- A release candidate of the specification (1.0.0-rc) published for public review; comments from
+  people other than its author answered.
+- No change to the controls or their test procedures for about four weeks after the release
+  candidate (one full release cycle).
 - Scale figures published ([docs/SCALE.md](SCALE.md)) and a threat model for the tool
-  ([docs/THREAT-MODEL.md](THREAT-MODEL.md)).
-- At least one co-maintainer, so that the project does not depend on a single person.
+  ([docs/THREAT-MODEL.md](THREAT-MODEL.md)): done.
+- Wished, not required: a co-maintainer, so that the project does not depend on a single person.

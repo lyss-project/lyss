@@ -24,7 +24,9 @@
 adapter: cisco_ios
 spec_version: "0.7.1-draft"
 platform: Cisco IOS / IOS-XE
-status: draft, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
+status: stable, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
+support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
+tested_on: real        # real switches
 
 facts:
   model:   {section: show inventory, line: '^PID:\s*(\S+)'}

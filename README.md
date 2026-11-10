@@ -31,8 +31,9 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   ARP inspection, 802.1X / MAC authentication, storm control, no CDP/LLDP towards users
   (opt-in: `lyss audit --level 3`, or Settings > Assessment).
 
-> Status: **0.17, draft specification 0.7.1, preview.** The specification and the tool may still change
-> before 1.0 (control IDs stay stable). Feedback and adapters for other platforms are welcome.
+> Status: **0.18, draft specification 0.7.1.** The specification may still change before 1.0
+> (control IDs stay stable). Each platform is labelled **stable** or **preview** (see
+> [Platform support](#platform-support)). Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
 ## Try it in two minutes (no switch needed)
@@ -65,6 +66,10 @@ lyss audit --level 2 router.rsc      # or a folder of saved configurations
 Or, without installing anything, paste it into **[lyss.dev/audit.html](https://lyss.dev/audit.html)**:
 LYSS runs inside the page and the configuration is not uploaded.
 
+`lyss explain LYSS-MGMT-001 --vendor cisco_ios` prints a control (requirement, test procedure,
+ISO 27001 / NIST / CIS / NIS2 references) and the platform's fix, offline; `lyss explain` lists
+them all.
+
 See [docs/OFFLINE.md](docs/OFFLINE.md): how to save the configuration on each platform, what a
 configuration alone can and cannot tell, and how to add device state by hand.
 
@@ -83,25 +88,31 @@ read-only account ([docs/ACCOUNTS.md](docs/ACCOUNTS.md)), and tell me what you f
 
 ## Platform support
 
-| Platform | Level 1 | Level 2 | Level 3 | Device state | Remediation | Firmware data |
-|---|---|---|---|---|---|---|
-| Cisco IOS / IOS-XE (Catalyst) | yes | yes | yes | yes | yes | Catalyst 1000 |
-| Cisco Small Business / Business (SG200-550X, CBS) | yes | yes | yes | yes | yes | SG200/300/500, 350, CBS250/350 |
-| HP ProCurve / HPE Aruba AOS-S | yes | yes | yes | yes | basic | AOS-S 16.x |
-| MikroTik RouterOS 6.x / 7.x (CRS, RouterBOARD, CHR), preview | yes | yes | yes (RouterOS 7) | yes | no | RouterOS (CISA KEV + critical) |
-| SONiC (community builds), preview | yes | yes | not applicable | yes | no | no |
-| Arista EOS (7000 series, cEOS / vEOS), preview | yes | yes | yes | yes | no | EOS (critical advisories) |
-| HPE Aruba AOS-CX (4100i, 6000-6300, 8xxx), preview: checked on the AOS-CX simulator, not yet on a physical switch | yes | yes | not yet | yes | no | no |
-| Huawei S series (VRP V200), preview: not yet validated on a device | yes | yes | not yet | yes | no | no |
-| Juniper EX (Junos), preview: not yet validated on a device | yes | yes | not yet | yes | no | no |
-| Zyxel GS1900, preview: **firmware only**, offline | no | no | no | no | no | GS1900 (CVE-2026-7273, CISA KEV) |
+| Platform | Support | Level 1 | Level 2 | Level 3 | Device state | Remediation | Firmware data |
+|---|---|---|---|---|---|---|---|
+| Cisco IOS / IOS-XE (Catalyst) | **stable**: real switches | yes | yes | yes | yes | yes | Catalyst 1000 |
+| Cisco Small Business / Business (SG200-550X, CBS) | **stable**: real switches | yes | yes | yes | yes | yes | SG200/300/500, 350, CBS250/350 |
+| HP ProCurve / HPE Aruba AOS-S | preview: LYSS simulator, synthetic outputs | yes | yes | yes | yes | basic | AOS-S 16.x |
+| MikroTik RouterOS 6.x / 7.x (CRS, RouterBOARD, CHR) | **stable**: virtual (CHR 7.25.1) | yes | yes | yes (RouterOS 7) | yes | no | RouterOS (CISA KEV + critical) |
+| SONiC (community builds) | **stable**: virtual (SONiC-VS 202505) | yes | yes | not applicable | yes | no | no |
+| Arista EOS (7000 series, cEOS / vEOS) | **stable**: virtual (cEOS-lab 4.37.0F) | yes | yes | yes | yes | no | EOS (critical advisories) |
+| HPE Aruba AOS-CX (4100i, 6000-6300, 8xxx) | **stable**: virtual (AOS-CX 10.17 simulator) | yes | yes | yes | yes | no | no |
+| Huawei S series (VRP V200) | preview: vendor documentation, synthetic outputs | yes | yes | yes | yes | no | no |
+| Juniper EX (Junos) | preview: vendor documentation, synthetic outputs | yes | yes | yes (ELS) | yes | no | no |
+| Zyxel GS1900 | preview: **firmware only**, offline | no | no | no | no | no | GS1900 (CVE-2026-7273, CISA KEV) |
 
 Level 3 (Advanced: DHCP snooping, ARP inspection, 802.1X / MAC authentication, storm control,
 no CDP/LLDP towards users) is opt-in: `lyss audit --level 3`, or Settings > Assessment in the web
 interface. It is not applicable on SONiC (data-centre fabric, no user ports) nor on any switch
 without access ports.
 
-Where each platform has been validated, and what is not validated yet, is in
+**Stable** means the Level 1 and 2 checks were verified on the vendor's own software: on real
+switches, or on the vendor's official virtual image named in the table. **Preview** means the
+checks were written from the vendor's documentation (or verified only on the LYSS simulator):
+verdicts may still change, and confirming its outputs on the vendor's software (a real switch or its
+official virtual image) can make the platform stable. A
+virtual image can still differ from hardware (models, defaults, switch-chip features). Where each
+platform has been validated, and what is not validated yet, is in
 [docs/VALIDATION.md](docs/VALIDATION.md).
 
 Cisco IOS and Cisco Small Business are validated on real switches; HPE Aruba AOS-S on the
@@ -185,7 +196,9 @@ Is management really unreachable from user networks? Run `lyss probe` on a user 
 result: see [docs/REACHABILITY.md](docs/REACHABILITY.md).
 
 Configurations in Git (Oxidized, or kept by hand)? The **GitHub Action** checks them at every push
-or pull request and fails the job on a weakening change: see [docs/CI.md](docs/CI.md).
+or pull request and fails the job on a weakening change, with findings in code scanning (SARIF) if
+you want them; a [GitLab CI job](integrations/gitlab/README.md) does the same in merge requests.
+Deliberate exceptions go in a dated accepted-risks file. See [docs/CI.md](docs/CI.md).
 
 Before production use, read the [threat model](docs/THREAT-MODEL.md), the
 [scale figures](docs/SCALE.md) (1,008 simulated switches collected and assessed by one instance)

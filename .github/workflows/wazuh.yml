@@ -15,5 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false   # no token left in .git/config
       - name: Decoders and rules fire the expected rules (wazuh-logtest)
         run: bash integrations/wazuh/test/run.sh 4.14.9

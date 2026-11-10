@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4            # in production, pin actions to a full commit SHA
         with:
           persist-credentials: false         # the audit needs no token
-      - uses: lyss-project/lyss@v0.17.0     # same here: the commit SHA of that tag
+      - uses: lyss-project/lyss@v0.18.0     # same here: the commit SHA of that tag
         with:
           path: configs
           level: "2"
@@ -42,9 +42,12 @@ control, the controls that failed and the redacted line that proves it.
 | `pattern` | (empty) | File name pattern. Empty: `.cfg .conf .txt .rsc .json` |
 | `recursive` | `true` | Also look in subfolders (hidden ones, such as `.git`, are skipped) |
 | `skip-unrecognised` | `false` | Skip files whose platform is not recognised instead of failing |
+| `accepted-risks` | (empty) | YAML file of accepted risks (see below). Empty: none |
+| `sarif` | `false` | `"true"` also writes the failed controls as SARIF (see "Code scanning") |
 
 Outputs: `switches`, `lowest-level`, `failing` (configurations with a failed control up to
-`require-level`) and `results` (path of the JSON results, for `actions/upload-artifact`).
+`require-level`), `results` (path of the JSON results, for `actions/upload-artifact`) and `sarif`
+(path of the SARIF file, empty unless `sarif: "true"`).
 
 **Oxidized git output** stores one file per node, without a suffix, in one folder per group:
 
@@ -69,10 +72,73 @@ That happens with a firmware-only platform such as Zyxel GS1900, or a file that 
 like a running configuration. A file whose format matches two platforms is not guessed either:
 give its platform with `vendor`.
 
-## Any other CI (GitLab, Jenkins, ...)
+## Accepted risks
+
+Some failures are accepted on purpose for a while: an end-of-life switch waiting for its
+replacement, a legacy device that needs Telnet. Write them in a file and give it with
+`--accepted-risks` (action input `accepted-risks`):
+
+```yaml
+accepted_risks:
+  - control: LYSS-VULN-001
+    switches: ["sw-old-*"]        # configuration or file names; * and ? allowed
+    reason: End of life, no fixed release; web interface off; replacement ordered (change 1234)
+    approved_by: Security officer
+    expires: 2027-03-31           # required, at most one year ahead
+```
+
+- An accepted failure **stays a failure**: same verdict, same level, shown with its reason, approver
+  and expiry date. Only the gate (`require-level`) stops failing on it.
+- After the expiry date it counts as a normal failure again, and the report says so. An entry that
+  matches no failed control is reported, so that stale exceptions get removed.
+- A malformed file stops the audit (exit code 2): it is never half-applied. The file is never read
+  automatically: a pull request cannot add one without the workflow naming it.
+- **Review changes to this file like code**: a pull request that accepts a risk changes what the
+  gate lets through. A `CODEOWNERS` entry for it is a good idea.
+
+## Code scanning (SARIF)
+
+With `sarif: "true"`, the action also writes the failed controls as SARIF (output `sarif`). Upload
+it to show them in the repository's **Security > Code scanning** page and on the configuration
+lines of pull requests (free for public repositories; private ones need GitHub Advanced Security):
+
+```yaml
+permissions:
+  contents: read
+  security-events: write                   # only for the upload step
+jobs:
+  lyss:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: lyss
+        uses: lyss-project/lyss@v0.18.0
+        with:
+          path: configs
+          sarif: "true"
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: ${{ steps.lyss.outputs.sarif }}
+          category: lyss
+```
+
+Each result sits on the line that proves the failure, or on line 1 when a setting is missing.
+Accepted risks are uploaded as suppressed results, with their reason. Outside GitHub:
+`lyss audit --sarif lyss.sarif --report-root . configs/`.
+
+## GitLab CI
+
+[integrations/gitlab](../integrations/gitlab/README.md) has a job to copy into a repository: failed
+controls appear in the merge request widget (Code Quality report, every GitLab tier), and the job
+fails when a required level is not met. Outside the template: `lyss audit --codequality FILE`.
+
+## Any other CI (Jenkins, ...)
 
 ```sh
-pip install "lyss==0.17.0"
+pip install "lyss==0.18.0"
 lyss audit --recursive --level 2 --require-level 2 --summary lyss-summary.md --json-file lyss.json configs/
 ```
 

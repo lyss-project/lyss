@@ -8,7 +8,9 @@
 adapter: cisco_sb
 spec_version: "0.7.1-draft"
 platform: Cisco Small Business / Business switches
-status: draft, validated on SG300 1.4.11.5, SRW2024P, SG350 2.5.0.83 (real devices, 2026-11)
+status: stable, validated on SG300 1.4.11.5, SRW2024P, SG350 2.5.0.83 (real devices, 2026-11)
+support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
+tested_on: real        # real switches
 
 facts:
   model:

@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+#
+# LYSS offline audit of saved switch configurations in GitLab CI (every tier, gitlab.com or
+# self-managed). It never connects to a device. Failed controls show in the merge request widget
+# (Code Quality report); the job fails when require-level is set and a control up to that level
+# fails. See integrations/gitlab/README.md.
+#
+# Use: copy this file into your repository and include it from .gitlab-ci.yml
+#   include:
+#     - local: lyss.gitlab-ci.yml
+#   variables:
+#     LYSS_PATH: configs
+#     LYSS_REQUIRE_LEVEL: "1"
+
+lyss-audit:
+  stage: test
+  image: python:3.12-slim
+  variables:
+    LYSS_VERSION: "0.18.0"          # pin: upgrade on purpose, after reading the changelog
+    LYSS_PATH: "."                  # file or folder of saved configurations
+    LYSS_LEVEL: "2"                 # highest level to assess (1, 2 or 3)
+    LYSS_REQUIRE_LEVEL: ""          # "1", "2" or "3": fail the job on a failed control up to it
+    LYSS_PATTERN: ""                # e.g. "*" for Oxidized git output (files without a suffix)
+    LYSS_ACCEPTED_RISKS: ""         # YAML file of accepted risks (review changes to it like code)
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  script:
+    # LYSS is installed outside the checkout and run with -I (isolated): no file of the audited
+    # repository (a merge request can add any file) can be imported instead of LYSS's own code
+    - python -I -m venv /tmp/lyss-venv
+    - '/tmp/lyss-venv/bin/python -I -m pip install --quiet --only-binary=:all: "lyss==${LYSS_VERSION}"'
+    - set -- audit --recursive --level "$LYSS_LEVEL" --report-root "$CI_PROJECT_DIR"
+        --json-file lyss-results.json --codequality gl-code-quality-report.json --summary lyss-summary.md
+    - if [ -n "$LYSS_REQUIRE_LEVEL" ]; then set -- "$@" --require-level "$LYSS_REQUIRE_LEVEL"; fi
+    - if [ -n "$LYSS_PATTERN" ]; then set -- "$@" --pattern "$LYSS_PATTERN" --skip-unrecognised; fi
+    - if [ -n "$LYSS_ACCEPTED_RISKS" ]; then set -- "$@" --accepted-risks "$LYSS_ACCEPTED_RISKS"; fi
+    - /tmp/lyss-venv/bin/python -I -m lyss "$@" -- "$LYSS_PATH"
+  artifacts:
+    when: always
+    expire_in: 30 days
+    reports:
+      codequality: gl-code-quality-report.json
+    paths:
+      - lyss-results.json
+      - lyss-summary.md

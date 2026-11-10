@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LYSS — Open security standard and free audit tool for network switches</title>
-<meta name="description" content="LYSS (Lyaazale Switch Security) is an open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, HPE Aruba, Arista EOS, MikroTik RouterOS and SONiC, with HPE Aruba AOS-CX, Juniper EX and Huawei S series (previews): evidence for every finding, fixes, ISO 27001 mappings. Made in Morocco.">
+<meta name="description" content="LYSS (Lyaazale Switch Security) is an open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, Arista EOS, HPE Aruba AOS-CX, MikroTik RouterOS and SONiC, and in preview HPE Aruba AOS-S, Juniper EX and Huawei S series: evidence for every finding, fixes, ISO 27001 mappings. Made in Morocco.">
 <meta name="author" content="Mouad Lyaazale">
 <link rel="canonical" href="https://lyss.dev/">
 <meta property="og:site_name" content="LYSS">
@@ -27,10 +27,10 @@
   "name": "LYSS (Lyaazale Switch Security)",
   "url": "https://lyss.dev/",
   "image": "https://lyss.dev/img/og-lyss.jpg",
-  "description": "Open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, HPE Aruba AOS-S, Arista EOS, MikroTik RouterOS and SONiC, with HPE Aruba AOS-CX, Juniper EX and Huawei S series (previews).",
+  "description": "Open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, Arista EOS, HPE Aruba AOS-CX, MikroTik RouterOS and SONiC, and in preview HPE Aruba AOS-S, Juniper EX and Huawei S series.",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Windows, Linux",
-  "softwareVersion": "0.17.0",
+  "softwareVersion": "0.18.0",
   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
   "codeRepository": "https://github.com/lyss-project/lyss",
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
@@ -69,7 +69,7 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="kicker"><span class="en">Lyaazale Switch Security · preview 0.17</span><span class="fr">Lyaazale Switch Security · préversion 0.17</span></p>
+      <p class="kicker"><span class="en">Lyaazale Switch Security · preview 0.18</span><span class="fr">Lyaazale Switch Security · préversion 0.18</span></p>
       <h1>
         <span class="en">The open security standard for network switches.</span>
         <span class="fr">Le standard ouvert de sécurité des commutateurs réseau.</span>
@@ -167,22 +167,23 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th><span class="en">Platform</span><span class="fr">Plateforme</span></th><th><span class="en">Levels</span><span class="fr">Niveaux</span></th><th><span class="en">Fixes</span><span class="fr">Corrections</span></th></tr>
+          <tr><th><span class="en">Platform</span><span class="fr">Plateforme</span></th><th><span class="en">Support</span><span class="fr">Statut</span></th><th><span class="en">Levels</span><span class="fr">Niveaux</span></th><th><span class="en">Fixes</span><span class="fr">Corrections</span></th></tr>
         </thead>
         <tbody>
-          <tr><td>Cisco IOS / IOS-XE (Catalyst)</td><td>1 · 2 · 3</td><td><span class="en">yes</span><span class="fr">oui</span></td></tr>
-          <tr><td>Cisco Small Business / Business (SG, CBS)</td><td>1 · 2 · 3</td><td><span class="en">yes</span><span class="fr">oui</span></td></tr>
-          <tr><td>HPE Aruba AOS-S (ProCurve)</td><td>1 · 2 · 3</td><td><span class="en">basic</span><span class="fr">de base</span></td></tr>
-          <tr><td><span class="en">MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR) · preview</span><span class="fr">MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR) · préversion</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
-          <tr><td><span class="en">SONiC (community builds) · preview</span><span class="fr">SONiC (versions communautaires) · préversion</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
-          <tr><td><span class="en">Arista EOS (7000 series, cEOS / vEOS) · preview</span><span class="fr">Arista EOS (série 7000, cEOS / vEOS) · préversion</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
-          <tr><td><span class="en">HPE Aruba AOS-CX · preview, checked on the AOS-CX simulator</span><span class="fr">HPE Aruba AOS-CX · préversion, vérifiée sur le simulateur AOS-CX</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
-          <tr><td><span class="en">Huawei S series (VRP) · preview, not yet validated on a device</span><span class="fr">Huawei série S (VRP) · préversion, pas encore validée sur un équipement</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
-          <tr><td><span class="en">Juniper EX (Junos) · preview, not yet validated on a device</span><span class="fr">Juniper EX (Junos) · préversion, pas encore validée sur un équipement</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
-          <tr><td><span class="en">Zyxel GS1900 · preview</span><span class="fr">Zyxel GS1900 · préversion</span></td><td><span class="en">firmware only (CVE-2026-7273)</span><span class="fr">firmware uniquement (CVE-2026-7273)</span></td><td><span class="en">offline</span><span class="fr">hors ligne</span></td></tr>
+          <tr><td>Cisco IOS / IOS-XE (Catalyst)</td><td><span class="en">stable · real switches</span><span class="fr">stable · switchs réels</span></td><td>1 · 2 · 3</td><td><span class="en">yes</span><span class="fr">oui</span></td></tr>
+          <tr><td>Cisco Small Business / Business (SG, CBS)</td><td><span class="en">stable · real switches</span><span class="fr">stable · switchs réels</span></td><td>1 · 2 · 3</td><td><span class="en">yes</span><span class="fr">oui</span></td></tr>
+          <tr><td>HPE Aruba AOS-S (ProCurve)</td><td><span class="en">preview · LYSS simulator</span><span class="fr">préversion · simulateur LYSS</span></td><td>1 · 2 · 3</td><td><span class="en">basic</span><span class="fr">de base</span></td></tr>
+          <tr><td>MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR)</td><td><span class="en">stable · virtual (CHR 7.25.1)</span><span class="fr">stable · virtuelle (CHR 7.25.1)</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td><span class="en">SONiC (community builds)</span><span class="fr">SONiC (versions communautaires)</span></td><td><span class="en">stable · virtual (SONiC-VS 202505)</span><span class="fr">stable · virtuelle (SONiC-VS 202505)</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td><span class="en">Arista EOS (7000 series, cEOS / vEOS)</span><span class="fr">Arista EOS (série 7000, cEOS / vEOS)</span></td><td><span class="en">stable · virtual (cEOS-lab 4.37.0F)</span><span class="fr">stable · virtuelle (cEOS-lab 4.37.0F)</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td>HPE Aruba AOS-CX</td><td><span class="en">stable · virtual (AOS-CX 10.17)</span><span class="fr">stable · virtuelle (AOS-CX 10.17)</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td><span class="en">Huawei S series (VRP)</span><span class="fr">Huawei série S (VRP)</span></td><td><span class="en">preview · vendor documentation</span><span class="fr">préversion · documentation du fabricant</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td>Juniper EX (Junos)</td><td><span class="en">preview · vendor documentation</span><span class="fr">préversion · documentation du fabricant</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td>Zyxel GS1900</td><td><span class="en">preview · firmware only</span><span class="fr">préversion · firmware uniquement</span></td><td><span class="en">firmware only (CVE-2026-7273)</span><span class="fr">firmware uniquement (CVE-2026-7273)</span></td><td><span class="en">offline</span><span class="fr">hors ligne</span></td></tr>
         </tbody>
       </table>
     </div>
+    <p class="note"><span class="en"><strong>Stable</strong>: Levels 1 and 2 verified on the vendor's own software, on real switches or its official virtual image. <strong>Preview</strong>: written from the vendor's documentation or verified only on the LYSS simulator, verdicts may still change. </span><span class="fr"><strong>Stable</strong> : niveaux 1 et 2 vérifiés sur le logiciel du fabricant, sur des switchs réels ou son image virtuelle officielle. <strong>Préversion</strong> : écrite d'après la documentation du fabricant ou vérifiée uniquement sur le simulateur LYSS, les verdicts peuvent encore changer. </span></p>
     <p class="note"><span class="en">Install with <code>pip install lyss</code>, then <code>lyss demo --open</code> to try nine simulated switches, Level 3 included. Adapters are plain YAML files: a new vendor needs no code.</span><span class="fr">Installation : <code>pip install lyss</code>, puis <code>lyss demo --open</code> pour essayer neuf switchs simulés, niveau 3 compris. Les adaptateurs sont de simples fichiers YAML : un nouveau fabricant ne demande aucun code.</span></p>
   </div>
 </section>

@@ -13,6 +13,8 @@ adapter: huawei_vrp
 spec_version: "0.7.1-draft"
 platform: Huawei S series (VRP)
 status: preview, written from the Huawei VRP documentation and synthetic configurations; not yet validated on a device
+support: preview          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
+tested_on: synthetic
 
 facts:
   model:
@@ -272,13 +274,130 @@ checks:
        stp edged-port enable
 
   # ---------------- Level 3 ----------------
-  # Huawei Level 3 checks (DHCP snooping, ARP inspection / DAI, NAC, storm control, LLDP) are not
-  # written yet: they need a device or a lab to verify.
+  # Written from the Huawei S series V200 configuration guides and security hardening guide, not
+  # yet checked on a device: DHCP snooping needs "dhcp enable" and "dhcp snooping enable" globally,
+  # then "dhcp snooping enable" in each user VLAN or on each access port ("dhcp snooping trusted"
+  # only on uplinks); dynamic ARP inspection is "arp anti-attack check user-bind enable" in the VLAN
+  # or on the port; NAC is an "authentication-profile" on the port (unified mode, V200R009 and
+  # later) or "dot1x enable" / "mac-authen" (common mode); storm control is "storm-control
+  # broadcast ..." or "broadcast-suppression ..." on the port; LLDP is on by default and is turned
+  # off with "undo lldp enable" (globally or per port) or "lldp admin-status rx".
+  # access ports = "port link-type access" interfaces that are not shut or Eth-Trunk members, as for
+  # LYSS-ACC-011; their VLAN is "port default vlan N" (VLAN 1 without it).
 
-  LYSS-ACC-020: &vrp_l3
-    otherwise: unknown
-    note: Level 3 checks for Huawei VRP are not written yet (help welcome, see CONTRIBUTING.md).
-  LYSS-ACC-021: *vrp_l3
-  LYSS-ACC-022: *vrp_l3
-  LYSS-ACC-023: *vrp_l3
-  LYSS-ACC-024: *vrp_l3
+  LYSS-ACC-020:
+    not_applicable_if_any: &vrp_no_access
+      - {not: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^port link-type access', where_not: '^(shutdown|eth-trunk \d+)\s*$'}, say: 'no enabled access port ("port link-type access")'}
+    fail_if_any:
+      - {not: {block: '^dhcp snooping enable( ipv4)?\s*$'}, say: 'DHCP snooping is not enabled globally ("dhcp snooping enable")'}
+      - {not: {block: '^dhcp enable\s*$'}, say: 'DHCP is not enabled globally ("dhcp enable"), which DHCP snooping needs'}
+      - {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^port link-type access', where_not: '^(shutdown|eth-trunk \d+)\s*$', line: '^dhcp snooping trusted\b'}
+    pass_if_any:
+      # per VLAN (for every access port without its own "dhcp snooping enable"), or per access port
+      - uncovered:
+          what: access VLANs without DHCP snooping
+          used: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^port link-type access', where_not: '^(shutdown|eth-trunk \d+|dhcp snooping enable)\s*$', line: '^port default vlan (\d+)', default: 1}
+          covered: {block: '^vlan (\d+)$', where: '^dhcp snooping enable\s*$'}
+        absent: true
+      - uncovered:
+          what: access ports without DHCP snooping
+          used: &vrp_access_ports {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^port link-type access', where_not: '^(shutdown|eth-trunk \d+)\s*$'}
+          covered: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^dhcp snooping enable\s*$'}
+        absent: true
+    otherwise: fail
+    remediation: |
+      dhcp enable
+      dhcp snooping enable
+      vlan <access-vlan>
+       dhcp snooping enable
+      interface <uplink>
+       dhcp snooping trusted
+
+  LYSS-ACC-021:
+    not_applicable_if_any: *vrp_no_access
+    pass_if_any:
+      - uncovered:
+          what: access VLANs without ARP inspection
+          used: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^port link-type access', where_not: '^(shutdown|eth-trunk \d+|arp anti-attack check user-bind enable)\s*$', line: '^port default vlan (\d+)', default: 1}
+          covered: {block: '^vlan (\d+)$', where: '^arp anti-attack check user-bind enable\s*$'}
+        absent: true
+      - uncovered:
+          what: access ports without ARP inspection
+          used: *vrp_access_ports
+          covered: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^arp anti-attack check user-bind enable\s*$'}
+        absent: true
+    otherwise: fail
+    note: Dynamic ARP inspection on VRP checks ARP packets against the DHCP snooping bindings ("arp anti-attack check user-bind enable", in the VLAN or on each access port).
+    remediation: |
+      vlan <access-vlan>
+       arp anti-attack check user-bind enable
+
+  LYSS-ACC-022:
+    not_applicable_if_any: *vrp_no_access
+    pass_if_any:
+      # unified mode: every access port bound to an authentication profile, and every profile bound
+      # to an access port runs 802.1X or MAC authentication
+      - all:
+          - uncovered:
+              what: access ports without 802.1X / MAC authentication
+              used: *vrp_access_ports
+              covered: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^authentication-profile \S+\s*$'}
+            absent: true
+          - uncovered:
+              what: authentication profiles without 802.1X or MAC authentication
+              used: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^port link-type access', where_not: '^(shutdown|eth-trunk \d+)\s*$', line: '^authentication-profile (\S+)\s*$'}
+              covered: {block: '^authentication-profile name (\S+)', where: '^(dot1x|mac)-access-profile \S+'}
+            absent: true
+      # common mode: enabled globally and on every access port
+      - all:
+          - {block: '^(dot1x enable|mac-authen)\s*$'}
+          - uncovered:
+              what: access ports without 802.1X / MAC authentication
+              used: *vrp_access_ports
+              covered: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^(dot1x enable|mac-authen)\s*$'}
+            absent: true
+    otherwise: fail
+    note: >-
+      Unified mode (V200R009 and later): an "authentication-profile" with a dot1x-access-profile or
+      mac-access-profile, bound to every access port. Common mode: "dot1x enable" or "mac-authen"
+      globally and on every access port.
+    remediation: |
+      dot1x-access-profile name d1x
+      authentication-profile name nac
+       dot1x-access-profile d1x
+      interface <access-port>
+       authentication-profile nac
+
+  LYSS-ACC-023:
+    not_applicable_if_any: *vrp_no_access
+    fail_if_any:
+      # 100 % limits nothing
+      - {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^port link-type access', where_not: '^(shutdown|eth-trunk \d+)\s*$', line: '^(broadcast-suppression 100|storm-control broadcast .*\bmax-rate percent 100)\s*$'}
+      - uncovered: &vrp_storm
+          what: access ports without broadcast storm control
+          used: *vrp_access_ports
+          covered: {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^(storm-control broadcast|broadcast-suppression) \S'}
+    pass_if_any:
+      - {uncovered: *vrp_storm, absent: true}
+    otherwise: fail
+    remediation: |
+      interface <access-port>
+       broadcast-suppression 5
+
+  LYSS-ACC-024:
+    not_applicable_if_any: *vrp_no_access
+    fail_if_any:
+      - all:
+          - {not: {block: '^undo lldp enable\s*$'}}
+          - uncovered:
+              what: access ports sending LLDP
+              used: *vrp_access_ports
+              covered:
+                - {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^(undo lldp enable|lldp admin-status (disable|rx))\s*$'}
+                # IP phone ports keep LLDP-MED
+                - {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^voice-vlan \d+ enable\b'}
+    otherwise: pass
+    note: VRP sends LLDP by default; IP phone ports ("voice-vlan N enable") are exempt. Huawei's own discovery protocols (NDP) are not assessed.
+    remediation: |
+      interface <user-access-port>
+       lldp admin-status rx

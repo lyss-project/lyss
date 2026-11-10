@@ -10,7 +10,9 @@
 adapter: sonic
 spec_version: "0.7.1-draft"
 platform: SONiC (community)
-status: preview, validated on SONiC-VS 202505 (virtual switch, 2026-11)
+status: stable, validated on SONiC-VS 202505 (virtual switch, 2026-11)
+support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
+tested_on: virtual        # SONiC-VS 202505
 
 facts:
   model: {section: show version, line: '^HwSKU:\s*(\S+)'}

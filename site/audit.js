@@ -175,6 +175,7 @@ function render(r) {
   title.appendChild(bi("Result", "Résultat", "h2"));
   const platform = el("p", "small");
   platform.append(PLATFORMS[r.vendor] || r.vendor);
+  if (r.support === "preview") platform.append(bi(" · preview: verdicts may still change", " · préversion : les verdicts peuvent encore changer"));
   if (r.detected) platform.append(bi(" · detected automatically", " · détectée automatiquement"));
   platform.append(" · LYSS " + r.version + " · spec " + r.spec_version);
   title.appendChild(platform);

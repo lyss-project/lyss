@@ -26,14 +26,23 @@ from pathlib import Path
 from . import PROJECT_LONG_NAME, PROJECT_NAME, __version__, ci
 from .engine import ADAPTER_DIR, audit, conformance, detect_vendor, load_spec
 
+def yaml_error():
+    import yaml
+    return yaml.YAMLError
+
+
 ICONS = {"pass": "PASS", "fail": "FAIL", "unknown": "????", "not_applicable": "n/a "}
 
 
-def print_text(name: str, findings, summary) -> None:
+def print_text(name: str, findings, summary, accepted: dict | None = None) -> None:
+    accepted = accepted or {}
     print(f"\n=== {name}  ->  {PROJECT_NAME} Level {summary['achieved_level']} "
           f"(pass {summary['pass']}, fail {summary['fail']}, unknown {summary['unknown']})")
     for f in findings:
         print(f"  [{ICONS[f.verdict]}] {f.control_id}  {f.title}")
+        if f.control_id in accepted:
+            a = accepted[f.control_id]
+            print(f"           accepted risk until {a['expires']} ({a['approved_by']}): {a['reason']}")
         for e in f.evidence[:3]:
             print(f"           evidence: {e}")
         if f.note:
@@ -85,6 +94,16 @@ def _readable(path: Path) -> str:
     return ""
 
 
+def _report_path(path: Path, root: Path | None) -> str:
+    """The file's path for SARIF / Code Quality: relative to the repository root (default: the
+    current folder), with "/" separators; just the file name if it is outside that root."""
+    base = (root or Path.cwd()).resolve()
+    try:
+        return path.resolve().relative_to(base).as_posix()
+    except ValueError:
+        return path.name
+
+
 def cmd_audit(args) -> int:
     # offline: a device = a saved configuration + optional <name>.state.txt (device state sections)
     if not args.path.exists():
@@ -95,6 +114,14 @@ def cmd_audit(args) -> int:
         # in CI, a pull request could turn the audited folder (or a folder above it) into a link
         print(f"{args.path}: goes through a symbolic link, not followed: give the real path", file=sys.stderr)
         return 2
+    acceptances, used = [], set()
+    if args.accepted_risks:
+        from . import accepted
+        try:
+            acceptances = accepted.load(args.accepted_risks)
+        except (OSError, ValueError, yaml_error()) as e:
+            print(f"accepted risks: {e}", file=sys.stderr)
+            return 2
     files = config_files(args.path, args.pattern, args.recursive)
     results, problems = [], []
     status = 0
@@ -145,17 +172,38 @@ def cmd_audit(args) -> int:
             continue
         findings = audit(text, vendor, args.level, state_text)
         summary = conformance(findings)
-        results.append({"device": name, "vendor": vendor,
-                        "summary": summary, "findings": [asdict(f) for f in findings]})
+        rows = [asdict(f) for f in findings]
+        for row in rows:
+            if row["verdict"] == "fail":
+                row["line"] = ci.locate(text, row["evidence"])   # SARIF / Code Quality: where to show it
+        if acceptances:
+            from . import accepted
+            for note in accepted.apply(name, rows, acceptances, used):
+                print(note, file=sys.stderr)
+                problems.append(note)
+        results.append({"device": name, "vendor": vendor, "file": _report_path(path, args.report_root),
+                        "summary": summary, "findings": rows})
         if not args.json:
-            print_text(f"{name} ({vendor})" if args.vendor == "auto" else name, findings, summary)
+            print_text(f"{name} ({vendor})" if args.vendor == "auto" else name, findings, summary,
+                       {r["control_id"]: r["accepted"] for r in rows if r.get("accepted")})
 
+    if acceptances:
+        from . import accepted
+        for note in accepted.unused(acceptances, used):
+            print(note, file=sys.stderr)
+            problems.append(note)
     spec_version = load_spec()["spec_version"]
     document = {"tool": PROJECT_NAME, "version": __version__, "spec_version": spec_version, "results": results}
     if args.json:
         json.dump(document, sys.stdout, indent=2, ensure_ascii=False)
     if args.json_file:
         args.json_file.write_text(json.dumps(document, indent=2, ensure_ascii=False), encoding="utf-8")
+    if args.sarif:
+        args.sarif.write_text(json.dumps(ci.sarif(results, load_spec(), lambda r: r["file"]), indent=2,
+                                         ensure_ascii=False), encoding="utf-8")
+    if args.codequality:
+        args.codequality.write_text(json.dumps(ci.codequality(results, lambda r: r["file"]), indent=2,
+                                               ensure_ascii=False), encoding="utf-8")
     bad = ci.failing(results, args.require_level)
     if args.require_level and not results:
         problems.append("no switch configuration found")
@@ -168,6 +216,53 @@ def cmd_audit(args) -> int:
               + ", ".join(r["device"] for r in bad[:10]) + (" ..." if len(bad) > 10 else ""), file=sys.stderr)
         status = max(status, 1)
     return status
+
+
+REFERENCES = (("iso27001_2022", "ISO/IEC 27001:2022", str), ("nist_800_53r5", "NIST SP 800-53 r5", str),
+              ("cis_v8", "CIS Controls v8", str), ("nis2_art21", "NIS2 Art.", lambda v: f"21(2)({v})"))
+
+
+def cmd_explain(args) -> int:
+    """A control of the specification, offline: requirement, rationale, test procedure, references,
+    and with --vendor what the adapter checks and how to fix it."""
+    import textwrap
+
+    from .engine import load_adapter
+    spec = load_spec()
+    controls = spec["controls"]
+    if not args.control:
+        for c in controls:
+            print(f"{c['id']:15} L{c['level']}  {c['title']}")
+        return 0
+    wanted = args.control.strip().upper()
+    wanted = wanted if wanted.startswith("LYSS-") else f"LYSS-{wanted}"
+    control = next((c for c in controls if c["id"] == wanted), None)
+    if control is None:
+        print(f"{args.control}: no such control (lyss explain lists them all)", file=sys.stderr)
+        return 2
+
+    def para(label: str, text) -> None:
+        if text:
+            print(f"\n{label}")
+            print(textwrap.fill(" ".join(str(text).split()), width=100, initial_indent="  ", subsequent_indent="  "))
+
+    print(f"{control['id']}  Level {control['level']}  {control['title']}")
+    para("Requirement", control.get("statement"))
+    para("Rationale", control.get("rationale"))
+    para("Test procedure", control.get("test_procedure"))
+    para("Evidence", ", ".join(control.get("evidence") or []))
+    mappings = control.get("mappings") or {}
+    refs = [f"{name} {', '.join(fmt(v) for v in mappings[key])}" for key, name, fmt in REFERENCES if mappings.get(key)]
+    para("References (informative)", "; ".join(refs))   # ASCII only: Windows consoles
+    if args.vendor:
+        check = load_adapter(args.vendor)["checks"].get(control["id"]) or {}
+        para(f"On {args.vendor}", check.get("note") or "(no platform note)")
+        if check.get("remediation"):
+            print("\nFix")
+            for line in check["remediation"].rstrip().splitlines():
+                print(f"  {line}")
+    print(f"\nSpecification {spec['spec_version']}. Full text: docs/LYSS-Specification.md, https://lyss.dev")
+    return 0
 
 
 def cmd_collect(args) -> int:
@@ -463,9 +558,23 @@ def main(argv=None) -> int:
     a.add_argument("--require-level", type=int, choices=(1, 2, 3), metavar="LEVEL",
                    help="exit code 1 if any control of level 1..LEVEL fails (for CI; unknown verdicts, "
                         "such as backups a file cannot show, do not fail)")
+    a.add_argument("--accepted-risks", type=Path, metavar="FILE",
+                   help="YAML file of accepted risks (control, switches, reason, approved_by, expires): "
+                        "shown next to the failure, never a pass; --require-level ignores them until they expire")
+    a.add_argument("--sarif", type=Path, metavar="FILE",
+                   help="also write failed controls as SARIF 2.1.0 (GitHub code scanning)")
+    a.add_argument("--codequality", type=Path, metavar="FILE",
+                   help="also write failed controls as a GitLab Code Quality report (merge request widget)")
+    a.add_argument("--report-root", type=Path, metavar="DIR",
+                   help="repository root that SARIF / Code Quality paths are relative to (default: current folder)")
     a.add_argument("--summary", type=Path, help="append a markdown summary to this file (CI job summary)")
     a.add_argument("path", type=Path)
     a.set_defaults(func=cmd_audit)
+
+    ex = sub.add_parser("explain", help="explain a control (offline): requirement, test procedure, references, fix")
+    ex.add_argument("control", nargs="?", help="control ID, e.g. LYSS-MGMT-001 or MGMT-001 (none: list all)")
+    ex.add_argument("--vendor", choices=vendors, metavar="VENDOR", help="also show what this adapter checks and the fix")
+    ex.set_defaults(func=cmd_explain)
 
     c = sub.add_parser("collect", help="collect and audit inventory devices (read-only)")
     c.add_argument("--only", nargs="*", help="device ids (default: all)")

@@ -16,7 +16,9 @@
 adapter: aruba_aoscx
 spec_version: "0.7.1-draft"
 platform: HPE Aruba Networking AOS-CX
-status: preview, written from the AOS-CX documentation; collection and Level 1-2 output formats checked on the AOS-CX 10.17 simulator, not yet on a physical switch
+status: stable, collection and Level 1-3 output formats checked on the AOS-CX 10.17 simulator (2026-11), not yet on a physical switch; ARP inspection from the documentation
+support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
+tested_on: virtual        # AOS-CX 10.17 simulator
 
 facts:
   model:
@@ -252,13 +254,106 @@ checks:
           spanning-tree bpdu-guard
 
   # ---------------- Level 3 ----------------
-  # AOS-CX Level 3 checks (DHCPv4 snooping, ARP inspection, port access, rate limits, LLDP) are not
-  # written yet; to be checked on the AOS-CX simulator or a real switch.
+  # Checked on the AOS-CX 10.17 simulator: "dhcpv4-snooping" (a global line, and a line inside
+  # "vlan N"), "dhcpv4-snooping trust" on uplinks; "aaa authentication port-access dot1x
+  # authenticator" and "... mac-auth" blocks, global and per port, holding "enable" (a port where
+  # it is disabled shows no such block); "rate-limit broadcast N percent|kbps" (100 percent is kept
+  # as written); "no lldp transmit" per port or "no lldp" globally. CDP is receive-only on AOS-CX
+  # ("show cdp": CDP Mode Rxonly), so only LLDP is checked.
+  # The virtual platform has no ARP inspection: "arp inspection" (VLAN) and "arp inspection trust"
+  # (port) follow the HPE documentation and the CIS HPE Aruba CX benchmark (6200, 6300, 6400 and
+  # 8400 from AOS-CX 10.4), not checked on a device.
+  # access ports = enabled interfaces with "vlan access" that are not LAG members (as LYSS-ACC-011);
+  # IP phone ports are trunks on AOS-CX ("vlan trunk native" + voice VLAN), so they are not counted.
 
-  LYSS-ACC-020: &cx_l3
-    otherwise: unknown
-    note: Level 3 checks for AOS-CX are not written yet (help welcome, see CONTRIBUTING.md).
-  LYSS-ACC-021: *cx_l3
-  LYSS-ACC-022: *cx_l3
-  LYSS-ACC-023: *cx_l3
-  LYSS-ACC-024: *cx_l3
+  LYSS-ACC-020:
+    not_applicable_if_any: &cx_no_access
+      - {not: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$'}, say: 'no enabled access port (no enabled interface with "vlan access")'}
+    fail_if_any:
+      - {not: {block: '^dhcpv4-snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("dhcpv4-snooping")'}
+      # a trusted access port accepts DHCP server messages
+      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', line: '^dhcpv4-snooping trust\b'}
+      - uncovered: &cx_snooping
+          what: access VLANs without DHCP snooping
+          used: &cx_access_vlans {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', line: '^vlan access (\d+)'}
+          covered: {block: '^vlan (\d+)$', where: '^dhcpv4-snooping\s*$'}
+    pass_if_any:
+      - {uncovered: *cx_snooping, absent: true}
+    otherwise: fail
+    remediation: |
+      dhcpv4-snooping
+      vlan <access-vlan>
+          dhcpv4-snooping
+      interface <uplink>
+          dhcpv4-snooping trust
+
+  LYSS-ACC-021:
+    not_applicable_if_any: *cx_no_access
+    fail_if_any:
+      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', line: '^arp inspection trust\b'}
+      - uncovered: &cx_dai
+          what: access VLANs without ARP inspection
+          used: *cx_access_vlans
+          covered: {block: '^vlan (\d+)$', where: '^arp inspection\s*$'}
+    pass_if_any:
+      - {uncovered: *cx_dai, absent: true}
+    otherwise: fail
+    note: >-
+      Dynamic ARP inspection exists on the 6200, 6300, 6400 and 8400 series (AOS-CX 10.4 or later),
+      not on the AOS-CX virtual platform. It relies on the DHCP snooping bindings (LYSS-ACC-020).
+    remediation: |
+      vlan <access-vlan>
+          arp inspection
+      interface <uplink>
+          arp inspection trust
+
+  LYSS-ACC-022:
+    not_applicable_if_any: *cx_no_access
+    fail_if_any:
+      - {not: {block: '^aaa authentication port-access (dot1x authenticator|mac-auth)$', line: '^enable\s*$'}, say: '802.1X / MAC authentication is not enabled globally ("aaa authentication port-access ... / enable")'}
+      - uncovered: &cx_nac
+          what: access ports without 802.1X / MAC authentication
+          used: &cx_access_ports {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$'}
+          covered: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^aaa authentication port-access (dot1x authenticator|mac-auth)$', '^enable\s*$']}
+    pass_if_any:
+      - {uncovered: *cx_nac, absent: true}
+    otherwise: fail
+    remediation: |
+      aaa authentication port-access dot1x authenticator
+          enable
+      interface <access-port>
+          aaa authentication port-access dot1x authenticator
+              enable
+          aaa authentication port-access mac-auth
+              enable
+
+  LYSS-ACC-023:
+    not_applicable_if_any: *cx_no_access
+    fail_if_any:
+      # a 100 % limit limits nothing
+      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', line: '^rate-limit broadcast 100 percent\b'}
+      - uncovered: &cx_storm
+          what: access ports without a broadcast rate limit
+          used: *cx_access_ports
+          covered: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: '^rate-limit broadcast \d+ (percent|kbps)\b'}
+    pass_if_any:
+      - {uncovered: *cx_storm, absent: true}
+    otherwise: fail
+    remediation: |
+      interface <access-port>
+          rate-limit broadcast 5 percent
+
+  LYSS-ACC-024:
+    not_applicable_if_any: *cx_no_access
+    fail_if_any:
+      - all:
+          - {not: {block: '^no lldp\s*$'}}
+          - uncovered:
+              what: access ports sending LLDP
+              used: *cx_access_ports
+              covered: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: '^no lldp transmit\s*$'}
+    otherwise: pass
+    note: AOS-CX only receives CDP (CDP mode "Rxonly"), so only LLDP transmission is checked; IP phone ports are trunks and not counted.
+    remediation: |
+      interface <user-access-port>
+          no lldp transmit

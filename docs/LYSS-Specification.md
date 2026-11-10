@@ -46,7 +46,7 @@ A device is **LYSS Level N conformant** when every control of levels 1 to N is `
 `not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.7.1-draft), assessed 2026-11-10 with LYSS 0.17.
+> core-sw-01 is LYSS Level 1 conformant (specification 0.7.1-draft), assessed 2026-11-11 with LYSS 0.18.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
 

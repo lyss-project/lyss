@@ -33,9 +33,13 @@ the **tool and adapters** (how it is checked on each platform). Both are welcome
 2. If device state is needed, add the read-only commands for the platform in
    `src/lyss/collector.py` (`COMMANDS`).
 3. Add test cases in `tests/cases/<name>/` (`config.cfg`, optional `state.txt`, `expected.yaml`).
-   For a fully supported platform, every Level 1-2 control must have a case where it passes and
-   one where it fails: `tests/test_controls.py` enforces it.
-4. Validate the rules on real devices you are authorised to assess, then contribute only
+   Every Level 1-2 control the adapter decides must have a case where it passes and one where it
+   fails: `tests/test_controls.py` enforces it.
+4. Set `support: preview` and `tested_on:` (`real`, `virtual` or `synthetic`) in the adapter, and
+   the same label in the README, website and docs/VALIDATION.md tables (a test checks them). A
+   platform becomes stable once its Level 1-2 outputs are confirmed on the vendor's software
+   ([docs/VERSIONING.md](docs/VERSIONING.md)).
+5. Validate the rules on real devices you are authorised to assess, then contribute only
    synthetic cases derived from them.
 
 ## Development

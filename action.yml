@@ -29,6 +29,12 @@ inputs:
   skip-unrecognised:
     description: Skip files whose platform is not recognised instead of failing.
     default: "false"
+  accepted-risks:
+    description: YAML file of accepted risks, relative to the workspace (control, switches, reason, approved_by, expires). Accepted failures stay failures in the report but do not fail the job until they expire. Review changes to this file like code. Empty = none.
+    default: ""
+  sarif:
+    description: '"true" to also write the failed controls as SARIF (output "sarif"), to upload with github/codeql-action/upload-sarif: findings then show in code scanning and on the configuration lines of pull requests.'
+    default: "false"
 
 outputs:
   lowest-level:
@@ -43,6 +49,9 @@ outputs:
   results:
     description: Path of the JSON results file (findings with redacted evidence).
     value: ${{ steps.audit.outputs.results }}
+  sarif:
+    description: Path of the SARIF file (empty unless the sarif input is "true").
+    value: ${{ steps.audit.outputs.sarif }}
 
 runs:
   using: composite
@@ -84,17 +93,28 @@ runs:
         LYSS_PATTERN: ${{ inputs.pattern }}
         LYSS_RECURSIVE: ${{ inputs.recursive }}
         LYSS_SKIP: ${{ inputs.skip-unrecognised }}
+        LYSS_ACCEPTED: ${{ inputs.accepted-risks }}
+        LYSS_SARIF: ${{ inputs.sarif }}
       run: |
         set -uo pipefail
         # one results file per step, removed first: a failed run never reports an earlier run's results
         step="$(printf '%s' "${GITHUB_ACTION:-run}" | tr -cd 'A-Za-z0-9_-')"
         results="$RUNNER_TEMP/lyss-results-${step}.json"
-        rm -f "$results"
-        args=(audit --vendor "$LYSS_VENDOR" --level "$LYSS_LEVEL" --json-file "$results" --summary "$GITHUB_STEP_SUMMARY")
+        sarif="$RUNNER_TEMP/lyss-${step}.sarif"
+        rm -f "$results" "$sarif"
+        args=(audit --vendor "$LYSS_VENDOR" --level "$LYSS_LEVEL" --json-file "$results" --summary "$GITHUB_STEP_SUMMARY"
+              --report-root "$GITHUB_WORKSPACE")
+        if [ "$LYSS_SARIF" = "true" ]; then args+=(--sarif "$sarif"); echo "sarif=$sarif" >> "$GITHUB_OUTPUT"; else echo "sarif=" >> "$GITHUB_OUTPUT"; fi
         [ -n "$LYSS_REQUIRE_LEVEL" ] && args+=(--require-level "$LYSS_REQUIRE_LEVEL")
         [ -n "$LYSS_PATTERN" ] && args+=(--pattern "$LYSS_PATTERN")
         [ "$LYSS_RECURSIVE" = "true" ] && args+=(--recursive)
         [ "$LYSS_SKIP" = "true" ] && args+=(--skip-unrecognised)
+        if [ -n "$LYSS_ACCEPTED" ]; then
+          case "$LYSS_ACCEPTED" in
+            /*|[A-Za-z]:*) args+=(--accepted-risks "$LYSS_ACCEPTED") ;;
+            *) args+=(--accepted-risks "$GITHUB_WORKSPACE/$LYSS_ACCEPTED") ;;
+          esac
+        fi
         # the path input is relative to the workspace (the steps run in the runner's temp folder)
         case "$LYSS_PATH" in
           /*|[A-Za-z]:*) target="$LYSS_PATH" ;;

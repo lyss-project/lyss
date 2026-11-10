@@ -7,7 +7,7 @@ import json
 from dataclasses import asdict
 
 from . import PROJECT_NAME, __version__
-from .engine import audit, conformance, detect_vendor, load_spec
+from .engine import audit, conformance, detect_vendor, load_adapter, load_spec
 
 VENDORS = ("arista_eos", "aruba_aoscx", "cisco_ios", "cisco_sb", "hp_procurve", "huawei_vrp", "juniper_junos", "mikrotik", "sonic", "zyxel_gs1900")
 
@@ -27,6 +27,7 @@ def run(text: str, vendor: str = "auto", level: int = 2, state_text: str = "") -
     findings = audit(text, vendor, max(1, min(int(level), 3)), state_text or "")
     return json.dumps({
         "ok": True, "tool": PROJECT_NAME, "version": __version__, "spec_version": load_spec()["spec_version"],
-        "vendor": vendor, "detected": detected, "summary": conformance(findings),
+        "vendor": vendor, "detected": detected, "support": load_adapter(vendor).get("support", "preview"),
+        "summary": conformance(findings),
         "findings": [asdict(f) for f in findings],
     }, ensure_ascii=False)

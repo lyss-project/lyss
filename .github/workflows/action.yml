@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          persist-credentials: false   # no token left in .git/config
       - name: Report only
         id: report
         uses: ./
@@ -21,6 +23,7 @@ jobs:
           path: tests/cases
           pattern: config.cfg
           level: "2"
+          sarif: "true"
       - name: Gate on the weak fictitious configurations (must fail)
         id: gate
         continue-on-error: true
@@ -43,8 +46,11 @@ jobs:
           SWITCHES: ${{ steps.report.outputs.switches }}
           GATE: ${{ steps.gate.outcome }}
           HARDENED: ${{ steps.hardened.outputs.failing }}
+          SARIF: ${{ steps.report.outputs.sarif }}
         run: |
           echo "switches=$SWITCHES gate=$GATE hardened-failing=$HARDENED"
           test "$SWITCHES" -ge 13
           test "$GATE" = failure
           test "$HARDENED" = 0
+          # SARIF: valid, with results on files relative to the repository (not uploaded: fictitious cases)
+          python3 -I -c 'import json,sys; s=json.load(open(sys.argv[1])); r=s["runs"][0]["results"]; assert s["version"]=="2.1.0" and r; assert all(x["locations"][0]["physicalLocation"]["artifactLocation"]["uri"].startswith("tests/cases/") for x in r); print(len(r), "SARIF results")' "$SARIF"

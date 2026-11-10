@@ -307,8 +307,14 @@ def _captures(cfg: Config, source) -> dict[str, list[str]]:
         return found
     if "block" not in source:
         regex = re.compile(source["line"])
+        # "value_in": {group: N, source: S} keeps a line only if its group N is a value of source S,
+        # e.g. Junos DHCP security group memberships of ACCESS ports only
+        keep = source.get("value_in")
+        allowed = set(_captures(cfg, keep["source"])) if keep else None
         for line in cfg.lines:
             if m := regex.search(line):
+                if keep and m.group(keep["group"]) not in allowed:
+                    continue
                 found.setdefault(m.group(1), []).append(line)
         return found
     header = re.compile(source["block"])
@@ -407,7 +413,8 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
         if rule.get("absent"):
             # pass form: something is in use and all of it is covered
             ok = bool(used) and not missing
-            return ok, [f"every {what} covered: {', '.join(sorted(used, key=_port_sort))}"] if ok else []
+            # "what" names the problem ("access ports without BPDU guard"): none of them, out of these
+            return ok, [f"no {what} (checked: {', '.join(sorted(used, key=_port_sort))})"] if ok else []
         if not missing:
             return False, []
         listed = sorted(missing, key=_port_sort)

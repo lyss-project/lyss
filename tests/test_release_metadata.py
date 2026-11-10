@@ -78,6 +78,15 @@ def test_third_party_actions_are_pinned_to_commit_shas():
                 assert re.search(r"#\s*v\d", line), f"{f.name}: say which version the SHA is: {line.strip()}"
 
 
+def test_checkouts_leave_no_token_on_disk():
+    """Plumber ISSUE-307: actions/checkout keeps the job token in .git/config unless told not to."""
+    for f in sorted((ROOT / ".github" / "workflows").glob("*.yml")):
+        for job, spec in yaml.safe_load(f.read_text(encoding="utf-8"))["jobs"].items():
+            for step in spec.get("steps", []):
+                if str(step.get("uses", "")).startswith("actions/checkout@"):
+                    assert (step.get("with") or {}).get("persist-credentials") is False, f"{f.name}: {job}"
+
+
 def test_release_jobs_have_least_privilege():
     release = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8"))
     assert release["permissions"] == {"contents": "read"}
@@ -85,6 +94,48 @@ def test_release_jobs_have_least_privilege():
     assert jobs["publish"]["permissions"] == {"id-token": "write"}
     assert jobs["sbom"]["permissions"] == {"contents": "write"}
     assert "permissions" not in jobs["build"]                     # the workflow default: read only
+
+
+def test_platform_support_labels_agree_everywhere():
+    """Option B (1.0 plan): each adapter says stable or preview; README, VALIDATION and the website
+    must show the same label for that platform."""
+    rows = {  # adapter -> text that starts its row in README / VALIDATION / site
+        "cisco_ios": ("| Cisco IOS / IOS-XE (Catalyst) |", "| Cisco IOS / IOS-XE |", "Cisco IOS / IOS-XE (Catalyst)</td>"),
+        "cisco_sb": ("| Cisco Small Business / Business (SG200-550X, CBS) |", "| Cisco Small Business / Business |",
+                     "Cisco Small Business / Business (SG, CBS)</td>"),
+        "hp_procurve": ("| HP ProCurve / HPE Aruba AOS-S |", "| HPE Aruba AOS-S |", "HPE Aruba AOS-S (ProCurve)</td>"),
+        "mikrotik": ("| MikroTik RouterOS", "| MikroTik RouterOS |", "MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR)</td>"),
+        "sonic": ("| SONiC (community builds) |", "| SONiC |", "SONiC (versions communautaires)</span></td>"),
+        "arista_eos": ("| Arista EOS", "| Arista EOS |", "Arista EOS (série 7000, cEOS / vEOS)</span></td>"),
+        "aruba_aoscx": ("| HPE Aruba AOS-CX", "| HPE Aruba AOS-CX |", "HPE Aruba AOS-CX</td>"),
+        "huawei_vrp": ("| Huawei S series", "| Huawei S series (VRP) |", "Huawei série S (VRP)</span></td>"),
+        "juniper_junos": ("| Juniper EX (Junos) |", "| Juniper EX (Junos) |", "Juniper EX (Junos)</td>"),
+        "zyxel_gs1900": ("| Zyxel GS1900 |", "| Zyxel GS1900 |", "Zyxel GS1900</td>"),
+    }
+    assert set(rows) == {p.stem for p in ADAPTER_DIR.glob("*.yaml")}, "new adapter: add its rows here"
+    readme = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()
+    validation = (ROOT / "docs" / "VALIDATION.md").read_text(encoding="utf-8").splitlines()
+    site = (ROOT / "site" / "index.html").read_text(encoding="utf-8").splitlines()
+
+    def row(lines, start):
+        found = [l.strip() for l in lines if l.strip().startswith(start) or (start.endswith("</td>") and start in l and "<tr>" in l)]
+        assert len(found) == 1, (start, found)
+        return found[0]
+
+    for name, (r_readme, r_validation, r_site) in rows.items():
+        adapter = yaml.safe_load((ADAPTER_DIR / f"{name}.yaml").read_text(encoding="utf-8"))
+        support, tested_on = adapter.get("support"), adapter.get("tested_on")
+        assert support in ("stable", "preview") and tested_on in ("real", "virtual", "synthetic"), name
+        assert (support == "stable") == (tested_on in ("real", "virtual")), name
+        assert str(adapter.get("status", "")).startswith(support + ","), name
+        cell = row(readme, r_readme).split("|")[2].strip()
+        assert cell.startswith("**stable**" if support == "stable" else "preview"), (name, cell)
+        if support == "stable":
+            assert ("real switches" in cell) == (tested_on == "real") and ("virtual" in cell) == (tested_on == "virtual"), (name, cell)
+        cell = row(validation, r_validation).split("|")[2].strip()
+        assert cell == ({"real": "**Stable** (real)", "virtual": "**Stable** (virtual)"}.get(tested_on, "Preview")), (name, cell)
+        html = row(site, r_site)
+        assert (f'"en">stable · ' in html) == (support == "stable") and (f'"en">preview · ' in html) == (support == "preview"), name
 
 
 def test_every_adapter_implements_the_current_specification():

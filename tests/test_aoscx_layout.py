@@ -70,3 +70,64 @@ def test_where_list_needs_every_pattern():
     ok, evidence = evaluate_rule(cfg, rule)
     assert ok and evidence == ["interface 1/1/2 / no shutdown"]
     assert evaluate_rule(cfg, {"block": r"^interface (\S+)$", "where": r"^vlan access", "every_contains": r"^no shutdown"})[0] is False
+
+
+# ---- Level 3 (formats checked on the AOS-CX 10.17 simulator; fixture tests/l3/aruba_aoscx.cfg) ----
+
+def _l3() -> str:
+    from pathlib import Path
+    return (Path(__file__).parent / "l3" / "aruba_aoscx.cfg").read_text(encoding="utf-8")
+
+
+def l3_verdict(text: str, control: str) -> tuple[str, list]:
+    f = next(f for f in audit(text, "aruba_aoscx", 3) if f.control_id == control)
+    return f.verdict, f.evidence
+
+
+def test_l3_port_without_authentication_block_fails():
+    # "no enable" on a port removes the whole block from the running configuration
+    text = _l3().replace("    aaa authentication port-access mac-auth\n        enable\ninterface 1/1/3", "interface 1/1/3")
+    v, ev = l3_verdict(text, "LYSS-ACC-022")
+    assert v == "fail" and ev[0] == "access ports without 802.1X / MAC authentication: 1/1/2"
+
+
+def test_l3_global_port_access_must_be_enabled():
+    text = _l3().replace("aaa authentication port-access dot1x authenticator\n    enable\naaa authentication port-access mac-auth\n    enable\n", "")
+    v, ev = l3_verdict(text, "LYSS-ACC-022")
+    assert v == "fail" and "not enabled globally" in ev[0]
+
+
+def test_l3_vlan_snooping_line_is_not_the_global_switch():
+    # "dhcpv4-snooping" inside "vlan 10" must not count as the global setting
+    text = _l3().replace("ssh server vrf mgmt\ndhcpv4-snooping\n", "ssh server vrf mgmt\n")
+    v, ev = l3_verdict(text, "LYSS-ACC-020")
+    assert v == "fail" and "not enabled globally" in ev[0]
+
+
+def test_l3_trusted_access_port_fails_snooping_and_arp_inspection():
+    text = _l3().replace("    vlan access 20\n", "    vlan access 20\n    dhcpv4-snooping trust\n    arp inspection trust\n")
+    assert l3_verdict(text, "LYSS-ACC-020")[0] == "fail"
+    assert l3_verdict(text, "LYSS-ACC-021")[0] == "fail"
+
+
+def test_l3_vlan_without_snooping_is_named():
+    text = _l3().replace("vlan 20\n    dhcpv4-snooping\n", "vlan 20\n")
+    v, ev = l3_verdict(text, "LYSS-ACC-020")
+    assert v == "fail" and ev[0] == "access VLANs without DHCP snooping: 20"
+
+
+def test_l3_storm_limit_of_100_percent_fails():
+    text = _l3().replace("rate-limit broadcast 5 percent", "rate-limit broadcast 100 percent")
+    assert l3_verdict(text, "LYSS-ACC-023")[0] == "fail"
+
+
+def test_l3_global_no_lldp_passes_without_per_port_lines():
+    text = _l3().replace("    no lldp transmit\n", "")
+    assert l3_verdict(text, "LYSS-ACC-024")[0] == "fail"
+    assert l3_verdict(text.replace("hostname lab-cx-l3\n", "hostname lab-cx-l3\nno lldp\n"), "LYSS-ACC-024")[0] == "pass"
+
+
+def test_l3_disabled_port_is_not_an_access_port():
+    # 1/1/3 has "vlan access 10" but is disabled (no "no shutdown"): nothing is required on it
+    assert "interface 1/1/3\n    vlan access 10\ninterface" in _l3()
+    assert {l3_verdict(_l3(), c)[0] for c in ("LYSS-ACC-022", "LYSS-ACC-023", "LYSS-ACC-024")} == {"pass"}

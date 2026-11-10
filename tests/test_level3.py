@@ -19,11 +19,16 @@ FIXTURES = {   # vendor -> (fully protected configuration, its device state)
     "hp_procurve": ("hp_procurve.cfg", "hp_procurve.state"),
     "arista_eos": ("arista_eos.cfg", None),
     "mikrotik": ("mikrotik.rsc", None),
+    "aruba_aoscx": ("aruba_aoscx.cfg", None),
+    "juniper_junos": ("juniper_junos.cfg", None),
+    "huawei_vrp": ("huawei_vrp.cfg", None),
 }
 UNPROTECTED = {"cisco_ios": "ios-hardened", "cisco_sb": "sb-hardened", "hp_procurve": "hp-hardened",
-               "arista_eos": "arista-hardened", "mikrotik": "mikrotik-hardened"}
-# a verdict that cannot be shown failing, with the reason
-NEVER_FAILS = {("mikrotik", "LYSS-ACC-023"): "storm-rate is a switch-chip setting: unknown when absent"}
+               "arista_eos": "arista-hardened", "mikrotik": "mikrotik-hardened", "aruba_aoscx": "cx-hardened",
+               "juniper_junos": "junos-hardened", "huawei_vrp": "vrp-hardened"}
+# a verdict that cannot be shown failing without the setting, with the reason
+NEVER_FAILS = {("mikrotik", "LYSS-ACC-023"): "storm-rate is a switch-chip setting: unknown when absent",
+               ("juniper_junos", "LYSS-ACC-023"): "most EX models apply 80 % by default: unknown without a profile"}
 
 
 def _verdicts(text: str, vendor: str, state: str = "") -> dict:

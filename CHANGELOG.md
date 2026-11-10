@@ -2,6 +2,48 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.18.0 (2026-11-11)
+
+Level 3 on every platform with configuration checks (Zyxel GS1900 is firmware only; not applicable
+on SONiC), stable / preview labels, accepted risks, SARIF and GitLab. Specification unchanged
+(0.7.1-draft).
+
+- **Platform labels: stable or preview.** Each adapter now says `support: stable` (Level 1 and 2
+  verified on the vendor's own software: real switches, or the vendor's official virtual image)
+  or `preview` (written from the documentation, or checked only on the LYSS simulator), with
+  `tested_on: real | virtual | synthetic`. Stable: Cisco IOS and Cisco Small Business (real
+  switches); MikroTik (CHR), SONiC (SONiC-VS), Arista (cEOS-lab) and HPE Aruba AOS-CX (AOS-CX
+  simulator). Preview: HPE Aruba AOS-S, Juniper EX, Huawei S series, Zyxel GS1900. README, website
+  and VALIDATION show the label; a test keeps them in line with the adapters.
+- **1.0 plan rewritten** (docs/VERSIONING.md): 1.0 is about the specification (a public release
+  candidate, then about four weeks without change), not about every platform being stable.
+- **Level 3 for HPE Aruba AOS-CX**, checked on the AOS-CX 10.17 simulator: DHCPv4 snooping (global
+  and per VLAN, trusted access ports), 802.1X / MAC authentication (global and per port), broadcast
+  rate limit (100 percent fails), LLDP (CDP is receive-only on AOS-CX). ARP inspection follows the
+  HPE documentation and the CIS benchmark: the virtual platform has none.
+- **Level 3 for Juniper EX (ELS) and Huawei S series**, written from the vendors' documentation
+  (preview): Junos `dhcp-security` / `arp-inspection` per VLAN, trusted groups, `dot1x
+  authenticator`, storm-control profiles (unknown without a profile: most EX models apply 80 % by
+  default), LLDP with VoIP ports exempt; Huawei `dhcp snooping` per VLAN or per port,
+  `arp anti-attack check user-bind`, authentication profiles or common-mode 802.1X / MAC
+  authentication, `broadcast-suppression` / `storm-control`, LLDP receive-only or off.
+- **Accepted risks** (`lyss audit --accepted-risks FILE`, action input `accepted-risks`): a failed
+  control can be accepted for a switch with a reason, an approver and an expiry date (at most one
+  year ahead). It stays a failure (same verdict, same level), shown with the acceptance; only the
+  `--require-level` gate ignores it until it expires. Expired and unused entries are reported, a
+  malformed file stops the audit, symbolic links are refused and YAML errors never quote the file.
+- **`lyss explain`**: a control offline (requirement, rationale, test procedure, ISO 27001 / NIST /
+  CIS / NIS2 references); `--vendor` adds the platform's note and fix.
+- **SARIF** (`--sarif`, action input `sarif`) for GitHub code scanning: each failed control on the
+  configuration line that proves it, accepted risks as suppressed results.
+- **GitLab CI**: `integrations/gitlab/lyss.gitlab-ci.yml` and `--codequality`: failed controls in
+  the merge request widget (Code Quality, every GitLab tier); the job fails on a required level.
+  Tested in the `python:3.12-slim` image.
+- **Workflows**: every `actions/checkout` sets `persist-credentials: false` (found by a Plumber
+  scan of LYSS's own CI); a test keeps it so.
+- Evidence of a passing coverage check now reads "no access ports without BPDU guard (checked:
+  ...)" instead of "every access ports without BPDU guard covered: ...".
+
 ## 0.17.0 (2026-11-10)
 
 - **New platform: Huawei S series (VRP V200), preview.** Levels 1 and 2 from

@@ -87,3 +87,13 @@ def test_site_policy_allows_webassembly_but_no_other_server():
     assert "'wasm-unsafe-eval'" in csp and "connect-src 'self'" in csp
     assert "unsafe-eval'" not in csp.replace("'wasm-unsafe-eval'", "") and "http" not in csp
     assert "AddType application/wasm .wasm" in htaccess and "AddType text/javascript .mjs" in htaccess
+
+
+def test_result_says_whether_the_platform_is_stable_or_preview():
+    import json
+
+    from lyss.browser import run
+    cases = Path(__file__).parent / "cases"
+    stable = json.loads(run((cases / "ios-hardened" / "config.cfg").read_text(encoding="utf-8")))
+    preview = json.loads(run((cases / "junos-hardened" / "config.cfg").read_text(encoding="utf-8"), "juniper_junos"))
+    assert (stable["support"], preview["support"]) == ("stable", "preview")

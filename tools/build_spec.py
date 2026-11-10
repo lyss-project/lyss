@@ -104,7 +104,7 @@ def build() -> str:
         "`not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,",
         "the specification version, the assessment date and the tool and version used, for example:",
         "",
-        f"> core-sw-01 is LYSS Level 1 conformant (specification {spec['spec_version']}), assessed 2026-11-10 with LYSS 0.17.",
+        f"> core-sw-01 is LYSS Level 1 conformant (specification {spec['spec_version']}), assessed 2026-11-11 with LYSS 0.18.",
         "",
         "A claim is valid for the configuration and firmware assessed; any change requires a new assessment.",
         "",
