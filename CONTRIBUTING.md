@@ -5,6 +5,7 @@ the **tool and adapters** (how it is checked on each platform). Both are welcome
 
 ## Ground rules
 
+- **Be respectful:** see the [code of conduct](CODE_OF_CONDUCT.md).
 - **Never commit real device data.** Configurations contain password hashes, keys, SNMP
   communities and topology. Test cases are synthetic: documentation addresses
   (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24), fake names, fake hashes. `private/` is git-ignored.

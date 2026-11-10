@@ -1,0 +1,47 @@
+# Library versions already merged into CISO Assistant, with their requirement node URNs.
+# PUBLIC COMMITMENT (CISO Assistant PR #5246, 2026-11-09): these URNs must stay in every later
+# library (a removed control is marked withdrawn, never deleted), and these version numbers never
+# change. Append a new entry when a new library version is merged upstream; never edit old ones.
+published:
+- version: 1
+  spec_version: 0.7.0-draft
+  merged: '2026-11-09'
+  pull_request: https://github.com/intuitem/ciso-assistant-community/pull/5246
+  requirement_nodes:
+  - urn:lyss:risk:req_node:lyss:l1
+  - urn:lyss:risk:req_node:lyss:l1.mgmt
+  - urn:lyss:risk:req_node:lyss:lyss-mgmt-001
+  - urn:lyss:risk:req_node:lyss:lyss-mgmt-002
+  - urn:lyss:risk:req_node:lyss:lyss-mgmt-003
+  - urn:lyss:risk:req_node:lyss:lyss-mgmt-004
+  - urn:lyss:risk:req_node:lyss:l1.auth
+  - urn:lyss:risk:req_node:lyss:lyss-auth-001
+  - urn:lyss:risk:req_node:lyss:lyss-auth-002
+  - urn:lyss:risk:req_node:lyss:lyss-auth-003
+  - urn:lyss:risk:req_node:lyss:lyss-auth-004
+  - urn:lyss:risk:req_node:lyss:l1.vuln
+  - urn:lyss:risk:req_node:lyss:lyss-vuln-001
+  - urn:lyss:risk:req_node:lyss:l1.bkp
+  - urn:lyss:risk:req_node:lyss:lyss-bkp-001
+  - urn:lyss:risk:req_node:lyss:l2
+  - urn:lyss:risk:req_node:lyss:l2.mgmt
+  - urn:lyss:risk:req_node:lyss:lyss-mgmt-010
+  - urn:lyss:risk:req_node:lyss:lyss-mgmt-011
+  - urn:lyss:risk:req_node:lyss:lyss-mgmt-012
+  - urn:lyss:risk:req_node:lyss:lyss-mgmt-013
+  - urn:lyss:risk:req_node:lyss:l2.auth
+  - urn:lyss:risk:req_node:lyss:lyss-auth-010
+  - urn:lyss:risk:req_node:lyss:lyss-auth-011
+  - urn:lyss:risk:req_node:lyss:l2.log
+  - urn:lyss:risk:req_node:lyss:lyss-log-010
+  - urn:lyss:risk:req_node:lyss:lyss-log-011
+  - urn:lyss:risk:req_node:lyss:l2.acc
+  - urn:lyss:risk:req_node:lyss:lyss-acc-010
+  - urn:lyss:risk:req_node:lyss:lyss-acc-011
+  - urn:lyss:risk:req_node:lyss:l3
+  - urn:lyss:risk:req_node:lyss:l3.acc
+  - urn:lyss:risk:req_node:lyss:lyss-acc-020
+  - urn:lyss:risk:req_node:lyss:lyss-acc-021
+  - urn:lyss:risk:req_node:lyss:lyss-acc-022
+  - urn:lyss:risk:req_node:lyss:lyss-acc-023
+  - urn:lyss:risk:req_node:lyss:lyss-acc-024

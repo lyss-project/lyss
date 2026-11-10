@@ -140,6 +140,27 @@ def test_library_version_is_a_counter_that_grows_with_the_specification():
         tool.library_version("9.9.9-unknown")
 
 
+PUBLISHED = yaml.safe_load((ROOT / "tests" / "data" / "ciso_published.yaml").read_text(encoding="utf-8"))["published"]
+
+
+def test_published_requirement_urns_are_never_removed(generated):
+    """PUBLIC COMMITMENT to CISO Assistant (PR #5246): a requirement URN that disappears deletes the
+    users' audit answers. Every URN of a merged library version must stay; withdraw, never delete."""
+    current = {n["urn"] for n in generated["fw"]["objects"]["framework"]["requirement_nodes"]}
+    for release in PUBLISHED:
+        missing = [u for u in release["requirement_nodes"] if u not in current]
+        assert not missing, (f"library version {release['version']} (merged in CISO Assistant) had these "
+                             f"requirements, now missing: {missing}. Mark the control withdrawn instead.")
+
+
+def test_published_library_versions_never_change():
+    """A version number merged upstream keeps its specification, and the next one is higher."""
+    tool = load_tool()
+    for release in PUBLISHED:
+        assert tool.LIBRARY_VERSIONS.get(release["spec_version"]) == release["version"], release["spec_version"]
+    assert max(tool.LIBRARY_VERSIONS.values()) >= max(r["version"] for r in PUBLISHED)
+
+
 def test_validation_catches_errors(generated):
     tool = load_tool()
     fw, mp = copy.deepcopy(generated["fw"]), copy.deepcopy(generated["map"])
