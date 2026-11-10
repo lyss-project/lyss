@@ -38,9 +38,10 @@ Options: `--base-port 2301` if the SSH ports are busy, `--lab <name|folder>` for
 | demo-hp-01 | HPE Aruba AOS-S | 2930F JL253A, WC.16.10.0012 | Level 0: firmware before HPESBNW05156 fix, Telnet/HTTP on |
 | demo-crs-01 | MikroTik RouterOS | CRS326-24G-2S+, 7.24.1 | Level 0: RouterOS factory defaults (Telnet/FTP/HTTP/API open to all, MAC-Winbox on every port, `strong-crypto=no`), one point release before the CISA KEV fixes of 7.24.2 |
 | demo-leaf-01 | SONiC | Accton AS4630-54PE, 202411.45 | Level 0: well run (TACACS+, control-plane ACL, banner, syslog, NTP), but SONiC's own `public` SNMP community and a TACACS+ key stored in cleartext |
+| demo-eos-01 | Arista EOS | CCS-720XP-24ZY4, 4.32.2F | Level 3 when Level 3 is assessed: campus access switch with DHCP snooping, ARP inspection, 802.1X and storm control |
 
 Cabling: the core switch connects the two Catalyst access switches, the CBS350 and the HPE
-switch; DEMO-SB-02, DEMO-CRS-01 and demo-leaf-01 hang off DEMO-ACC-01. Neighbour tables also show a wireless access point
+switch, and the Arista access switch demo-eos-01; DEMO-SB-02, DEMO-CRS-01 and demo-leaf-01 hang off DEMO-ACC-01. Neighbour tables also show a wireless access point
 (DEMO-AP-01) and an unmanaged Catalyst (DEMO-LAB-SW, 198.51.100.40), which the discovery page
 proposes to add.
 
@@ -57,9 +58,10 @@ closely enough for LYSS and netmiko (Cisco SB: "User Name:" prompt inside the sh
 any key to continue"; legacy switches only offer SHA-1 key exchange and CBC ciphers). It is not
 a full switch emulator.
 
-MikroTik and SONiC switches are read-only in the simulator (LYSS never changes them): they serve
-fixed outputs for the commands LYSS collects.
+MikroTik, SONiC and Arista switches are read-only in the simulator (LYSS never changes them): they
+serve fixed outputs for the commands LYSS collects.
 
 Labs live in `src/lyss/sim/labs/<name>/`: `lab.yaml` (switches, cables, external neighbours) and
 one `<switch>.cfg` running configuration per switch (RouterOS export, SONiC config_db JSON), plus
-a `<switch>.state` file with one `===== command =====` section per command for MikroTik and SONiC.
+a `<switch>.state` file with one `===== command =====` section per command for MikroTik, SONiC and
+Arista.

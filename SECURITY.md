@@ -9,16 +9,16 @@ Please report vulnerabilities privately, never in a public issue:
 - on GitHub: **Security → Report a vulnerability** in this repository (private advisory), or
 - by e-mail to **lyaazale@lyss.dev**.
 
-Include the version, the steps to reproduce and the impact. You will receive an answer within
-7 days. Please allow time for a fix before any public disclosure; reporters are credited in the
-advisory unless they prefer otherwise.
+Include the version, the steps to reproduce and the impact. Reports are handled on a best-effort
+basis by a volunteer maintainer, without a guaranteed response time. Please allow time for a fix
+before any public disclosure; reporters are credited in the advisory unless they prefer otherwise.
 
 ## Security design
 
 The full threat model (assets, trust boundaries, mitigations, what LYSS does not protect against)
 is in [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md).
 
-- Collection is read-only (`show` commands only) and runs over SSH.
+- Collection is read-only (fixed `show` / `display` / `print` commands) and runs over SSH.
 - The web interface listens on 127.0.0.1 by default. Remote listening requires `LYSS_ALLOW_REMOTE=1`
   and should only be used behind an HTTPS reverse proxy: the interface itself speaks plain HTTP.
 - Administrator password stored as a scrypt hash; 5 failed logins lock the login for 5 minutes;

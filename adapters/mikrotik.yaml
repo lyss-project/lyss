@@ -8,7 +8,7 @@
 #     3     name=telnet port=23 proto=tcp available-from= vrf=main max-sessions=20
 #     5  X  name=www-ssl port=443 ...                 (flag X = disabled, R = running, D = dynamic)
 adapter: mikrotik
-spec_version: "0.7.0-draft"
+spec_version: "0.7.1-draft"
 platform: MikroTik RouterOS
 status: preview, validated on CHR 7.25.1 (2026-11)
 
@@ -304,7 +304,8 @@ checks:
   # "/interface dot1x server add interface=etherN", "/ip neighbor discovery-settings set
   # discover-interface-list=none". Access ports = bridge ports admitting untagged frames only or
   # marked edge (as for LYSS-ACC-011). Snooping and ARP inspection are bridge-wide settings.
-  # Not yet checked: bonding interfaces towards servers (LYSS-ACC-011).
+  # A bonding interface (link aggregation) is itself the bridge port, with its own frame-types and
+  # bpdu-guard: a bond to a server is checked like any access port (LYSS-ACC-011).
 
   LYSS-ACC-020:
     not_applicable_if_any: &ros_no_access

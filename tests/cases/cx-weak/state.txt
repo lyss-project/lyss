@@ -1,0 +1,22 @@
+collected: 2026-11-10 02:00
+===== ssh banner =====
+SSH-2.0-OpenSSH_8.4
+===== ssh negotiated =====
+kex: diffie-hellman-group14-sha1
+cipher: aes128-cbc
+mac: hmac-sha1
+hostkey: ssh-rsa
+===== show version =====
+Version      : FL.10.10.1000
+===== show system =====
+Product Name       : JL675A 6100 48G CL4 4SFP+ Sw
+===== show ntp status =====
+NTP Status Information
+
+NTP                       : Disabled
+
+Not synchronized with an NTP server.
+===== show interface brief =====
+Port      Native  Mode   Type           Enabled Status  Reason                  Speed
+1/1/1     10      access 1GbT           yes     up                              1000
+1/1/2     10      access 1GbT           yes     down    Waiting for link        --

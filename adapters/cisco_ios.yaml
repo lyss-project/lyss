@@ -6,6 +6,7 @@
 #   {block: H, line: R}             true if any block whose header matches H contains a line matching R
 #   {block: H, every_contains: R}   true if at least one H block exists and every one contains R
 #   add where: W to a block rule    only consider H blocks that contain a line matching W
+#                                   (where: [W1, W2]: blocks with a line matching each pattern)
 #   add where_not: W to a block rule  only consider H blocks with no line matching W
 #   {comment: R}                    true if a comment line of the configuration matches R
 #   {all: [rule, ...]}              true if every sub-rule is true
@@ -21,7 +22,7 @@
 # Per control: fail_if_any -> fail; firmware -> data/firmware.yaml; pass_if_all / pass_if_any -> pass;
 # else `otherwise`. A state rule never matches when that state was not collected.
 adapter: cisco_ios
-spec_version: "0.7.0-draft"
+spec_version: "0.7.1-draft"
 platform: Cisco IOS / IOS-XE
 status: draft, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
 

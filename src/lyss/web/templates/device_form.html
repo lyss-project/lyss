@@ -8,7 +8,7 @@
   <div>
     <a class="back" href="/">← Switches</a>
     <h1>{{ "Edit " ~ device.id if editing else "Add a switch" }}</h1>
-    <p class="muted">LYSS only runs read-only "show" commands. A read-only account is enough.</p>
+    <p class="muted">LYSS only runs read-only commands (show, display, print). A read-only account is enough.</p>
   </div>
 </div>
 
@@ -26,7 +26,7 @@
       <option value="auto" {% if not device.vendor or device.vendor == "auto" %}selected{% endif %}>Auto-detect (from the SSH banner)</option>
       {% for v in vendors %}<option value="{{ v }}" {% if v == device.vendor %}selected{% endif %}>{{ v }}</option>{% endfor %}
     </select>
-    <small>Auto-detect picks the adapter at the first scan. Device state collection: arista_eos, cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic (choose arista_eos and sonic explicitly: their SSH banner is plain OpenSSH).</small>
+    <small>Auto-detect picks the adapter at the first scan. Device state collection: arista_eos, aruba_aoscx, cisco_ios, cisco_sb, hp_procurve, huawei_vrp, juniper_junos, mikrotik, sonic (choose arista_eos, aruba_aoscx, huawei_vrp, juniper_junos and sonic explicitly: their SSH banner does not identify them).</small>
   </label>
   <label>Address
     <input name="host" value="{{ device.host or '' }}" maxlength="253" placeholder="192.0.2.10" required>

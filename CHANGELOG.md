@@ -2,6 +2,69 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.17.0 (2026-11-10)
+
+- **New platform: Huawei S series (VRP V200), preview.** Levels 1 and 2 from
+  `display current-configuration`, device state from `display version`,
+  `display ntp-service status` and `display interface brief`. Written from the VRP documentation and
+  synthetic configurations, **not yet validated on a device**. Where a default changed between
+  releases (Telnet, HTTP) and the configuration does not say, the verdict is unknown. Level 3 and
+  firmware data are not written yet.
+- **New platform: HPE Aruba AOS-CX, preview.** Levels 1 and 2 from `show running-config`, device
+  state from `show version`, `show system`, `show ntp status` and `show interface brief`.
+  **Checked on the AOS-CX 10.17 simulator** (collection, factory default and hardened
+  configurations, read-only account), not yet on a physical switch. The simulator corrected the
+  documentation-based adapter: a disabled port has no `shutdown` line (only enabled ports show
+  `no shutdown`), so a disabled access port no longer counts as missing BPDU guard; the read-only
+  account is a custom user group, because the built-in `operators` group cannot read the
+  configuration (docs/ACCOUNTS.md). Level 3 and firmware data are not written yet. Evidence
+  redaction now also hides AOS-CX `plaintext` / `ciphertext` passwords and keys.
+- **A refused configuration command is a collection error, on every platform.** An account
+  without the right to read the configuration got an error message assessed as if it were the
+  configuration, which could give false passes. LYSS now stops, stores nothing and says to check
+  the account's rights.
+- **Engine:** a block filter `where` can be a list; a block must then contain a line matching each
+  pattern.
+- **Discovery** proposes the AOS-CX, Junos and Huawei adapters for LLDP neighbours (an AOS-CX
+  neighbour was proposed with the AOS-S adapter).
+- **Documentation made consistent** for the three new platforms (Oxidized models, offline formats,
+  read-only accounts, issue forms, site descriptions); a test now checks every visible version
+  mention (the site headline still said 0.12).
+- **New platform: Juniper EX (Junos), preview.** Levels 1 and 2 from
+  `show configuration | display inheritance | display set` (a curly-brace `show configuration` is
+  converted; inactive and deactivated statements are left out; interface ranges are expanded),
+  device state from `show version`, `show ntp status` and `show interfaces terse`. Written from the
+  Junos documentation and synthetic configurations, **not yet validated on a device**; Level 3 and
+  firmware data are not written yet. Read-only account: a login class with
+  `view view-configuration` (docs/ACCOUNTS.md). The engine gained the `first` rule (ordered
+  lists written one item per line, such as `system authentication-order`).
+- **HPE AOS-S: clock synchronization is read again** (`show ntp status`, NTP mode), so an HPE
+  switch can reach Level 2 again. In SNTP mode AOS-S reports no status: LYSS-LOG-011 stays unknown,
+  and the fix suggests `timesync ntp`.
+- **Link aggregations towards end devices on every adapter (LYSS-ACC-011):** Cisco Business
+  port-channels that are neither trunk nor general, and HPE trunk groups tagged in no VLAN, are
+  edge ports and need BPDU protection on the aggregation itself. RouterOS bonds were already
+  checked as bridge ports (now tested).
+- **HPE AOS-S Level 3:** a non-uplink port in `dhcp-snooping trust` or `arp-protect trust` fails
+  LYSS-ACC-020/021, and a 100 % broadcast limit on an edge port fails LYSS-ACC-023. The engine's
+  `uncovered` rule gained `lists: ports` (HP-style port lists such as `1-24,Trk1`).
+- **Specification 0.7.1-draft (wording only, no verdict change):** LYSS-LOG-011 passes only when
+  the synchronization status was collected; LYSS-ACC-011 statement says "link aggregations that
+  are trunks"; LYSS-AUTH-004 no longer announces a future control. CISO Assistant library
+  version 2 (version 1 stays as merged upstream).
+- **Guard for the CISO Assistant commitments:** tests fail if a published requirement disappears,
+  a published version number changes, or the content of a published version changes without a
+  new version.
+- **Code of conduct** (best-effort moderation by a volunteer). SECURITY.md no longer promises an
+  answer within 7 days: reports are handled on a best-effort basis.
+- **Browser audit:** the device-state help now shows the real section format
+  (`===== show version =====`); the shorter `=== command` it showed was ignored by the parser.
+  MikroTik: `/export verbose` recommended.
+- **Documentation review:** Arista EOS added where it was missing (offline vendors list, testers
+  guide, demo table, Oxidized models), Wazuh rule ranges, the CISO Assistant upstream-update
+  procedure, the specification's versioning section aligned with VERSIONING.md, and the site's
+  example assessment now matches the fictitious switch it shows.
+
 ## 0.16.1 (2026-11-09)
 
 - **LYSS is part of CISO Assistant.** The framework and its ISO/IEC 27001:2022 mapping were merged

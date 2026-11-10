@@ -147,6 +147,153 @@ def routeros_terse(text: str) -> str:
     return "\n".join(out) + "\n"
 
 
+MAX_JUNOS_LINES = 200_000          # a switch configuration is far smaller (untrusted input)
+MAX_JUNOS_DEPTH = 64               # real Junos hierarchies are under 20 levels deep
+MAX_JUNOS_CHARS = 20_000_000       # total size of the converted "set" text
+MAX_RANGE_MEMBERS = 1024
+
+
+def _junos_tokens(text: str) -> list[str]:
+    """Words, quoted strings and { } ; [ ] of a Junos curly-brace configuration, without comments
+    (/* ... */ and "#" at the start of a token: "## Last commit", "## SECRET-DATA")."""
+    tokens, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c in " \t\r\n":
+            i += 1
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif c == "#":
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif c in "{};[]":
+            tokens.append(c)
+            i += 1
+        elif c == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            tokens.append(text[i:j + 1])
+            i = j + 1
+        else:
+            j = i
+            while j < n and text[j] not in ' \t\r\n{};[]"':
+                j += 1
+            tokens.append(text[i:j])
+            i = j
+    return tokens
+
+
+def junos_braces_to_set(text: str) -> str:
+    """Junos curly-brace configuration ("show configuration") -> one "set" line per statement, as
+    "show configuration | display set" prints it. Inactive statements ("inactive:") and everything
+    under them are left out, because they are not in effect; "protect:" marks are dropped."""
+    out: list[str] = []
+    path: list[tuple[list[str], bool]] = []
+    stmt: list = []
+    in_list: list[str] | None = None
+
+    def clean(words: list) -> tuple[list, bool]:
+        """(words without the inactive: / protect: marks, True if marked inactive)."""
+        inactive = False
+        while words and isinstance(words[0], str) and words[0] in ("inactive:", "protect:"):
+            inactive = inactive or words[0] == "inactive:"
+            words = words[1:]
+        return words, inactive
+
+    size = 0
+    for tok in _junos_tokens(text):
+        if len(out) > MAX_JUNOS_LINES or len(path) > MAX_JUNOS_DEPTH or size > MAX_JUNOS_CHARS:
+            break                               # not a real configuration: stop converting
+        if in_list is not None:
+            if tok == "]":
+                stmt.append(in_list)
+                in_list = None
+            elif tok not in ("{", "}", ";", "["):
+                in_list.append(tok)
+            continue
+        if tok == "[":
+            in_list = []
+        elif tok == "{":
+            words, inactive = clean(stmt)
+            path.append(([w for w in words if isinstance(w, str)], inactive))
+            stmt = []
+        elif tok == "}":
+            if path:
+                path.pop()
+            stmt = []
+        elif tok == ";":
+            words, inactive = clean(stmt)
+            stmt = []
+            if not words or inactive or any(off for _, off in path):
+                continue
+            prefix = " ".join(w for p, _ in path for w in p)
+            lists = [w for w in words if isinstance(w, list)]
+            head = " ".join(w for w in words if isinstance(w, str))
+            base = f"set {prefix} {head}".replace("  ", " ").rstrip()
+            new = [f"{base} {value}" for value in lists[0]] if lists else [base]   # "[ a b ]" -> one line each
+            out.extend(new)
+            size += sum(len(l) + 1 for l in new)
+        else:
+            stmt.append(tok)
+    return "\n".join(out) + "\n"
+
+
+def _junos_range_members(first: str, last: str) -> list[str]:
+    """"ge-0/0/0", "ge-0/0/23" -> ge-0/0/0 ... ge-0/0/23 (same prefix only, bounded)."""
+    a, b = re.match(r"^(.*?)(\d+)$", first), re.match(r"^(.*?)(\d+)$", last)
+    if not (a and b and a.group(1) == b.group(1)):
+        return [first, last]
+    lo, hi = int(a.group(2)), int(b.group(2))
+    if not 0 <= hi - lo <= MAX_RANGE_MEMBERS:
+        return [first, last]
+    return [f"{a.group(1)}{n}" for n in range(lo, hi + 1)]
+
+
+def junos_normalize(text: str) -> str:
+    """Junos configuration -> "set" lines (curly braces converted, deactivated statements removed)
+    followed by one indented block per interface ("interfaces ge-0/0/1" + the rest of each of its
+    "set interfaces ge-0/0/1 ..." lines), so the block rules (where / where_not) work as on other
+    platforms. Interface ranges ("interface-range R member-range ge-0/0/0 to ge-0/0/23") give their
+    settings to every member."""
+    if not re.search(r"(?m)^\s*set ", text) and "{" in text:
+        text = junos_braces_to_set(text)
+    lines = [l.strip() for l in text.splitlines() if l.strip()][:MAX_JUNOS_LINES]
+    # a set lookup of the deactivated paths: linear in the size of the file, even a hostile one
+    deactivated = {tuple(l.split()[1:]) for l in lines if l.startswith("deactivate ") and len(l.split()) > 1}
+    longest = max((len(d) for d in deactivated), default=0)
+
+    def is_active(line: str) -> bool:
+        words = tuple(line.split()[1:])
+        return not any(words[:n] in deactivated for n in range(1, min(len(words), longest) + 1))
+
+    set_lines = [l for l in lines if l.startswith("set ") and is_active(l)]
+    members: dict[str, list[str]] = {}
+    for l in set_lines:
+        if m := re.match(r"^set interfaces interface-range (\S+) member-range (\S+) to (\S+)$", l):
+            members.setdefault(m.group(1), []).extend(_junos_range_members(m.group(2), m.group(3)))
+        elif m := re.match(r"^set interfaces interface-range (\S+) member (\S+)$", l):
+            members.setdefault(m.group(1), []).append(m.group(2))
+    blocks: dict[str, list[str]] = {}
+    children = 0
+    for l in set_lines:
+        if children > MAX_JUNOS_LINES:
+            break                               # ranges multiplied beyond any real switch
+        if m := re.match(r"^set interfaces interface-range (\S+) (?!member(?:-range)? )(.+)$", l):
+            for name in members.get(m.group(1), [])[:MAX_RANGE_MEMBERS]:
+                blocks.setdefault(name, []).append(m.group(2))
+                children += 1
+        elif m := re.match(r"^set interfaces (?!interface-range )(\S+) (.+)$", l):
+            blocks.setdefault(m.group(1), []).append(m.group(2))
+            children += 1
+    out = [l for l in lines if l.startswith("#")] + set_lines   # "## Last commit ..." stays a comment
+    for name, children in blocks.items():
+        out.append(f"interfaces {name}")
+        out.extend(f"  {c}" for c in children)
+    return "\n".join(out) + "\n"
+
+
 BANNER_START = re.compile(r"^banner\s+(?:motd|login|exec|incoming|slip-ppp|config-save|prompt-timeout)\b[ \t]*(.*)$")
 MACRO_START = re.compile(r"^macro name \S+\s*$")
 BANNER_TEXT = "banner-text "
@@ -239,6 +386,8 @@ def parse(text: str, state_text: str = "", vendor: str | None = None) -> Config:
             pass  # not JSON after all: parsed as text
     elif vendor in (None, "mikrotik") and re.search(r"(?m)^/[a-z]", text):
         text = routeros_terse(text)
+    elif vendor == "juniper_junos":
+        text = junos_normalize(text)
     lines: list[str] = []
     blocks: list[Block] = []
     comments: list[str] = []

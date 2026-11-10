@@ -22,6 +22,13 @@ body:
         - Cisco IOS / IOS-XE
         - Cisco Small Business / Business (SG, CBS)
         - HPE Aruba AOS-S (ProCurve)
+        - HPE Aruba AOS-CX
+        - Arista EOS
+        - Juniper EX (Junos)
+        - Huawei S series (VRP)
+        - MikroTik RouterOS
+        - SONiC
+        - Zyxel GS1900
         - Other
     validations:
       required: true
@@ -48,4 +55,4 @@ body:
     attributes:
       label: LYSS version
       description: Shown in the footer of the web interface.
-      placeholder: 0.7.0
+      placeholder: 0.17.0

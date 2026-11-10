@@ -4,7 +4,7 @@ Where each platform's checks have been verified, and what has not been verified 
 means configurations and device outputs written for the test suite. "Simulator" means the LYSS
 switch simulator (`python -m lyss sim`), which answers over real SSH like the platform does.
 
-Last reviewed: November 2026 (LYSS 0.16). To add a platform or a model, see
+Last reviewed: November 2026 (LYSS 0.17). To add a platform or a model, see
 [TESTERS.md](TESTERS.md): a report from a real switch is the most useful contribution.
 
 | Platform | Level 1–2 | Level 3 | Firmware data | Not validated yet |
@@ -15,6 +15,9 @@ Last reviewed: November 2026 (LYSS 0.16). To add a platform or a model, see
 | MikroTik RouterOS | **Virtual: CHR 7.25.1** (export, state, read-only group), simulator, synthetic; RouterOS 6 synthetic only | CHR 7.25.1 (bridge DHCP snooping, ARP inspection, discovery), synthetic | Vendor advisories, CISA KEV | CRS / RouterBOARD hardware (switch chip offload) |
 | SONiC | **Virtual: SONiC-VS 202505**, simulator, synthetic | Not applicable | None (no published end of support) | Hardware builds |
 | Arista EOS | **Virtual: cEOS-lab 4.37.0F** (default, insecure and hardened configurations, LLDP between two switches), simulator, synthetic | Synthetic: cEOS-lab does not support DHCP snooping, ARP inspection and storm control | Arista security advisories, CISA KEV | Any physical 7000-series switch |
+| HPE Aruba AOS-CX | **Virtual: AOS-CX 10.17 simulator** (collection, factory default and hardened configurations, read-only account), synthetic | Not assessed yet | None yet | Any physical CX switch; the "synchronized" line of `show ntp status` (the lab had no reachable NTP server) |
+| Huawei S series (VRP) | Synthetic only (written from the VRP documentation) | Not assessed yet | None yet | **Any real S series switch**: collection, outputs, every verdict |
+| Juniper EX (Junos) | Synthetic only (written from the Junos documentation; `display set` and curly-brace formats) | Not assessed yet | None yet | **Any real EX switch or vJunos-switch**: collection, outputs, every verdict |
 | Zyxel GS1900 | Not assessed (firmware only) | Not assessed | Zyxel advisory, CISA KEV | Configuration format; any real GS1900 output |
 
 ## What every platform shares

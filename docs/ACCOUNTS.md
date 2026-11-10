@@ -21,6 +21,9 @@ General rules, whatever the platform:
 | Cisco IOS / IOS-XE | privilege 15 (`show running-config`), restricted by TACACS+ command authorization | privilege 15 tested; restriction recommended, not lab-tested |
 | Cisco Small Business / Business | privilege 15 | tested; lower levels not yet (reports welcome) |
 | HPE Aruba AOS-S | manager | simulator only (reports from real switches welcome) |
+| HPE Aruba AOS-CX | local user in a custom user group that permits `show` commands only (the built-in `operators` group cannot run `show running-config`) | yes, AOS-CX 10.17 simulator: same verdicts as `admin`, configuration commands refused |
+| Huawei S series (VRP) | local user of level 3 with SSH only (`display current-configuration` needs level 3) | not yet (preview adapter, reports welcome) |
+| Juniper EX (Junos) | login class with `view view-configuration` only | not yet (preview adapter, reports welcome) |
 
 ## MikroTik RouterOS
 
@@ -68,6 +71,55 @@ aaa authorization commands all default local
 - Checked on cEOS-lab 4.37.0F: the `lyss-audit` account collects everything LYSS needs, and it
   cannot even enter configuration mode.
 
+## HPE Aruba AOS-CX
+
+```
+user-group lyss-ro
+    10 permit cli command "show .*"
+user lyss-audit group lyss-ro password
+```
+
+- A custom user group: every command its rules do not permit is refused. `show .*` lets LYSS run
+  `show running-config` and the state commands; `configure terminal` and `copy` answer
+  "Command not allowed".
+- Do **not** use the built-in `operators` group: it cannot run `show running-config` (the switch
+  answers `% Command incomplete.`). LYSS reports that as a collection error and assesses nothing.
+- An account's group cannot be changed afterwards: delete the user and create it again.
+- The configuration shows RADIUS, TACACS+ and SNMPv3 keys as `ciphertext`, encrypted with the export
+  password (`!export-password: default` unless you set one): anyone who reads the configuration
+  with that key can recover them. Set a custom export password.
+- Checked on the AOS-CX 10.17 simulator: `lyss-audit` gets the same verdicts as `admin`;
+  not yet on a physical switch.
+
+## Huawei S series (VRP)
+
+```
+aaa
+ local-user lyss-audit password irreversible-cipher <password>
+ local-user lyss-audit privilege level 3
+ local-user lyss-audit service-type ssh
+```
+
+- On VRP, level 3 is the lowest level allowed to run `display current-configuration`. Check on your
+  release that this level cannot change the configuration (`system-view` refused); if it can, use
+  command authorization through HWTACACS to limit the account to `display` commands.
+- Not yet checked on a real switch (preview adapter).
+
+## Juniper EX (Junos)
+
+```
+set system login class lyss-audit permissions [ view view-configuration ]
+set system login class lyss-audit idle-timeout 10
+set system login user lyss-audit class lyss-audit authentication plain-text-password
+```
+
+- `view` and `view-configuration` let the account run `show` commands and read the configuration,
+  but not change it. Without the `secret` permission Junos hides password hashes and keys
+  ("SECRET-DATA"): that is safer, but LYSS-AUTH-002 (hash strength) then stays unknown.
+- LYSS reads `show configuration | display inheritance | display set`, so settings inherited from
+  configuration groups are assessed too.
+- Not yet checked on a real switch or vJunos-switch (preview adapter).
+
 ## Cisco IOS / IOS-XE (Catalyst)
 
 LYSS collects `show running-config`, which IOS shows in full only at privilege 15.
@@ -104,5 +156,5 @@ username lyss-audit privilege 15 password <long-random-password>
 ## Remediation
 
 The LYSS remediation page applies low-risk fixes on Cisco IOS, Cisco SB and HPE switches only
-(never on MikroTik or SONiC). It needs configuration rights: configure a **separate** credential
+(never on MikroTik, SONiC, Arista, AOS-CX, Huawei or Junos). It needs configuration rights: configure a **separate** credential
 profile for it, and keep the scan account read-only.

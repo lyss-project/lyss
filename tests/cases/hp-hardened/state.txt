@@ -90,3 +90,9 @@ Active Boot ROM:     Primary
 
   Port   Device ID                     | Platform                     Capability
   ------ ----------------------------- + ---------------------------- -----------
+===== show ntp status =====
+ NTP Status Information
+
+  NTP Status            : Enabled       NTP Mode        : Unicast
+  Synchronization Status : Synchronized   Peer Dispersion : 0.00000 sec
+  Stratum Number         : 3

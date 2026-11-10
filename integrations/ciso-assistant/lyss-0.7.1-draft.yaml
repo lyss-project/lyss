@@ -1,8 +1,8 @@
 urn: urn:lyss:risk:library:lyss
 locale: en
 ref_id: LYSS
-name: "LYSS \u2014 Lyaazale Switch Security (draft 0.7.0)"
-description: 'LYSS (Lyaazale Switch Security) specification 0.7.0-draft (draft): vendor-neutral
+name: "LYSS \u2014 Lyaazale Switch Security (draft 0.7.1)"
+description: 'LYSS (Lyaazale Switch Security) specification 0.7.1-draft (draft): vendor-neutral
   security controls for managed network switches, in three cumulative conformance
   levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is one control (LYSS-<DOMAIN>-<NNN>);
   its annotation gives the rationale, vendor-neutral test procedure and informative
@@ -12,16 +12,16 @@ description: 'LYSS (Lyaazale Switch Security) specification 0.7.0-draft (draft):
   Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py
   in the LYSS repository (https://github.com/lyss-project/lyss).'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
-version: 1
-publication_date: 2026-11-09
+version: 2
+publication_date: 2026-11-10
 provider: Mouad Lyaazale
 packager: LYSS project
 objects:
   framework:
     urn: urn:lyss:risk:framework:lyss
     ref_id: LYSS
-    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.7.0)"
-    description: 'LYSS (Lyaazale Switch Security) specification 0.7.0-draft (draft):
+    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.7.1)"
+    description: 'LYSS (Lyaazale Switch Security) specification 0.7.1-draft (draft):
       vendor-neutral security controls for managed network switches, in three cumulative
       conformance levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is
       one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, vendor-neutral
@@ -282,14 +282,13 @@ objects:
       annotation: 'Rationale: A cleartext RADIUS key in a backup can be read by anyone
         who sees the file, and lets an attacker impersonate the AAA server or decrypt
         authentication traffic. Level 1 only removes the cleartext key: many switches
-        can only store these keys in a reversible form, which is weaker protection
-        and is addressed separately.
+        can only store these keys in a reversible form, which is weaker protection.
 
 
         Test procedure: Fail if a RADIUS or TACACS+ shared key appears in cleartext.
         A reversible encoding (e.g. Cisco type 7) is not cleartext and passes this
-        Level 1 control; it gives only weak protection, and storing keys with a device-specific
-        encryption key is planned as a separate Level 2 control.
+        Level 1 control, although it gives only weak protection; storing keys with
+        a device-specific encryption key may become a separate Level 2 control.
 
 
         Informative references: ISO/IEC 27001:2022 A.5.17, A.8.24; NIST SP 800-53
@@ -623,9 +622,9 @@ objects:
 
         Test procedure: Fail if no NTP or SNTP server is configured, or if the device
         state reports the clock as not synchronized. Pass if a time server is configured
-        and the device state does not report the clock as unsynchronized. Unknown
-        without device state: a configured server alone does not show that the clock
-        is synchronized.
+        and the device''s synchronization status was collected and does not report
+        the clock as unsynchronized. Unknown without that status: a configured server
+        alone does not show that the clock is synchronized.
 
 
         Informative references: ISO/IEC 27001:2022 A.8.17; NIST SP 800-53 r5 AU-8,
@@ -682,8 +681,8 @@ objects:
       name: Edge ports are protected against rogue spanning-tree participants (BPDU
         guard)
       description: Every edge port disables itself when it receives a spanning-tree
-        BPDU. Links to other switches are configured as such (trunks or link aggregations);
-        every other port is an edge port.
+        BPDU. Links to other switches are configured as such (trunks, or link aggregations
+        that are trunks); every other port is an edge port.
       annotation: 'Rationale: A rogue or misconnected switch on an access port can
         take over the spanning tree or create a loop.
 

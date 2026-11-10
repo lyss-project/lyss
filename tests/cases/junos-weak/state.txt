@@ -1,0 +1,20 @@
+collected: 2026-11-10 02:00
+===== ssh banner =====
+SSH-2.0-OpenSSH_7.5
+===== ssh negotiated =====
+kex: diffie-hellman-group14-sha1
+cipher: aes128-cbc
+mac: hmac-sha1
+hostkey: ssh-rsa
+===== show version =====
+Hostname: lab-ex-weak
+Model: ex2300-24t
+Junos: 18.4R2.7
+===== show ntp status =====
+status=c011 leap_alarm, sync_unspec, 1 event, event_restart,
+===== show interfaces terse =====
+Interface               Admin Link Proto    Local                 Remote
+ge-0/0/0                up    up
+ge-0/0/0.0              up    up   eth-switch
+ge-0/0/1                up    down
+ge-0/0/1.0              up    down eth-switch

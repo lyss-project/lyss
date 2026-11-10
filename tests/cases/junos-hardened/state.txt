@@ -1,0 +1,27 @@
+collected: 2026-11-10 02:00
+===== ssh banner =====
+SSH-2.0-OpenSSH_9.2
+===== ssh negotiated =====
+kex: curve25519-sha256
+cipher: aes256-gcm@openssh.com
+mac: hmac-sha2-256
+hostkey: ssh-ed25519
+===== show version =====
+fpc0:
+--------------------------------------------------------------------------
+Hostname: lab-ex-hard
+Model: ex2300-24p
+Junos: 23.4R2-S2.1
+===== show ntp status =====
+status=0644 leap_none, sync_ntp, 15 events, clock_sync,
+system peer: 192.0.2.123
+===== show interfaces terse =====
+Interface               Admin Link Proto    Local                 Remote
+ge-0/0/0                up    up
+ge-0/0/0.0              up    up   eth-switch
+ge-0/0/1                down  down
+xe-0/1/0                up    up
+xe-0/1/0.0              up    up   eth-switch
+irb                     up    up
+irb.99                  up    up   inet     192.0.2.31/24
+lo0                     up    up

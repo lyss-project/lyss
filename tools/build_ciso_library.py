@@ -76,6 +76,7 @@ EVIDENCE_TEXT = {
 # Add the new spec_version here before building; never change or remove an existing entry.
 LIBRARY_VERSIONS = {
     "0.7.0-draft": 1,
+    "0.7.1-draft": 2,
 }
 
 

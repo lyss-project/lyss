@@ -7,6 +7,9 @@ published:
   spec_version: 0.7.0-draft
   merged: '2026-11-09'
   pull_request: https://github.com/intuitem/ciso-assistant-community/pull/5246
+  # sha256 of the generated framework + mapping objects (dates excluded): any change to the
+  # library content needs a new spec_version and a new LIBRARY_VERSIONS entry
+  content_sha256: 31b23db3300ad022aed02c100aea6ee7c1a0e8922c5e0f21805c8e82d9263a85
   requirement_nodes:
   - urn:lyss:risk:req_node:lyss:l1
   - urn:lyss:risk:req_node:lyss:l1.mgmt

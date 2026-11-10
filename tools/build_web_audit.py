@@ -50,6 +50,9 @@ EXAMPLES = {
     "hp_procurve.cfg": DEMO / "demo-hp-01.cfg",
     "sonic.json": DEMO / "demo-leaf-01.cfg",
     "arista_eos.cfg": ROOT / "tests" / "cases" / "arista-weak" / "config.cfg",
+    "juniper_junos.cfg": ROOT / "tests" / "cases" / "junos-weak" / "config.cfg",
+    "aruba_aoscx.cfg": ROOT / "tests" / "cases" / "cx-weak" / "config.cfg",
+    "huawei_vrp.cfg": ROOT / "tests" / "cases" / "vrp-weak" / "config.cfg",
     "zyxel_gs1900.txt": ROOT / "tests" / "examples" / "zyxel_gs1900.txt",
 }
 FIXED_TIME = (2026, 1, 1, 0, 0, 0)

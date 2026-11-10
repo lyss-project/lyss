@@ -18,7 +18,11 @@ LYSS reads the Oxidized REST API (oxidized-web), read-only: `GET /nodes.json` an
 | `ios`, `iosxe` | Cisco IOS / IOS-XE |
 | `ciscosmb` | Cisco Small Business / Business |
 | `procurve` | HPE Aruba AOS-S (ProCurve) |
+| `eos` | Arista EOS |
 | `routeros` | MikroTik RouterOS |
+| `aoscx` | HPE Aruba AOS-CX (preview) |
+| `junos` | Juniper EX (Junos, preview) |
+| `vrp` | Huawei S series (VRP, preview) |
 
 Other models are listed as skipped.
 

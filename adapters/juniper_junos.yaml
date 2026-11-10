@@ -1,0 +1,300 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+# LYSS adapter: Juniper EX switches (Junos, ELS configuration style).
+# Rule forms: see adapters/cisco_ios.yaml, plus {first: R, is: M} (the first line matching R decides,
+# by its group 1 matching M: Junos writes ordered lists one item per line).
+# Input: "show configuration | display inheritance | display set" (what a LYSS scan collects); a
+# curly-brace "show configuration" is converted to "set" lines (config.junos_normalize), inactive
+# and deactivated statements are left out, and every interface also becomes a block
+# ("interfaces ge-0/0/1" + the rest of its "set interfaces ge-0/0/1 ..." lines, interface ranges
+# expanded), so block rules apply.
+# Junos defaults this adapter relies on (Junos OS documentation): Telnet, J-Web over HTTP and SNMP
+# are off unless configured; SSH speaks version 2 unless "protocol-version v1"; the login classes
+# super-user, operator and read-only have no idle timeout; the default authentication order is
+# local passwords only.
+# Read-only LYSS account (no "secret" permission: password hashes then show as SECRET-DATA and
+# LYSS-AUTH-002 stays unknown):
+#   set system login class lyss-audit permissions [ view view-configuration ]
+#   set system login class lyss-audit idle-timeout 10
+#   set system login user lyss-audit class lyss-audit authentication encrypted-password "<hash>"
+adapter: juniper_junos
+spec_version: "0.7.1-draft"
+platform: Juniper EX (Junos)
+status: preview, written from the Junos documentation and synthetic configurations; not yet validated on a device
+
+facts:
+  model:
+    - {section: show version, line: '^Model:\s*(\S+)'}
+  version:
+    - {section: show version, line: '^Junos:\s*(\S+)'}
+    - {section: show version, line: '^JUNOS .*\[(\S+)\]'}
+    - {section: config, line: '^set version (\S+)$'}
+
+checks:
+
+  # ---------------- Level 1 ----------------
+
+  LYSS-MGMT-001:
+    fail_if_any:
+      - {line: '^set system services telnet\b'}
+    otherwise: pass
+    note: Telnet is off on Junos unless "system services telnet" is configured.
+    remediation: |
+      delete system services telnet
+
+  LYSS-MGMT-002:
+    fail_if_any:
+      - {line: '^set system services ssh protocol-version v1\b'}
+      - {state: '^SSH-1\.', section: ssh banner}
+    otherwise: pass
+    note: Junos speaks SSH version 2 unless "protocol-version v1" is configured.
+    remediation: |
+      delete system services ssh protocol-version v1
+
+  LYSS-MGMT-003:
+    fail_if_any:
+      - {line: '^set system services web-management http\b'}
+    otherwise: pass
+    note: >-
+      J-Web over plain HTTP is configured with "system services web-management http". J-Web had
+      known-exploited flaws (CVE-2023-36844 to 36847, CISA KEV): if it is not used, remove it entirely.
+    remediation: |
+      delete system services web-management http
+      ! or, if J-Web is not used at all:
+      delete system services web-management
+
+  LYSS-MGMT-004:
+    fail_if_any:
+      - {line: '^set system login class \S+ idle-timeout (\d+)$', gt: 10}
+      - uncovered: &junos_idle
+          what: login classes used by local accounts without an idle timeout of 10 minutes or less
+          used: {line: '^set system login user \S+ class (\S+)$'}
+          covered: {line: '^set system login class (\S+) idle-timeout (?:[1-9]|10)$'}
+    pass_if_any:
+      - {uncovered: *junos_idle, absent: true}
+    otherwise: unknown
+    note: >-
+      Junos sets idle timeouts per login class; the predefined classes (super-user, operator,
+      read-only) have none, so accounts need a custom class with "idle-timeout" of 10 minutes or less.
+    remediation: |
+      set system login class admin-10 permissions all
+      set system login class admin-10 idle-timeout 10
+      set system login user <name> class admin-10
+
+  LYSS-AUTH-001:
+    fail_if_any:
+      - {line: '(?i)^set snmp community "?(public|private)"?(\s|$)'}
+    otherwise: pass
+    remediation: |
+      delete snmp community public
+      delete snmp community private
+      ! then configure SNMPv3 (LYSS-AUTH-011)
+
+  LYSS-AUTH-002:
+    fail_if_any:
+      # $1$ = MD5-crypt, $sha1$ = SHA-1 based: cracked quickly
+      - {line: '^set system (root-authentication|login user \S+ authentication) encrypted-password "?\$(1|sha1)\$'}
+    pass_if_any:
+      # $5$ / $6$ = SHA-256 / SHA-512 crypt (salted), the Junos default
+      - {line: '^set system root-authentication encrypted-password "?\$(5|6)\$'}
+    otherwise: unknown
+    note: >-
+      The root password must use SHA-256 or SHA-512 crypt ($5$ / $6$). Without the "secret"
+      permission the hashes are hidden (SECRET-DATA) and the verdict stays unknown.
+    remediation: |
+      set system login password format sha512
+      set system root-authentication plain-text-password    ! re-enter the root password
+      ! re-enter the password of every local account the same way
+
+  LYSS-AUTH-003:
+    otherwise: pass
+    note: Junos stores login passwords as one-way hashes only (encrypted-password).
+    remediation: |
+      set system login user <name> authentication plain-text-password
+
+  LYSS-AUTH-004:
+    fail_if_any:
+      - {line: '^set (system|access) (radius-server|tacplus-server) \S+ secret "?(?!\$9\$)[^\s"]'}
+    otherwise: pass
+    note: Junos stores RADIUS / TACACS+ secrets as "$9$" (reversible, never cleartext); protect configuration backups like the switch itself.
+    remediation: |
+      set system radius-server <radius-ip> secret <secret>    ! stored as $9$
+
+  LYSS-VULN-001:
+    firmware: true
+    otherwise: unknown
+    note: >-
+      No Junos release data yet in data/firmware.yaml: check the running release against Juniper's
+      Security Advisories and the CISA KEV catalogue (for example the J-Web flaws CVE-2023-36844 to
+      36847 on EX switches).
+    remediation: |
+      ! upgrade to the latest Juniper-recommended release of your train (JSA advisories)
+      ! until then, disable J-Web (delete system services web-management) and restrict management access
+
+  LYSS-BKP-001:
+    backup: true   # vendor-neutral: evaluated from the LYSS configuration archive / attestation
+    otherwise: unknown
+    note: No backup evidence yet. Enable scheduled scans, or attest the external backup system on the switch page.
+    remediation: |
+      ! Settings > Scheduled scans (LYSS keeps every configuration version), or
+      ! attest the external backup (Oxidized, Junos Space...) on the switch page.
+
+  # ---------------- Level 2 ----------------
+
+  LYSS-AUTH-010:
+    fail_if_any:
+      - {first: '^set system authentication-order (\S+)$', is: '^password$', say: 'local passwords come first in "system authentication-order"'}
+    pass_if_all:
+      - {first: '^set system authentication-order (\S+)$', is: '^(radius|tacplus)$'}
+      - {line: '^set system (radius-server|tacplus-server) \S+'}
+    otherwise: fail
+    note: >-
+      Without "system authentication-order" Junos uses local passwords only. The order must start
+      with radius or tacplus; "password" (local accounts) may only come after it. Console logins are
+      not assessed.
+    remediation: |
+      set system radius-server <radius-ip> secret <secret>
+      set system authentication-order [ radius password ]
+
+  LYSS-AUTH-011:
+    fail_if_any:
+      - {line: '^set snmp community '}
+      - {line: '^set snmp v3 vacm security-to-group security-model v(1|2c)\b'}
+      - {line: '^set snmp v3 vacm access group \S+ .*\bsecurity-level (none|authentication)\b'}
+      - {line: '^set snmp v3 usm local-engine user \S+ privacy-none\b'}
+    otherwise: pass
+    remediation: |
+      delete snmp community <name>
+      set snmp v3 usm local-engine user <user> authentication-sha256 authentication-password <pw>
+      set snmp v3 usm local-engine user <user> privacy-aes128 privacy-password <pw>
+      set snmp v3 vacm access group <group> default-context-prefix security-model usm security-level privacy read-view all
+
+  LYSS-MGMT-010:
+    pass_if_any:
+      - {line: '^set interfaces lo0 unit \d+ family inet filter input(?:-list)? \S+'}
+    otherwise: fail
+    note: >-
+      Junos protects its management plane with a firewall filter on lo0 (input). LYSS checks that one
+      is applied; that it only accepts SSH from the administration networks is up to you.
+    remediation: |
+      set firewall family inet filter PROTECT-RE term ssh from source-prefix-list ADMIN
+      set firewall family inet filter PROTECT-RE term ssh from protocol tcp destination-port ssh
+      set firewall family inet filter PROTECT-RE term ssh then accept
+      ! ... terms for the other protocols the switch needs (NTP, SNMP, routing), then:
+      set interfaces lo0 unit 0 family inet filter input PROTECT-RE
+
+  LYSS-MGMT-011:
+    fail_if_any:
+      # the management address on the default VLAN ("default", VLAN 1 on ELS switches)
+      - captures_in_both:
+          - {line: '^set vlans default l3-interface irb\.(\d+)$'}
+          - {line: '^set interfaces irb unit (\d+) family inet address \d'}
+    pass_if_any:
+      - {line: '^set interfaces (me0|vme|em0|fxp0) unit 0 family inet address \d', say: 'out-of-band management port addressed'}
+      - {line: '^set interfaces irb unit \d+ family inet address \d'}
+    otherwise: unknown
+    note: Access ports in the management VLAN are not checked yet on Junos.
+    remediation: |
+      set vlans MGMT vlan-id <mgmt-vlan>
+      set vlans MGMT l3-interface irb.<mgmt-vlan>
+      set interfaces irb unit <mgmt-vlan> family inet address <ip/prefix>
+      ! or use the out-of-band port: set interfaces me0 unit 0 family inet address <ip/prefix>
+
+  LYSS-MGMT-012:
+    pass_if_all:
+      - {line: '^set system login message '}
+      - {line: '(?i)^set system login message .*authori[sz]ed'}
+    otherwise: fail
+    note: '"system login message" is shown before the login prompt; "announcement" only after login.'
+    remediation: |
+      set system login message "Authorized access only. Activity is logged."
+
+  LYSS-MGMT-013:
+    fail_if_any:
+      - {state: '^kex: .*(sha1|group1\b)', section: ssh negotiated}
+      - {state: '^cipher: .*(cbc|3des|arcfour|blowfish)', section: ssh negotiated}
+      - {state: '^hostkey: (ssh-rsa|ssh-dss)\s*$', section: ssh negotiated}
+    pass_if_any:
+      - {state: '^kex: ', section: ssh negotiated}
+    otherwise: unknown
+    note: Needs the negotiated SSH algorithms (collector).
+    remediation: |
+      set system services ssh ciphers [ aes256-gcm@openssh.com aes256-ctr aes128-ctr ]
+      set system services ssh key-exchange [ curve25519-sha256 ecdh-sha2-nistp256 group-exchange-sha2 ]
+      set system services ssh macs [ hmac-sha2-512 hmac-sha2-256 ]
+      set system services ssh hostkey-algorithm no-ssh-dss
+
+  LYSS-LOG-010:
+    pass_if_any:
+      - {line: '^set system syslog host \S+ \S+'}
+    otherwise: fail
+    remediation: |
+      set system syslog host <siem-ip> any notice
+      set system syslog host <siem-ip> authorization info
+      set system syslog host <siem-ip> interactive-commands info
+
+  LYSS-LOG-011:
+    fail_if_any:
+      - {line: '^set system ntp server \S+', absent: true, say: 'no NTP server configured'}
+      # "status=c011 leap_alarm, sync_unspec": not synchronized
+      - {state: '(?i)\bsync_unspec\b|\bleap_alarm\b', section: show ntp status}
+    pass_if_all:
+      - {line: '^set system ntp server \S+'}
+      # "status=0644 leap_none, sync_ntp": synchronized
+      - {state: '(?i)\bsync_ntp\b', section: show ntp status}
+    otherwise: unknown
+    note: Synchronization is read from "show ntp status"; without device state the verdict is unknown.
+    remediation: |
+      set system ntp server <ntp-ip>
+
+  LYSS-ACC-010:
+    fail_if_any:
+      # "show interfaces terse": physical port Admin up, Link down (enabled but unused)
+      - {state: '^(?:ge|xe|mge|et|te)-\d+/\d+/\d+\s+up\s+down\s*$', section: show interfaces terse}
+    pass_if_any:
+      - {state: '^(?:ge|xe|mge|et|te)-\d+/\d+/\d+\s', section: show interfaces terse}
+    otherwise: unknown
+    note: Needs "show interfaces terse".
+    remediation: |
+      set interfaces <unused-port> disable
+
+  LYSS-ACC-011:
+    # access (edge) ports = Ethernet / ae interfaces with family ethernet-switching that are not
+    # trunks, not disabled and not LAG members (a non-trunk ae to a server is an edge port itself)
+    pass_if_any:
+      - {line: '^set protocols layer2-control bpdu-block interface all$', say: 'BPDU block on all interfaces'}
+      - uncovered: &junos_bpdu_block
+          what: access ports without BPDU block
+          used: &junos_access_ports {block: '^interfaces ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+)$', where: '^unit 0 family ethernet-switching\b', where_not: '^(unit 0 family ethernet-switching (interface|port)-mode trunk|disable$|ether-options 802\.3ad )'}
+          covered: {line: '^set protocols layer2-control bpdu-block interface (\S+?)(?:\.0)?$'}
+        absent: true
+      - all:
+          - {line: '^set protocols (rstp|mstp|vstp) bpdu-block-on-edge$'}
+          - {line: '^set protocols (rstp|mstp|vstp) interface all edge$'}
+      - all:
+          - {line: '^set protocols (rstp|mstp|vstp) bpdu-block-on-edge$'}
+          - uncovered:
+              what: access ports not marked edge
+              used: *junos_access_ports
+              covered: {line: '^set protocols (?:rstp|mstp|vstp) interface (\S+?)(?:\.0)? edge$'}
+            absent: true
+    otherwise: fail
+    note: >-
+      Every access port needs BPDU protection: "protocols layer2-control bpdu-block interface <port>"
+      (or "all"), or "protocols rstp bpdu-block-on-edge" with the port marked "edge".
+    remediation: |
+      set protocols rstp bpdu-block-on-edge
+      set protocols rstp interface <access-port> edge
+      ! or: set protocols layer2-control bpdu-block interface <access-port>
+
+  # ---------------- Level 3 ----------------
+  # Junos EX Level 3 checks (DHCP security, ARP inspection, 802.1X, storm control, LLDP) are not
+  # written yet: their syntax changed across Junos releases and needs a lab to verify.
+
+  LYSS-ACC-020: &junos_l3
+    otherwise: unknown
+    note: Level 3 checks for Junos are not written yet (help welcome, see CONTRIBUTING.md).
+  LYSS-ACC-021: *junos_l3
+  LYSS-ACC-022: *junos_l3
+  LYSS-ACC-023: *junos_l3
+  LYSS-ACC-024: *junos_l3

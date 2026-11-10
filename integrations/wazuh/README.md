@@ -8,7 +8,7 @@ e-mail, next to your firewall and server logs.
 | Rule | Level | When |
 |---|---|---|
 | 100801 | 3 | a switch was assessed: `LYSS: sw1 assessed, level 1, 4 failed control(s)` |
-| 100810–100839 | 7 / 5 | a control fails, one rule per control: 7 for Level 1 (Baseline), 5 for Level 2 (Hardened) |
+| 100810–100839 | 7 / 5 | a control fails, one rule per control: 7 for Level 1 (Baseline), 5 for Levels 2 and 3 (Hardened, Advanced) |
 | 100840–100869 | 10 | **regression**, one rule per control: a control that passed now fails (configuration changed) |
 | 100802 / 100804 | 5 / 10 | generic finding / regression (controls of a newer specification) |
 | 100805 | 3 | a control that failed now passes |
@@ -33,7 +33,7 @@ sudo sh install.sh --regression-level 12    # same, with regressions at level 12
 sudo sh install.sh --remove                 # uninstall
 ```
 
-The script refuses to install if one of the rule ids (100800-100869) is already used, and restores
+The script refuses to install if one of the rule ids (100800-100874) is already used, and restores
 the previous state if Wazuh's configuration check fails.
 
 ## 2. Choose how events reach Wazuh

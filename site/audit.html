@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Audit in your browser — LYSS</title>
-<meta name="description" content="Paste a saved switch configuration (Cisco IOS, Cisco Business, HPE Aruba, Arista EOS, MikroTik RouterOS /export, SONiC config_db.json) and get the LYSS security assessment. LYSS runs inside the page: nothing is uploaded.">
+<meta name="description" content="Paste a saved switch configuration (Cisco IOS, Cisco Business, HPE Aruba AOS-S or AOS-CX, Arista EOS, Juniper EX, Huawei S series, MikroTik RouterOS /export, SONiC config_db.json) and get the LYSS security assessment. LYSS runs inside the page: nothing is uploaded.">
 <meta name="author" content="Mouad Lyaazale">
 <link rel="canonical" href="https://lyss.dev/audit.html">
 <meta property="og:site_name" content="LYSS">
 <meta property="og:title" content="Audit your switch configuration in your browser — nothing uploaded">
-<meta property="og:description" content="Paste a Cisco, HPE Aruba, Arista, MikroTik or SONiC configuration and get the LYSS security assessment with evidence and fixes. It runs inside the page; the configuration never leaves your computer.">
+<meta property="og:description" content="Paste a Cisco, HPE Aruba, Arista, Juniper, Huawei, MikroTik or SONiC configuration and get the LYSS security assessment with evidence and fixes. It runs inside the page; the configuration never leaves your computer.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://lyss.dev/audit.html">
 <meta property="og:image" content="https://lyss.dev/img/og-lyss.jpg">
@@ -62,10 +62,13 @@
           <select id="vendor" name="vendor">
             <option value="auto">Auto-detect · Détection auto</option>
             <option value="arista_eos">Arista EOS</option>
+            <option value="aruba_aoscx">HPE Aruba AOS-CX</option>
             <option value="zyxel_gs1900">Zyxel GS1900 (firmware)</option>
             <option value="cisco_ios">Cisco IOS / IOS-XE</option>
             <option value="cisco_sb">Cisco Small Business / Business</option>
             <option value="hp_procurve">HPE Aruba AOS-S (ProCurve)</option>
+            <option value="huawei_vrp">Huawei S series (VRP)</option>
+            <option value="juniper_junos">Juniper EX (Junos)</option>
             <option value="mikrotik">MikroTik RouterOS</option>
             <option value="sonic">SONiC (config_db.json)</option>
           </select>
@@ -88,12 +91,12 @@
       <label class="audit-label" for="config"><span class="en">Configuration</span><span class="fr">Configuration</span></label>
       <textarea id="config" name="config" spellcheck="false" wrap="off" rows="16"
         placeholder="show running-config · /export · config_db.json"></textarea>
-      <p class="small"><span class="en">Cisco / HPE / Arista: <code>show running-config</code>. MikroTik: <code>/export</code> (RouterOS 6: <code>/export hide-sensitive</code>). SONiC: <code>/etc/sonic/config_db.json</code>. Zyxel GS1900: <code>show version</code> or the System Information page (firmware check). You can also drop a file here. Secrets are hidden in the results; you may remove passwords before pasting.</span><span class="fr">Cisco / HPE / Arista : <code>show running-config</code>. MikroTik : <code>/export</code> (RouterOS 6 : <code>/export hide-sensitive</code>). SONiC : <code>/etc/sonic/config_db.json</code>. Zyxel GS1900 : <code>show version</code> ou la page System Information (contrôle du firmware). Vous pouvez aussi déposer un fichier ici. Les secrets sont masqués dans les résultats ; vous pouvez retirer les mots de passe avant de coller.</span></p>
+      <p class="small"><span class="en">Cisco / HPE / Arista: <code>show running-config</code>. Juniper: <code>show configuration | display inheritance | display set</code>. Huawei: <code>display current-configuration</code>. MikroTik: <code>/export verbose</code> (RouterOS 6: <code>/export hide-sensitive</code>). SONiC: <code>/etc/sonic/config_db.json</code>. Zyxel GS1900: <code>show version</code> or the System Information page (firmware check). You can also drop a file here. Secrets are hidden in the results; you may remove passwords before pasting.</span><span class="fr">Cisco / HPE / Arista : <code>show running-config</code>. Juniper : <code>show configuration | display inheritance | display set</code>. Huawei : <code>display current-configuration</code>. MikroTik : <code>/export verbose</code> (RouterOS 6 : <code>/export hide-sensitive</code>). SONiC : <code>/etc/sonic/config_db.json</code>. Zyxel GS1900 : <code>show version</code> ou la page System Information (contrôle du firmware). Vous pouvez aussi déposer un fichier ici. Les secrets sont masqués dans les résultats ; vous pouvez retirer les mots de passe avant de coller.</span></p>
 
       <details class="audit-state">
         <summary><span class="en">Device state (optional): outputs that a configuration cannot show</span><span class="fr">État de l'équipement (facultatif) : sorties qu'une configuration ne montre pas</span></summary>
-        <p class="small"><span class="en">Firmware version, port status, enabled services… Paste the outputs, each one under a line <code>=== command</code>. The list of commands per platform is in the <a href="https://github.com/lyss-project/lyss/blob/main/docs/OFFLINE.md">offline audit guide</a>.</span><span class="fr">Version du firmware, état des ports, services actifs… Collez les sorties, chacune sous une ligne <code>=== commande</code>. La liste des commandes par plateforme est dans le <a href="https://github.com/lyss-project/lyss/blob/main/docs/OFFLINE.md">guide de l'audit hors ligne</a>.</span></p>
-        <textarea id="state" name="state" spellcheck="false" wrap="off" rows="8" placeholder="=== show version"></textarea>
+        <p class="small"><span class="en">Firmware version, port status, enabled services… Paste the outputs, each one under a line <code>===== command =====</code> (for example <code>===== show version =====</code>). The list of commands per platform is in the <a href="https://github.com/lyss-project/lyss/blob/main/docs/OFFLINE.md">offline audit guide</a>.</span><span class="fr">Version du firmware, état des ports, services actifs… Collez les sorties, chacune sous une ligne <code>===== commande =====</code> (par exemple <code>===== show version =====</code>). La liste des commandes par plateforme est dans le <a href="https://github.com/lyss-project/lyss/blob/main/docs/OFFLINE.md">guide de l'audit hors ligne</a>.</span></p>
+        <textarea id="state" name="state" spellcheck="false" wrap="off" rows="8" placeholder="===== show version ====="></textarea>
       </details>
 
       <div class="audit-run">

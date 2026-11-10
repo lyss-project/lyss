@@ -66,12 +66,32 @@ COMMANDS = {
                   "/interface ethernet print terse", "/interface bridge port print terse",
                   "/tool mac-server mac-winbox print", "/ip neighbor print detail"],
     },
+    "huawei_vrp": {
+        # netmiko disables paging ("screen-length 0 temporary")
+        "netmiko": "huawei_vrp",
+        "config": "display current-configuration",
+        "state": ["display version", "display ntp-service status", "display interface brief"],
+    },
+    "aruba_aoscx": {
+        "netmiko": "aruba_aoscx",
+        "config": "show running-config",
+        "state": ["show version", "show system", "show ntp status", "show interface brief"],
+    },
+    "juniper_junos": {
+        # Junos operational mode; "display inheritance" includes settings inherited from
+        # configuration groups, "display set" gives one full statement per line
+        "netmiko": "juniper_junos",
+        "config": "show configuration | display inheritance | display set",
+        "state": ["show version", "show ntp status", "show interfaces terse"],
+    },
     "hp_procurve": {
         # netmiko answers "Press any key to continue" and disables paging ("no page")
         "netmiko": "hp_procurve",
         "config": "show running-config",
         "state": ["show version", "show system", "show modules", "show ip ssh",
-                  "show interfaces brief", "show lldp info remote-device", "show cdp neighbors"],
+                  "show interfaces brief", "show lldp info remote-device", "show cdp neighbors",
+                  # "Synchronization Status : Synchronized / Not Synced" (NTP mode; SNTP shows no status)
+                  "show ntp status"],
     },
 }
 
@@ -80,6 +100,22 @@ COMMANDS = {
 CLI_ERROR = re.compile(r"(?m)^\s*%|Invalid input|Unrecognized command|Incomplete command|Wrong number of parameters|bad parameter")
 # the only multi-line command LYSS sends: the Cisco SB login banner (delimiter line, text, delimiter)
 BANNER_BLOCK = re.compile(r"banner (?:login|motd) #\n[^\x00-\x1f\x7f#]{1,200}\n#")
+# the configuration command refused to the account (AOS-CX operators: "% Command incomplete.";
+# "Cannot execute command. Command not allowed.", "Permission denied", ...)
+CONFIG_REFUSED = re.compile(r"(?i)^\s*%|invalid input|unrecognized command|incomplete|not allowed|permission denied"
+                            r"|not authori[sz]ed|insufficient privilege|access denied|cannot execute|unknown command")
+
+
+def config_refusal(output: str) -> str | None:
+    """Why a configuration command's output is not a configuration, or None. Only an empty answer or a
+    short answer that starts with an error counts: a real configuration may quote such words (banners)."""
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if not lines:
+        return "the switch returned an empty configuration"
+    if len(lines) <= 5 and CONFIG_REFUSED.search(lines[0]):
+        return (f"the configuration command was refused ({lines[0][:80]}): check the account's rights "
+                "(docs/ACCOUNTS.md); nothing was assessed")
+    return None
 
 
 def check_commands(commands: list[str], banner_block: bool = False) -> None:
@@ -494,6 +530,9 @@ def collect_device(device: dict, jump: JumpHost | None) -> str:
             # the switch had no modern key exchange / host key algorithm: SHA-1 had to be allowed
             negotiated += "\nlegacy: required (no modern key exchange or host key algorithm offered)"
         config = session.run(cmds["config"], 90)
+        if refusal := config_refusal(config):
+            # never assess an error message as if it were the configuration (false passes)
+            raise ValueError(refusal)
         # section headers carry a random value the switch cannot know: text sent by a neighbour
         # (CDP/LLDP fields) that looks like a header stays plain output (config.parse_state)
         nonce = secrets.token_hex(8)

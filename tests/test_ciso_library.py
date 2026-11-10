@@ -153,6 +153,23 @@ def test_published_requirement_urns_are_never_removed(generated):
                              f"requirements, now missing: {missing}. Mark the control withdrawn instead.")
 
 
+def test_published_library_content_is_frozen():
+    """The content merged upstream under a version number never changes under that number: a new
+    wording or mapping needs a new spec_version and the next LIBRARY_VERSIONS counter."""
+    import hashlib
+    import json
+    tool = load_tool()
+    spec, fw, mp = tool.build("2000-01-01")
+    digest = hashlib.sha256(json.dumps({"framework": fw["objects"], "mapping": mp["objects"]}, sort_keys=True,
+                                       default=str).encode("utf-8")).hexdigest()
+    for release in PUBLISHED:
+        if release["spec_version"] == spec["spec_version"]:
+            assert digest == release["content_sha256"], (
+                f"the library content changed but spec_version is still {spec['spec_version']} (published as "
+                f"CISO Assistant library version {release['version']}): bump spec_version and add the next "
+                "LIBRARY_VERSIONS entry")
+
+
 def test_published_library_versions_never_change():
     """A version number merged upstream keeps its specification, and the next one is higher."""
     tool = load_tool()

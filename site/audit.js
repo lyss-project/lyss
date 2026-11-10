@@ -7,10 +7,10 @@ const PY = new URL("py/", document.baseURI).href;
 const MAX_BYTES = 5 * 1024 * 1024;
 
 const PLATFORMS = {
-  arista_eos: "Arista EOS", zyxel_gs1900: "Zyxel GS1900", cisco_ios: "Cisco IOS / IOS-XE", cisco_sb: "Cisco Small Business / Business",
-  hp_procurve: "HPE Aruba AOS-S", mikrotik: "MikroTik RouterOS", sonic: "SONiC",
+  arista_eos: "Arista EOS", aruba_aoscx: "HPE Aruba AOS-CX", zyxel_gs1900: "Zyxel GS1900", cisco_ios: "Cisco IOS / IOS-XE", cisco_sb: "Cisco Small Business / Business",
+  hp_procurve: "HPE Aruba AOS-S", huawei_vrp: "Huawei S series (VRP)", juniper_junos: "Juniper EX (Junos)", mikrotik: "MikroTik RouterOS", sonic: "SONiC",
 };
-const EXAMPLES = ["mikrotik.rsc", "cisco_ios.cfg", "zyxel_gs1900.txt", "arista_eos.cfg", "sonic.json", "hp_procurve.cfg", "cisco_sb.cfg"];
+const EXAMPLES = ["mikrotik.rsc", "cisco_ios.cfg", "zyxel_gs1900.txt", "arista_eos.cfg", "aruba_aoscx.cfg", "huawei_vrp.cfg", "juniper_junos.cfg", "sonic.json", "hp_procurve.cfg", "cisco_sb.cfg"];
 const VERDICTS = {
   fail: ["Failed", "Non conforme"], unknown: ["Unknown", "Inconnu"],
   pass: ["Passed", "Conforme"], not_applicable: ["Not applicable", "Non applicable"],

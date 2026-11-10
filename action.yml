@@ -12,7 +12,7 @@ inputs:
     description: Configuration file or folder, relative to the workspace.
     default: "."
   vendor:
-    description: "Adapter name (cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic, arista_eos, zyxel_gs1900) or auto."
+    description: "Adapter name (cisco_ios, cisco_sb, hp_procurve, mikrotik, sonic, arista_eos, aruba_aoscx, huawei_vrp, juniper_junos, zyxel_gs1900) or auto."
     default: auto
   level:
     description: Highest level to assess (1, 2 or 3).

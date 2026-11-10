@@ -1,0 +1,284 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+# LYSS adapter: Huawei S series campus switches (VRP V200R0xx: S5700, S5735, S6730...).
+# Rule forms: see adapters/cisco_ios.yaml. "display current-configuration" separates sections
+# with "#" lines (comments here) and indents settings by one space under "interface ...",
+# "user-interface vty 0 4", "aaa" (its authentication schemes and domains are flattened into the
+# "aaa" block), "radius-server template ...". It starts with "!Software Version V200R0..." and ends
+# with "return". Settings left at their default are not shown, and some defaults changed between
+# releases (Telnet, HTTP): where the configuration alone cannot tell, the verdict stays unknown.
+# Passwords: "irreversible-cipher" = one-way hash; "cipher" = reversible encryption; "simple" =
+# cleartext.
+adapter: huawei_vrp
+spec_version: "0.7.1-draft"
+platform: Huawei S series (VRP)
+status: preview, written from the Huawei VRP documentation and synthetic configurations; not yet validated on a device
+
+facts:
+  model:
+    - {section: display version, line: '^(?:HUAWEI|Huawei) (S\d\S*)'}
+  version:
+    - {section: display version, line: '\((S\S+ (V\d+R\d+C\d+\S*))\)', format: '{1}'}
+    - {section: config comments, line: '^!Software Version (V\d+R\d+C\d+\S*)'}
+
+checks:
+
+  # ---------------- Level 1 ----------------
+
+  LYSS-MGMT-001:
+    fail_if_any:
+      - {line: '^telnet server enable\b'}
+      - {block: '^user-interface vty', line: '^protocol inbound (telnet|all)\b'}
+    pass_if_any:
+      - {line: '^(undo telnet server enable|telnet server disable)\b'}
+      - {block: '^user-interface vty', every_contains: '^protocol inbound ssh\s*$'}
+    otherwise: unknown
+    note: The Telnet default changed across VRP releases; disable it explicitly and allow only SSH on the VTY lines.
+    remediation: |
+      undo telnet server enable
+      user-interface vty 0 4
+       protocol inbound ssh
+
+  LYSS-MGMT-002:
+    fail_if_any:
+      - {line: '^ssh server compatible-ssh1x enable\b'}
+      - {state: '^SSH-1\.', section: ssh banner}
+    otherwise: pass
+    note: SSH version 1 compatibility is off unless "ssh server compatible-ssh1x enable" is configured.
+    remediation: |
+      undo ssh server compatible-ssh1x enable
+
+  LYSS-MGMT-003:
+    fail_if_any:
+      - {line: '^http server enable\b'}
+    pass_if_any:
+      - {line: '^undo http server enable\b'}
+    otherwise: unknown
+    note: '"http server enable" is plain HTTP ("http secure-server enable" is HTTPS); its default depends on the release, so disable it explicitly.'
+    remediation: |
+      undo http server enable
+      ! keep "http secure-server enable" only if the web interface is needed
+
+  LYSS-MGMT-004:
+    fail_if_any:
+      - {block: '^user-interface (con|vty)', line: '^idle-timeout 0( 0)?\s*$'}
+      - {block: '^user-interface (con|vty)', line: '^idle-timeout (\d+)', gt: 10}
+      - {block: '^user-interface (con|vty)', line: '^idle-timeout 10 [1-9]'}
+    otherwise: pass
+    note: The VRP default idle timeout is 10 minutes.
+    remediation: |
+      user-interface con 0
+       idle-timeout 10 0
+      user-interface vty 0 4
+       idle-timeout 10 0
+
+  LYSS-AUTH-001:
+    fail_if_any:
+      - {line: '(?i)^snmp-agent community (read|write) (public|private)\b'}
+    pass_if_any:
+      - {line: '^snmp-agent community ', absent: true, say: 'no SNMPv1/v2c community configured'}
+    otherwise: unknown
+    note: Community names stored with "cipher" cannot be read from the configuration; remove SNMPv1/v2c communities (LYSS-AUTH-011).
+    remediation: |
+      undo snmp-agent community public
+      undo snmp-agent community private
+
+  LYSS-AUTH-002:
+    fail_if_any:
+      - {line: '^super password (level \d+ )?(simple|cipher) '}
+      - {block: '^aaa$', line: '^local-user \S+ password (simple|cipher) '}
+    pass_if_any:
+      - {block: '^aaa$', line: '^local-user \S+ password irreversible-cipher ', say: 'local passwords stored as irreversible hashes'}
+    otherwise: unknown
+    note: Privileged access comes from local users of level 15 (or a "super" password); both must use "irreversible-cipher".
+    remediation: |
+      aaa
+       local-user admin password irreversible-cipher <new-password>
+
+  LYSS-AUTH-003:
+    fail_if_any:
+      - {block: '^aaa$', line: '^local-user \S+ password (simple|cipher) '}
+    otherwise: pass
+    note: '"cipher" is reversible encryption and "simple" is cleartext; use "irreversible-cipher".'
+    remediation: |
+      aaa
+       local-user <name> password irreversible-cipher <new-password>
+
+  LYSS-AUTH-004:
+    fail_if_any:
+      - {line: '^(radius-server )?shared-key simple '}
+      - {line: '^radius-server (authentication|accounting) \S+ \d+ (.* )?shared-key simple '}
+    otherwise: pass
+    note: '"shared-key cipher" is reversible encryption, not cleartext; protect configuration backups like the switch itself.'
+    remediation: |
+      radius-server template <name>
+       radius-server shared-key cipher <key>
+
+  LYSS-VULN-001:
+    firmware: true
+    otherwise: unknown
+    note: No VRP release data yet in data/firmware.yaml; check the running release against Huawei PSIRT advisories and the CISA KEV catalogue.
+    remediation: |
+      ! upgrade to the latest recommended VRP patch for your model (Huawei support site)
+
+  LYSS-BKP-001:
+    backup: true
+    otherwise: unknown
+    note: No backup evidence yet. Enable scheduled scans, or attest the external backup system on the switch page.
+    remediation: |
+      ! Settings > Scheduled scans (LYSS keeps every configuration version), or
+      ! attest the external backup (Oxidized, eSight...) on the switch page.
+
+  # ---------------- Level 2 ----------------
+
+  LYSS-AUTH-010:
+    fail_if_any:
+      - {block: '^aaa$', line: '^authentication-mode local\b', say: 'an authentication scheme tries local accounts first'}
+      - {block: '^aaa$', line: '^authentication-mode (radius|hwtacacs)\b.*\bnone\b', say: 'an authentication scheme falls back to no authentication ("none")'}
+    pass_if_all:
+      - {block: '^aaa$', line: '^authentication-mode (radius|hwtacacs)( local)?\s*$'}
+      - {line: '^(radius-server|hwtacacs-server) authentication \S+'}
+      - {block: '^user-interface vty', every_contains: '^authentication-mode aaa\s*$'}
+    otherwise: fail
+    note: >-
+      VTY lines must use "authentication-mode aaa" with a scheme that tries RADIUS / HWTACACS first
+      and local accounts only after it ("authentication-mode radius local"). LYSS checks every
+      scheme; the one bound to the administrators' domain is the one that matters.
+    remediation: |
+      aaa
+       authentication-scheme admin-radius
+        authentication-mode radius local
+       domain default_admin
+        authentication-scheme admin-radius
+        radius-server <template>
+      user-interface vty 0 4
+       authentication-mode aaa
+
+  LYSS-AUTH-011:
+    fail_if_any:
+      - {line: '^snmp-agent community '}
+      - {line: '^snmp-agent sys-info version (all|v1|v2c)\b'}
+      - {line: '^snmp-agent group v3 \S+ (noauthentication|authentication)\b'}
+    otherwise: pass
+    remediation: |
+      undo snmp-agent community <name>
+      snmp-agent sys-info version v3
+      snmp-agent group v3 LYSS privacy
+      snmp-agent usm-user v3 <user> group LYSS
+      snmp-agent usm-user v3 <user> authentication-mode sha2-256 cipher <pw>
+      snmp-agent usm-user v3 <user> privacy-mode aes256 cipher <pw>
+
+  LYSS-MGMT-010:
+    pass_if_all:
+      - {block: '^user-interface vty', every_contains: '^acl (ipv6 )?\S+ inbound\s*$'}
+    otherwise: fail
+    remediation: |
+      acl number 2000
+       rule 5 permit source <admin-subnet> <wildcard>
+       rule 10 deny
+      user-interface vty 0 4
+       acl 2000 inbound
+
+  LYSS-MGMT-011:
+    fail_if_any:
+      - {block: '^interface Vlanif1$', line: '^ip address \d'}
+      - captures_in_both:
+          - {block: '^interface Vlanif(\d+)$', where: '^ip address \d'}
+          - {block: '^interface \S*Ethernet\S+$', where: '^port link-type access', line: '^port default vlan (\d+)'}
+    pass_if_any:
+      - {block: '^interface MEth\S+$', line: '^ip address \d', say: 'out-of-band management port (MEth) addressed'}
+      - {block: '^interface Vlanif(?!1$)\d+$', line: '^ip address \d'}
+    otherwise: unknown
+    remediation: |
+      vlan 99
+      interface Vlanif99
+       ip address <ip> <mask>
+      ! or use the out-of-band port: interface MEth0/0/1
+
+  LYSS-MGMT-012:
+    pass_if_all:
+      - {line: '^header login information '}
+      - {line: '(?i)authori[sz]ed'}
+    otherwise: fail
+    note: '"header login" is shown before login; "header shell" only after it.'
+    remediation: |
+      header login information "Authorized access only. Activity is logged."
+
+  LYSS-MGMT-013:
+    fail_if_any:
+      - {state: '^kex: .*(sha1|group1\b)', section: ssh negotiated}
+      - {state: '^cipher: .*(cbc|3des|arcfour|blowfish)', section: ssh negotiated}
+      - {state: '^hostkey: (ssh-rsa|ssh-dss)\s*$', section: ssh negotiated}
+    pass_if_any:
+      - {state: '^kex: ', section: ssh negotiated}
+    otherwise: unknown
+    note: Needs the negotiated SSH algorithms (collector).
+    remediation: |
+      ssh server cipher aes256_gcm aes128_gcm aes256_ctr aes128_ctr
+      ssh server key-exchange dh_group16_sha512 dh_group_exchange_sha256
+      ssh server hmac sha2_512 sha2_256
+
+  LYSS-LOG-010:
+    fail_if_any:
+      - {line: '^undo info-center enable\b', say: 'the information center is disabled: no log reaches the log hosts'}
+    pass_if_any:
+      - {line: '^info-center loghost \S+'}
+    otherwise: fail
+    remediation: |
+      info-center loghost <siem-ip>
+
+  LYSS-LOG-011:
+    fail_if_any:
+      - {line: '^ntp-service unicast-server \S+', absent: true, say: 'no NTP server configured'}
+      - {state: '(?i)clock status\s*:\s*unsynchroni[sz]ed', section: display ntp-service status}
+    pass_if_all:
+      - {line: '^ntp-service unicast-server \S+'}
+      - {state: '(?i)clock status\s*:\s*synchroni[sz]ed', section: display ntp-service status}
+    otherwise: unknown
+    note: Synchronization is read from "display ntp-service status" ("clock status"); without device state the verdict is unknown.
+    remediation: |
+      ntp-service unicast-server <ntp-ip>
+
+  LYSS-ACC-010:
+    fail_if_any:
+      # "display interface brief": PHY "down" (not "*down" = administratively down)
+      - {state: '^(?:GigabitEthernet|XGigabitEthernet|MultiGE|Ethernet|25GE|40GE|100GE)\S+\s+down\s', section: display interface brief}
+    pass_if_any:
+      - {state: '^(?:GigabitEthernet|XGigabitEthernet|MultiGE|Ethernet|25GE|40GE|100GE)\S+\s', section: display interface brief}
+    otherwise: unknown
+    note: Needs "display interface brief" ("*down" = shut down by the administrator).
+    remediation: |
+      interface <unused-port>
+       shutdown
+
+  LYSS-ACC-011:
+    # access ports = "port link-type access" interfaces (an Eth-Trunk in access mode, e.g. to a
+    # server, is an edge port itself; its members carry "eth-trunk N" and are not counted)
+    pass_if_any:
+      - all:
+          - {line: '^stp bpdu-protection\s*$'}
+          - {line: '^stp edged-port default\s*$'}
+      - all:
+          - {line: '^stp bpdu-protection\s*$'}
+          - {block: '^interface (\S*Ethernet\S+|MultiGE\S+|Eth-Trunk\d+)$', where: '^port link-type access', where_not: '^(shutdown|eth-trunk \d+)\s*$', every_contains: '^stp edged-port enable\s*$'}
+    otherwise: fail
+    note: >-
+      VRP shuts an edge port that receives a BPDU when "stp bpdu-protection" is on: access ports must
+      be edge ports ("stp edged-port enable", or "stp edged-port default"). Hybrid ports (the default
+      link type on many models) are not counted as access ports yet.
+    remediation: |
+      stp bpdu-protection
+      interface <access-port>
+       stp edged-port enable
+
+  # ---------------- Level 3 ----------------
+  # Huawei Level 3 checks (DHCP snooping, ARP inspection / DAI, NAC, storm control, LLDP) are not
+  # written yet: they need a device or a lab to verify.
+
+  LYSS-ACC-020: &vrp_l3
+    otherwise: unknown
+    note: Level 3 checks for Huawei VRP are not written yet (help welcome, see CONTRIBUTING.md).
+  LYSS-ACC-021: *vrp_l3
+  LYSS-ACC-022: *vrp_l3
+  LYSS-ACC-023: *vrp_l3
+  LYSS-ACC-024: *vrp_l3

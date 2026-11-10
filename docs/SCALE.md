@@ -7,7 +7,7 @@ by anyone) and a real network.
 ## Load test on simulated switches
 
 `python tools/load_test.py --switches N [--workers W] [--level 3]` builds N fictitious switches by
-cloning the demo lab. The mix covers all six SSH platforms: Cisco IOS, Cisco Business, HPE Aruba,
+cloning the demo lab. The mix covers the six platforms of the demo lab: Cisco IOS, Cisco Business, HPE Aruba,
 MikroTik, SONiC and Arista. About a fifth of the switches are legacy and only speak SHA-1 SSH, so
 they need the second, legacy connection. The tool then runs a complete scan: collection, audit and
 history.

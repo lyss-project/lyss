@@ -1,0 +1,38 @@
+collected: 2026-11-10 02:00
+===== ssh banner =====
+SSH-2.0-OpenSSH_8.4
+===== ssh negotiated =====
+kex: curve25519-sha256
+cipher: aes256-gcm@openssh.com
+mac: hmac-sha2-256
+hostkey: ecdsa-sha2-nistp256
+===== show version =====
+-----------------------------------------------------------------------------
+AOS-CX
+(c) Copyright Hewlett Packard Enterprise Development LP
+-----------------------------------------------------------------------------
+Version      : FL.10.13.1040
+Build Date   : 2026-01-01 00:00:00 UTC
+===== show system =====
+Hostname               : lab-cx-hard
+Product Name           : JL678A 6100 24G CL4 4SFP+ Sw
+===== show ntp status =====
+NTP Status Information
+
+NTP                        : Enabled
+NTP DHCP                   : Enabled
+NTP Authentication         : Disabled
+NTP Server Connections     : Using the mgmt VRF
+
+System time                : Tue Nov 10 02:00:00 UTC 2026
+NTP uptime                 : 3 days, 4 hours, 5 minutes, 6 seconds
+
+Synchronized to NTP Server 192.0.2.123 at stratum 2.
+===== show interface brief =====
+--------------------------------------------------------------------------------------------------------
+Port           Native  Mode   Type           Enabled Status  Reason                  Speed   Description
+               VLAN                                                                  (Mb/s)
+--------------------------------------------------------------------------------------------------------
+1/1/1          10      access 1GbT           yes     up                              1000    --
+1/1/2          10      access 1GbT           no      down    Administratively down   --      --
+1/1/48         1       trunk  SFP+DA1        yes     up                              10000   uplink

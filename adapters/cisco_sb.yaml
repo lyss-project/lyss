@@ -6,7 +6,7 @@
 # families and firmware versions, so config-only checks often end as "unknown";
 # device state (tools/Collect-State.ps1) resolves them.
 adapter: cisco_sb
-spec_version: "0.7.0-draft"
+spec_version: "0.7.1-draft"
 platform: Cisco Small Business / Business switches
 status: draft, validated on SG300 1.4.11.5, SRW2024P, SG350 2.5.0.83 (real devices, 2026-11)
 
@@ -264,13 +264,19 @@ checks:
           ports: {section: show interfaces status, line: '^((?:gi|te|fa)\S+)\s'}
           uplink_config: '^(switchport mode (trunk|general)|channel-group)\b'
           require: '^spanning-tree bpduguard enable'
+      # a port-channel that is neither trunk nor general goes to an end device (e.g. a server): it is
+      # an edge port, protected on the port-channel interface itself
+      - uncovered:
+          what: port-channels to end devices (not trunk/general) without BPDU guard
+          used: {block: '(?i)^interface (port-channel ?\d+|po\d+)$', where_not: '^(switchport mode (trunk|general)\b|shutdown$)'}
+          covered: {block: '(?i)^interface (port-channel ?\d+|po\d+)$', where: '^spanning-tree bpduguard enable'}
     pass_if_any:
       - {edge_ports_missing: *edge, absent: true}
     otherwise: unknown
     note: >-
       Needs "show interfaces status"; links to other switches must be configured as trunk/general or
-      LAG members. Not yet checked: a LAG towards a server (its port-channel interface) is still
-      treated as an uplink here.
+      LAG members, and a port-channel that is neither trunk nor general (e.g. to a server) needs
+      BPDU guard on the port-channel interface.
     remediation: |
       ! only on edge ports (users, printers, APs, servers) - never on links to other switches
       interface range <edge-ports>

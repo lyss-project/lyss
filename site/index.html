@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LYSS — Open security standard and free audit tool for network switches</title>
-<meta name="description" content="LYSS (Lyaazale Switch Security) is an open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, HPE Aruba, Arista EOS, MikroTik RouterOS and SONiC: evidence for every finding, fixes, ISO 27001 mappings. Made in Morocco.">
+<meta name="description" content="LYSS (Lyaazale Switch Security) is an open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, HPE Aruba, Arista EOS, MikroTik RouterOS and SONiC, with HPE Aruba AOS-CX, Juniper EX and Huawei S series (previews): evidence for every finding, fixes, ISO 27001 mappings. Made in Morocco.">
 <meta name="author" content="Mouad Lyaazale">
 <link rel="canonical" href="https://lyss.dev/">
 <meta property="og:site_name" content="LYSS">
 <meta property="og:title" content="LYSS — the open security standard for network switches">
-<meta property="og:description" content="Telnet still on? SNMP public? Exploited firmware? A free, read-only tool checks your Cisco, HPE Aruba, Arista, MikroTik and SONiC switches, shows the evidence and the fix. By Mouad Lyaazale · Made in Morocco.">
+<meta property="og:description" content="Telnet still on? SNMP public? Exploited firmware? A free, read-only tool checks your Cisco, HPE Aruba, Arista, Juniper, Huawei, MikroTik and SONiC switches, shows the evidence and the fix. By Mouad Lyaazale · Made in Morocco.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://lyss.dev/">
 <meta property="og:image" content="https://lyss.dev/img/og-lyss.jpg">
@@ -27,10 +27,10 @@
   "name": "LYSS (Lyaazale Switch Security)",
   "url": "https://lyss.dev/",
   "image": "https://lyss.dev/img/og-lyss.jpg",
-  "description": "Open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, HPE Aruba AOS-S, Arista EOS, MikroTik RouterOS and SONiC.",
+  "description": "Open, vendor-neutral security standard for network switches, with a free read-only audit tool for Cisco IOS, Cisco Business, HPE Aruba AOS-S, Arista EOS, MikroTik RouterOS and SONiC, with HPE Aruba AOS-CX, Juniper EX and Huawei S series (previews).",
   "applicationCategory": "SecurityApplication",
   "operatingSystem": "Windows, Linux",
-  "softwareVersion": "0.16.1",
+  "softwareVersion": "0.17.0",
   "license": "https://www.gnu.org/licenses/agpl-3.0.html",
   "codeRepository": "https://github.com/lyss-project/lyss",
   "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
@@ -69,7 +69,7 @@
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="kicker"><span class="en">Lyaazale Switch Security · preview 0.12</span><span class="fr">Lyaazale Switch Security · préversion 0.12</span></p>
+      <p class="kicker"><span class="en">Lyaazale Switch Security · preview 0.17</span><span class="fr">Lyaazale Switch Security · préversion 0.17</span></p>
       <h1>
         <span class="en">The open security standard for network switches.</span>
         <span class="fr">Le standard ouvert de sécurité des commutateurs réseau.</span>
@@ -92,8 +92,8 @@
         <li class="fail"><code>MGMT-001</code><span class="en">Telnet management is enabled</span><span class="fr">Administration Telnet activée</span></li>
         <li class="fail"><code>MGMT-003</code><span class="en">Cleartext HTTP management is enabled</span><span class="fr">Administration HTTP en clair activée</span></li>
         <li class="fail"><code>VULN-001</code><span class="en">Firmware has a known critical vulnerability</span><span class="fr">Firmware avec une vulnérabilité critique connue</span></li>
-        <li class="pass"><code>AUTH-001</code><span class="en">No default SNMP community</span><span class="fr">Pas de communauté SNMP par défaut</span></li>
-        <li class="pass"><code>AUTH-002</code><span class="en">Privileged password stored as a strong hash</span><span class="fr">Mot de passe privilégié stocké en hachage fort</span></li>
+        <li class="fail"><code>AUTH-001</code><span class="en">Default SNMP community "public" configured</span><span class="fr">Communauté SNMP par défaut « public » configurée</span></li>
+        <li class="pass"><code>MGMT-004</code><span class="en">Idle sessions time out within 10 minutes</span><span class="fr">Sessions inactives fermées en 10 minutes maximum</span></li>
       </ul>
     </figure>
   </div>
@@ -146,7 +146,7 @@
     <ol class="steps">
       <li>
         <h3><span class="en">Collect</span><span class="fr">Collecter</span></h3>
-        <p><span class="en">Read-only SSH, in parallel, optionally through a jump host. Only "show" commands. Host keys are pinned on first contact.</span><span class="fr">SSH en lecture seule, en parallèle, éventuellement via un rebond. Uniquement des commandes « show ». Clés d'hôte épinglées au premier contact.</span></p>
+        <p><span class="en">Read-only SSH, in parallel, optionally through a jump host. Read-only commands only. Host keys are pinned on first contact.</span><span class="fr">SSH en lecture seule, en parallèle, éventuellement via un rebond. Uniquement des commandes de lecture. Clés d'hôte épinglées au premier contact.</span></p>
       </li>
       <li>
         <h3><span class="en">Assess</span><span class="fr">Évaluer</span></h3>
@@ -176,6 +176,9 @@
           <tr><td><span class="en">MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR) · preview</span><span class="fr">MikroTik RouterOS 6/7 (CRS, RouterBOARD, CHR) · préversion</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
           <tr><td><span class="en">SONiC (community builds) · preview</span><span class="fr">SONiC (versions communautaires) · préversion</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
           <tr><td><span class="en">Arista EOS (7000 series, cEOS / vEOS) · preview</span><span class="fr">Arista EOS (série 7000, cEOS / vEOS) · préversion</span></td><td>1 · 2 · 3</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td><span class="en">HPE Aruba AOS-CX · preview, checked on the AOS-CX simulator</span><span class="fr">HPE Aruba AOS-CX · préversion, vérifiée sur le simulateur AOS-CX</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td><span class="en">Huawei S series (VRP) · preview, not yet validated on a device</span><span class="fr">Huawei série S (VRP) · préversion, pas encore validée sur un équipement</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
+          <tr><td><span class="en">Juniper EX (Junos) · preview, not yet validated on a device</span><span class="fr">Juniper EX (Junos) · préversion, pas encore validée sur un équipement</span></td><td>1 · 2</td><td><span class="en">read-only</span><span class="fr">lecture seule</span></td></tr>
           <tr><td><span class="en">Zyxel GS1900 · preview</span><span class="fr">Zyxel GS1900 · préversion</span></td><td><span class="en">firmware only (CVE-2026-7273)</span><span class="fr">firmware uniquement (CVE-2026-7273)</span></td><td><span class="en">offline</span><span class="fr">hors ligne</span></td></tr>
         </tbody>
       </table>
@@ -190,7 +193,7 @@
     <div class="three">
       <article class="level">
         <h3>CISO Assistant</h3>
-        <p><span class="en">LYSS is part of CISO Assistant, the open-source GRC platform: its framework and ISO 27001 mapping are in the built-in library. After every scheduled scan, LYSS uploads the switch report as a new revision of your evidence, automatically: your ISO 27001 controls stay documented without copy and paste.</span><span class="fr">LYSS fait partie de CISO Assistant, la plateforme GRC open source : son référentiel et sa correspondance ISO 27001 sont dans la bibliothèque intégrée. Après chaque scan planifié, LYSS dépose automatiquement le rapport des switchs comme nouvelle révision de votre preuve : vos mesures ISO 27001 restent documentées, sans copier-coller.</span></p>
+        <p><span class="en">LYSS is part of CISO Assistant, the open-source GRC platform: its framework and ISO 27001 mapping are in the built-in library (from the CISO Assistant release after v4.2.2). After every scheduled scan, LYSS uploads the switch report as a new revision of your evidence, automatically: your ISO 27001 controls stay documented without copy and paste.</span><span class="fr">LYSS fait partie de CISO Assistant, la plateforme GRC open source : son référentiel et sa correspondance ISO 27001 sont dans la bibliothèque intégrée (à partir de la version de CISO Assistant qui suit la v4.2.2). Après chaque scan planifié, LYSS dépose automatiquement le rapport des switchs comme nouvelle révision de votre preuve : vos mesures ISO 27001 restent documentées, sans copier-coller.</span></p>
       </article>
       <article class="level">
         <h3><span class="en">Reports for auditors</span><span class="fr">Rapports pour les auditeurs</span></h3>

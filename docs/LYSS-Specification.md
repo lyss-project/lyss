@@ -2,7 +2,7 @@
 
 # LYSS Specification: security controls for network switches
 
-**Version 0.7.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
+**Version 0.7.1-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
 
 ## 1. Scope
 
@@ -46,7 +46,7 @@ A device is **LYSS Level N conformant** when every control of levels 1 to N is `
 `not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.7.0-draft), assessed 2026-11-03 with LYSS 0.3.0.
+> core-sw-01 is LYSS Level 1 conformant (specification 0.7.1-draft), assessed 2026-11-10 with LYSS 0.17.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
 
@@ -158,8 +158,8 @@ A claim is valid for the configuration and firmware assessed; any change require
 **AAA shared secrets (RADIUS/TACACS+) are not stored in cleartext**
 
 - **Requirement.** Keys shared with RADIUS or TACACS+ servers are never stored in cleartext in the configuration.
-- **Rationale.** A cleartext RADIUS key in a backup can be read by anyone who sees the file, and lets an attacker impersonate the AAA server or decrypt authentication traffic. Level 1 only removes the cleartext key: many switches can only store these keys in a reversible form, which is weaker protection and is addressed separately.
-- **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding (e.g. Cisco type 7) is not cleartext and passes this Level 1 control; it gives only weak protection, and storing keys with a device-specific encryption key is planned as a separate Level 2 control.
+- **Rationale.** A cleartext RADIUS key in a backup can be read by anyone who sees the file, and lets an attacker impersonate the AAA server or decrypt authentication traffic. Level 1 only removes the cleartext key: many switches can only store these keys in a reversible form, which is weaker protection.
+- **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding (e.g. Cisco type 7) is not cleartext and passes this Level 1 control, although it gives only weak protection; storing keys with a device-specific encryption key may become a separate Level 2 control.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.24 · NIST SP 800-53 r5 IA-5, SC-28 · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h)
 
@@ -262,7 +262,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** The switch clock is synchronized with at least one configured time server.
 - **Rationale.** Without a reliable clock, logs cannot be correlated and certificates and schedules misbehave.
-- **Test procedure.** Fail if no NTP or SNTP server is configured, or if the device state reports the clock as not synchronized. Pass if a time server is configured and the device state does not report the clock as unsynchronized. Unknown without device state: a configured server alone does not show that the clock is synchronized.
+- **Test procedure.** Fail if no NTP or SNTP server is configured, or if the device state reports the clock as not synchronized. Pass if a time server is configured and the device's synchronization status was collected and does not report the clock as unsynchronized. Unknown without that status: a configured server alone does not show that the clock is synchronized.
 - **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.17 · NIST SP 800-53 r5 AU-8, SC-45 · CIS Controls v8 8.4 · NIS2 Art. 21(2)(b)
 
@@ -280,7 +280,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Edge ports are protected against rogue spanning-tree participants (BPDU guard)**
 
-- **Requirement.** Every edge port disables itself when it receives a spanning-tree BPDU. Links to other switches are configured as such (trunks or link aggregations); every other port is an edge port.
+- **Requirement.** Every edge port disables itself when it receives a spanning-tree BPDU. Links to other switches are configured as such (trunks, or link aggregations that are trunks); every other port is an edge port.
 - **Rationale.** A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
 - **Test procedure.** Edge ports are all ports minus uplinks. Uplinks are only trunk ports (tagged on HPE AOS-S) and the member ports of link aggregations that are trunks. A link aggregation that is not a trunk (for example towards a server) is an edge port. Spanning tree runs on its logical interface, so BPDU protection is checked there, and that check covers its member ports. Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
 - **Evidence.** config, state
@@ -372,14 +372,15 @@ A tool MAY offer to apply fixes. If it does, remediation:
 
 ## 8. Versioning
 
-The specification follows semantic versioning:
+From 1.0.0 the specification follows semantic versioning:
 
-- **MAJOR**: a control is removed, or its requirement becomes stricter or changes meaning.
-- **MINOR**: controls are added, or a level gains controls.
-- **PATCH**: editorial changes, references, test procedure clarifications.
+- **MAJOR**: a control is withdrawn, made stricter in a way that can turn a pass into a fail, or moved to another level.
+- **MINOR**: a control or a level is added, or a wording changes without changing any verdict.
+- **PATCH**: typos and references.
 
-Control identifiers are never reused. A withdrawn control keeps its identifier, marked withdrawn.
-While the version is below 1.0.0 the specification is a draft and MAY change without a MAJOR increment.
+Control identifiers are never reused, renamed or renumbered. A withdrawn control keeps its identifier, marked withdrawn.
+While the version is below 1.0.0 the specification is a draft and MAY change without a MAJOR increment;
+every change is listed in the changelog (see docs/VERSIONING.md).
 
 ## 9. References (informative)
 

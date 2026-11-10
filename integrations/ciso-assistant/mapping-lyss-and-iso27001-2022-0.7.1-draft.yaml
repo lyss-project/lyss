@@ -1,8 +1,8 @@
 urn: urn:lyss:risk:library:mapping-lyss-and-iso27001-2022
 locale: en
 ref_id: mapping-lyss-and-iso27001-2022
-name: LYSS (draft 0.7.0) -> ISO/IEC 27001:2022
-description: 'Mapping between LYSS (Lyaazale Switch Security) specification 0.7.0-draft
+name: LYSS (draft 0.7.1) -> ISO/IEC 27001:2022
+description: 'Mapping between LYSS (Lyaazale Switch Security) specification 0.7.1-draft
   and ISO/IEC 27001:2022 Annex A, from the informative references of the specification.
   Each LYSS control is a specific, testable part (subset) of the ISO control it maps
   to. Compliant LYSS requirements give at most partial coverage of the ISO control.
@@ -13,8 +13,8 @@ description: 'Mapping between LYSS (Lyaazale Switch Security) specification 0.7.
   control identifiers are stable: never renamed, renumbered or reused. Generated from
   spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss).'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
-version: 1
-publication_date: 2026-11-09
+version: 2
+publication_date: 2026-11-10
 provider: Mouad Lyaazale
 packager: LYSS project
 dependencies:
@@ -24,8 +24,8 @@ objects:
   requirement_mapping_sets:
   - urn: urn:lyss:risk:req_mapping_set:mapping-lyss-and-iso27001-2022
     ref_id: mapping-lyss-and-iso27001-2022
-    name: LYSS (draft 0.7.0) -> ISO/IEC 27001:2022
-    description: 'Mapping between LYSS (Lyaazale Switch Security) specification 0.7.0-draft
+    name: LYSS (draft 0.7.1) -> ISO/IEC 27001:2022
+    description: 'Mapping between LYSS (Lyaazale Switch Security) specification 0.7.1-draft
       and ISO/IEC 27001:2022 Annex A, from the informative references of the specification.
       Each LYSS control is a specific, testable part (subset) of the ISO control it
       maps to. Compliant LYSS requirements give at most partial coverage of the ISO

@@ -1,8 +1,8 @@
 # HPE Aruba 2930F hardened to Level 2 on WC.16.11.0032 (fixes HPESBNW05156). Synthetic data.
-# Level 1 only: clock synchronization (LYSS-LOG-011) is not collected on AOS-S yet -> unknown.
+# NTP mode ("timesync ntp"): "show ntp status" reports the clock synchronized (LYSS-LOG-011).
 vendor: hp_procurve
 backup: {automatic_days_ago: 1}
-level: 1
+level: 2
 verdicts:
   LYSS-MGMT-001: pass
   LYSS-MGMT-002: pass
@@ -21,6 +21,6 @@ verdicts:
   LYSS-MGMT-012: pass
   LYSS-MGMT-013: pass
   LYSS-LOG-010: pass
-  LYSS-LOG-011: unknown
+  LYSS-LOG-011: pass
   LYSS-ACC-010: pass
   LYSS-ACC-011: pass

@@ -1,0 +1,25 @@
+collected: 2026-11-10 02:00
+===== ssh banner =====
+SSH-2.0--
+===== ssh negotiated =====
+kex: diffie-hellman-group16-sha512
+cipher: aes256-gcm@openssh.com
+mac: hmac-sha2-256
+hostkey: rsa-sha2-256
+===== display version =====
+Huawei Versatile Routing Platform Software
+VRP (R) software, Version 5.170 (S5735 V200R021C10SPC600)
+Copyright (C) 2000-2026 HUAWEI TECH Co., Ltd.
+HUAWEI S5735-L24T4S-A1 Routing Switch uptime is 12 days, 4 hours, 31 minutes
+===== display ntp-service status =====
+ clock status: synchronized
+ clock stratum: 3
+ reference clock ID: 192.0.2.123
+===== display interface brief =====
+PHY: Physical
+*down: administratively down
+Interface                   PHY   Protocol  InUti OutUti   inErrors  outErrors
+GigabitEthernet0/0/1        up    up           0%     0%          0          0
+GigabitEthernet0/0/2        *down down         0%     0%          0          0
+XGigabitEthernet0/0/1       up    up           1%     1%          0          0
+Vlanif99                    up    up           --     --          0          0

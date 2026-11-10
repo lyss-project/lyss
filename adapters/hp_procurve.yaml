@@ -6,9 +6,9 @@
 # "spanning-tree 1-24 bpdu-protection"): edge-port rules use uplink_lists / require_lists.
 # Credentials only appear in the config when "include-credentials" is enabled.
 adapter: hp_procurve
-spec_version: "0.7.0-draft"
+spec_version: "0.7.1-draft"
 platform: HP ProCurve / HPE Aruba AOS-S
-status: draft, validated on synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
+status: draft, validated on the LYSS simulator and synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
 
 facts:
   model:
@@ -216,12 +216,24 @@ checks:
   LYSS-LOG-011:
     fail_if_any:
       - {line: '^(sntp server (priority \d+ )?\S+|ntp server \S+)', absent: true, say: 'no SNTP/NTP server configured'}
+      # only in NTP mode: with "timesync sntp" the NTP status says nothing about the SNTP clock
+      - all:
+          - {line: '^ntp server \S+'}
+          - {line: '^timesync sntp\b', absent: true}
+          - {state: '(?i)Synchronization Status\s*:\s*(Not|Un)', section: show ntp status}
+    pass_if_all:
+      - {line: '^ntp server \S+'}
+      - {line: '^timesync sntp\b', absent: true}
+      - {state: '(?i)Synchronization Status\s*:\s*Synchroni[sz]ed\b', section: show ntp status}
     otherwise: unknown
-    note: Synchronization itself is not collected on AOS-S yet, so a configured time server gives unknown.
+    note: >-
+      Synchronization is read from "show ntp status" (NTP mode). In SNTP mode AOS-S reports no
+      synchronization status, so the verdict stays unknown: prefer "timesync ntp".
     remediation: |
-      timesync sntp
-      sntp unicast
-      sntp server priority 1 <ntp-ip>
+      timesync ntp
+      ntp unicast
+      ntp server <ntp-ip> iburst
+      ntp enable
 
   LYSS-ACC-010:
     fail_if_any:
@@ -244,10 +256,19 @@ checks:
           ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
           uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
           require_lists: '^spanning-tree (\S+) bpdu-protection'
+      # a trunk group (link aggregation) tagged in no VLAN goes to an end device such as a server:
+      # it is an edge port itself and needs "spanning-tree TrkN bpdu-protection"
+      - uncovered:
+          what: trunk groups to end devices (tagged in no VLAN) without BPDU protection
+          used: {line: '(?i)^trunk \S+ (trk\d+)\b'}
+          covered: [{block: '^vlan \d+$', line: '^tagged (\S+)'}, {line: '^spanning-tree (\S+) bpdu-protection'}]
+          lists: ports
     pass_if_any:
       - {edge_ports_missing: *edge, absent: true}
     otherwise: unknown
-    note: Needs "show interfaces brief" to know the ports; trunk and tagged ports count as uplinks.
+    note: >-
+      Needs "show interfaces brief" to know the ports; trunk and tagged ports count as uplinks, and a
+      trunk group tagged in no VLAN (e.g. to a server) is an edge port.
     remediation: |
       ! only on edge ports (users, printers, APs, servers) - never on links to other switches
       spanning-tree <edge-ports> bpdu-protection
@@ -255,14 +276,19 @@ checks:
   # ---------------- Level 3 ----------------
   # Syntax from the AOS-S 16.x guides; simulator and synthetic outputs only so far. User VLANs =
   # VLANs with untagged access ports (as for LYSS-MGMT-011); edge ports as for LYSS-ACC-011.
-  # Not yet checked on AOS-S (port lists): access ports listed in "dhcp-snooping trust" /
-  # "arp-protect trust", 100 % broadcast limits, and trunk groups towards servers (LYSS-ACC-011).
+  # Uplinks for the trust checks = trunk members, trunk groups and ports tagged in a VLAN.
 
   LYSS-ACC-020:
     not_applicable_if_any: &hp_no_access
       - {not: {captured: {untagged_access_vlans: true}}, say: 'no VLAN with untagged access ports'}
     fail_if_any:
       - {not: {line: '^dhcp-snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("dhcp-snooping")'}
+      # a trusted port that is not an uplink accepts DHCP server messages from an end device
+      - uncovered:
+          what: non-uplink ports trusted for DHCP snooping
+          used: {line: '^dhcp-snooping trust (\S+)'}
+          covered: &hp_uplinks [{line: '^trunk (\S+) '}, {line: '(?i)^trunk \S+ (trk\d+)\b'}, {block: '^vlan \d+$', line: '^tagged (\S+)'}]
+          lists: ports
       - uncovered: &hp_snooping
           what: access VLANs without DHCP snooping
           used: {untagged_access_vlans: true}
@@ -280,6 +306,12 @@ checks:
     not_applicable_if_any: *hp_no_access
     fail_if_any:
       - {not: {line: '^arp-protect\s*$'}, say: 'ARP protection is not enabled globally ("arp-protect")'}
+      # a trusted port that is not an uplink skips ARP protection
+      - uncovered:
+          what: non-uplink ports trusted for ARP protection
+          used: {line: '^arp-protect trust (\S+)'}
+          covered: *hp_uplinks
+          lists: ports
       - uncovered: &hp_dai
           what: access VLANs without ARP protection
           used: {untagged_access_vlans: true}
@@ -312,6 +344,12 @@ checks:
   LYSS-ACC-023:
     not_applicable_if_any: *hp_no_access
     fail_if_any:
+      # a 100 % limit on a port that is not an uplink limits nothing
+      - uncovered:
+          what: edge ports with a 100 % broadcast limit (no limit)
+          used: {block: '^interface (\S+)$', where: '^(broadcast-limit|rate-limit bcast in percent) 100\b'}
+          covered: *hp_uplinks
+          lists: ports
       - edge_ports_missing: &hp_storm
           ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
           uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']

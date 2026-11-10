@@ -16,6 +16,8 @@ version 1, specification 0.7.0-draft) were merged into CISO Assistant on 2026-11
 ([intuitem/ciso-assistant-community#5246](https://github.com/intuitem/ciso-assistant-community/pull/5246)).
 From the CISO Assistant release that follows v4.2.2, load them from the built-in libraries store
 (search "LYSS"); the manual import below is only needed for older versions or newer LYSS drafts.
+The files in this folder are library version 2 (specification 0.7.1-draft, wording only), an
+update of the merged version 1; CISO Assistant itself still ships version 1.
 
 ## Import into CISO Assistant (v4.x)
 
@@ -48,18 +50,21 @@ answered from LYSS results, then an ISO/IEC 27001:2022 audit created with the LY
   This comes from CISO Assistant's mapping engine, not from the library.
 - Evidence attached to LYSS requirements is carried over to the ISO controls, and every ISO result
   links to the LYSS requirements it was inferred from. Observations are not copied.
-- On the demo lab, 12 ISO controls were prefilled (A.5.10, A.5.16, A.5.17, A.8.5, A.8.8, A.8.15,
-  A.8.16, A.8.17, A.8.20, A.8.21, A.8.22, A.8.24).
+- On the demo lab (CISO Assistant 4.1.1, specification 0.6.0-draft), 12 ISO controls were
+  prefilled (A.5.10, A.5.16, A.5.17, A.8.5, A.8.8, A.8.15, A.8.16, A.8.17, A.8.20, A.8.21, A.8.22,
+  A.8.24). Since specification 0.6.1-draft nothing maps to A.5.10 any more.
 
-## Contributing the library upstream
+## Updating the library upstream
 
-CISO Assistant keeps its libraries as Excel "v2" workbooks and generates the YAML with its own
-converter. `python tools/build_ciso_library.py --excel DIR` writes the two workbooks (needs
-`openpyxl`). Checked with upstream's tools from CISO Assistant 4.1.1: `check_library_v2.py` accepts
-both workbooks, and `convert_library_v2.py` produces exactly the content of the YAML files here
-(37 nodes, 39 mappings), with one difference: upstream's converter always adds the reverse mapping
-set (ISO → LYSS, `superset`), which this repository leaves out on purpose (see above). Upstream
-asks contributors to sign its CLA.
+The library in CISO Assistant is the YAML file (its source of truth). For an update, open a pull
+request with the two regenerated YAML files, converted with upstream's own tools:
+`python tools/build_ciso_library.py --excel DIR` writes the Excel "v2" workbooks (needs
+`openpyxl`); upstream's `check_library_v2.py` accepts them, and `convert_library_v2.py` produces
+the same content as the YAML files here (37 nodes, 43 mappings) plus a reverse mapping set
+(ISO → LYSS, `superset`) that must be removed, because the mapping is one-way on purpose (see
+above). Do not add the workbooks to the pull request. Every update needs the next
+`LIBRARY_VERSIONS` number, and control identifiers must never disappear
+(`tests/data/ciso_published.yaml`). Upstream asks contributors to sign its CLA.
 
 ## Regenerate
 

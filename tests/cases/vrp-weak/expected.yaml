@@ -1,0 +1,25 @@
+# Huawei S5735 left insecure on purpose. Synthetic data.
+vendor: huawei_vrp
+backup: {manual_days_ago: 0}
+level: 0
+verdicts:
+  LYSS-MGMT-001: fail
+  LYSS-MGMT-002: fail
+  LYSS-MGMT-003: fail
+  LYSS-MGMT-004: fail
+  LYSS-AUTH-001: fail
+  LYSS-AUTH-002: fail
+  LYSS-AUTH-003: fail
+  LYSS-AUTH-004: fail
+  LYSS-VULN-001: unknown
+  LYSS-BKP-001: fail
+  LYSS-AUTH-010: fail
+  LYSS-AUTH-011: fail
+  LYSS-MGMT-010: fail
+  LYSS-MGMT-011: fail
+  LYSS-MGMT-012: fail
+  LYSS-MGMT-013: fail
+  LYSS-LOG-010: fail
+  LYSS-LOG-011: fail
+  LYSS-ACC-010: fail
+  LYSS-ACC-011: fail

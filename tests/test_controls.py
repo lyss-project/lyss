@@ -20,6 +20,17 @@ PREVIEW_VENDORS = {
         "LYSS-MGMT-002": "EOS speaks SSH protocol version 2 only",
         "LYSS-AUTH-003": "EOS stores local passwords as one-way hashes only (SHA-512 or MD5 crypt)",
     },
+    "aruba_aoscx": {
+        "LYSS-MGMT-002": "AOS-CX speaks SSH protocol version 2 only",
+        "LYSS-VULN-001": "no AOS-CX release data yet in data/firmware.yaml",
+    },
+    "huawei_vrp": {
+        "LYSS-VULN-001": "no VRP release data yet in data/firmware.yaml",
+    },
+    "juniper_junos": {
+        "LYSS-AUTH-003": "Junos stores login passwords as one-way hashes only (encrypted-password)",
+        "LYSS-VULN-001": "no Junos release data yet in data/firmware.yaml",
+    },
     "mikrotik": {
         "LYSS-MGMT-002": "RouterOS (ROSSSH) speaks SSH protocol version 2 only",
         "LYSS-AUTH-002": "no enable password, and local password hashes are never exported",
@@ -31,7 +42,7 @@ PREVIEW_VENDORS = {
         "LYSS-VULN-001": "no published end-of-support data for community SONiC builds",
     },
 }
-SECRETS_IN_CASES = ["cisco123", "PlainSharedKey", "0822455D0A16", "$9$FAKE", "FAKEHASH", "FAKEAESKEY",
+SECRETS_IN_CASES = ["cisco123", "FAKEAESKEY==", "PlainSharedKey", "0822455D0A16", "$9$FAKE", "FAKEHASH", "FAKEAESKEY",
                     "FAKEAUTHPW", "FAKEPRIVPW", "s3cretCommunity", "lab-v3-ro", "$1$FAKEHASH", "$6$FAKEHASH"]
 
 
@@ -65,9 +76,7 @@ def test_every_control_has_a_passing_and_a_failing_case(vendor):
 
 
 # controls an adapter can only fail or leave unknown until the needed device state is collected
-CANNOT_PASS_YET = {
-    ("hp_procurve", "LYSS-LOG-011"),  # AOS-S clock synchronization status is not collected yet
-}
+CANNOT_PASS_YET: set[tuple[str, str]] = set()
 
 
 @pytest.mark.parametrize("vendor", FULL_VENDORS)
@@ -107,6 +116,10 @@ def test_adapter_regexes_compile():
             for key, value in node.items():
                 if key in ("line", "block", "every_contains", "where", "where_not", "state", "uplink_config", "require") and isinstance(value, str):
                     re.compile(value)
+                if key == "where" and isinstance(value, list):  # every pattern must match
+                    assert value and all(isinstance(v, str) for v in value), value
+                    for v in value:
+                        re.compile(v)
                 walk(value)
         elif isinstance(node, list):
             for item in node:

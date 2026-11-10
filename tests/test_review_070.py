@@ -164,6 +164,36 @@ def test_sb_acc_023_rejects_a_100_percent_threshold():
     assert l3("cisco_sb.cfg", "cisco_sb", "LYSS-ACC-023", edit, state)[0] == "fail"
 
 
+# ---------------- LYSS-LOG-011 on HPE AOS-S: "show ntp status" ----------------
+
+HP_NTP = "===== show ntp status ====="
+
+
+def _hp(state_status: str | None, sntp: bool = False) -> str:
+    c = load_case("hp-hardened")
+    config = c["config"]
+    if sntp:
+        config = config.replace("timesync ntp\nntp unicast\nntp server 192.0.2.123 iburst\nntp enable",
+                                "timesync sntp\nsntp unicast\nsntp server priority 1 192.0.2.123")
+        assert "timesync sntp" in config
+    state = re.sub(rf"(?ms)^{re.escape(HP_NTP)}\n.*?(?=^===== |\Z)", "", c["state"])
+    if state_status is not None:
+        state += f"{HP_NTP}\n  Synchronization Status : {state_status}   Peer Dispersion : 0.00000 sec\n"
+    f = next(f for f in audit(config, "hp_procurve", 2, state, c["context"]) if f.control_id == "LYSS-LOG-011")
+    return f.verdict
+
+
+@pytest.mark.parametrize("status, sntp, expected", [
+    ("Synchronized", False, "pass"),
+    ("Not Synced", False, "fail"),
+    (None, False, "unknown"),         # no device state: synchronization not verified
+    ("Not Synced", True, "unknown"),  # SNTP mode: the NTP status says nothing about the SNTP clock
+    (None, True, "unknown"),
+])
+def test_hp_log_011_reads_show_ntp_status(status, sntp, expected):
+    assert _hp(status, sntp) == expected
+
+
 # ---------------- LYSS-BKP-001: how often backups really run ----------------
 
 def _backup(last_days_ago: float, previous_days_ago: float | None) -> dict:

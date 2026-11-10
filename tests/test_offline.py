@@ -35,7 +35,9 @@ def test_offline_doc_lists_exactly_the_collected_state_commands():
     from lyss.collector import COMMANDS
     doc = (Path(__file__).parent.parent / "docs" / "OFFLINE.md").read_text(encoding="utf-8")
     labels = {"arista_eos": "Arista EOS", "mikrotik": "MikroTik RouterOS", "cisco_ios": "Cisco IOS / IOS-XE", "sonic": "SONiC",
-              "cisco_sb": "Cisco Small Business / Business", "hp_procurve": "HPE Aruba AOS-S"}
+              "cisco_sb": "Cisco Small Business / Business", "hp_procurve": "HPE Aruba AOS-S",
+              "juniper_junos": "Juniper EX (Junos)", "aruba_aoscx": "HPE Aruba AOS-CX",
+              "huawei_vrp": "Huawei S series (VRP)"}
     assert set(labels) == set(COMMANDS)
     for vendor, label in labels.items():
         row = next(l for l in doc.splitlines() if l.startswith(f"| {label} | `") and "·" in l)
@@ -43,7 +45,8 @@ def test_offline_doc_lists_exactly_the_collected_state_commands():
         assert documented == set(COMMANDS[vendor]["state"]), vendor
 
 
-CASE_VENDORS = {"arista": "arista_eos", "ios": "cisco_ios", "sb": "cisco_sb", "hp": "hp_procurve", "mikrotik": "mikrotik", "sonic": "sonic"}
+CASE_VENDORS = {"arista": "arista_eos", "ios": "cisco_ios", "sb": "cisco_sb", "hp": "hp_procurve", "mikrotik": "mikrotik", "sonic": "sonic",
+                "junos": "juniper_junos", "cx": "aruba_aoscx", "vrp": "huawei_vrp"}
 
 
 def test_platform_recognised_from_every_fixture_and_demo_configuration():

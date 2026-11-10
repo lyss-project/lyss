@@ -166,6 +166,12 @@ def test_ssh_fingerprints(banner, adapter):
 @pytest.mark.parametrize("platform, adapter", [
     ("Cisco SG350-52P (PID:SG350-52P-K9)-VSD", "cisco_sb"), ("cisco C1000-24T-4G-L", "cisco_ios"),
     ("Cisco IOS Software, C1000 Software", "cisco_ios"), ("Aruba JL256A 2930F-48G", "hp_procurve"),
+    ("HP J9772A 2530-48G-PoEP Switch, revision YA.16.10.0012, ROM YA.15.20", "hp_procurve"),
+    ("Aruba JL675A 6100 48G CL4 4SFP+ Swch FL.10.13.1040", "aruba_aoscx"),
+    ("Virtual.10.17.1010", "aruba_aoscx"), ("Aruba AOS-CX 6300M", "aruba_aoscx"),
+    ("Juniper Networks, Inc. ex2300-24t Ethernet Switch, kernel JUNOS 23.4R2", "juniper_junos"),
+    ("S5735-L24T4S-A1 Huawei Versatile Routing Platform Software VRP (R) software, Version 5.170", "huawei_vrp"),
+    ("H3C Comware Platform Software, Software Version 7.1.064", None),
 ])
 def test_platform_from_neighbour(platform, adapter):
     assert discovery.guess_platform(platform, discovery.PLATFORMS)[0] == adapter

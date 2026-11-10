@@ -17,7 +17,7 @@ tool that checks your switches against it, shows the evidence and gives the fix.
 
 ![LYSS demo: one-click read-only scan, evidence and fix for every finding, topology, control matrix, low-risk fixes verified by a new scan](docs/media/lyss-demo.gif)
 
-<sub>Demo on a fictitious network. Cisco IOS · Cisco Business · HPE Aruba AOS-S · MikroTik RouterOS · SONiC · Website: [lyss.dev](https://lyss.dev) · Try it in your browser: [lyss.dev/audit.html](https://lyss.dev/audit.html)</sub>
+<sub>Demo on a fictitious network. Cisco IOS · Cisco Business · HPE Aruba AOS-S · Arista EOS · MikroTik RouterOS · SONiC · Website: [lyss.dev](https://lyss.dev) · Try it in your browser: [lyss.dev/audit.html](https://lyss.dev/audit.html)</sub>
 
 LYSS defines **what** a securely managed switch looks like, once, independently of any vendor
 (the [specification](docs/LYSS-Specification.md)), and **how to verify it** on each platform
@@ -31,7 +31,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   ARP inspection, 802.1X / MAC authentication, storm control, no CDP/LLDP towards users
   (opt-in: `lyss audit --level 3`, or Settings > Assessment).
 
-> Status: **0.16, draft specification 0.7, preview.** The specification and the tool may still change
+> Status: **0.17, draft specification 0.7.1, preview.** The specification and the tool may still change
 > before 1.0 (control IDs stay stable). Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
@@ -53,7 +53,9 @@ python -m venv .venv
 ```
 
 **No connection to your devices at all?** Audit a configuration you saved yourself (a MikroTik
-`/export`, a Cisco or HPE `show running-config`, a SONiC config_db): nothing is sent anywhere.
+`/export verbose`, a Cisco, HPE or Arista `show running-config`, a Junos
+`show configuration | display inheritance | display set`, a Huawei `display current-configuration`,
+a SONiC config_db): nothing is sent anywhere.
 The platform is recognised from the file.
 
 ```sh
@@ -89,6 +91,9 @@ read-only account ([docs/ACCOUNTS.md](docs/ACCOUNTS.md)), and tell me what you f
 | MikroTik RouterOS 6.x / 7.x (CRS, RouterBOARD, CHR), preview | yes | yes | yes (RouterOS 7) | yes | no | RouterOS (CISA KEV + critical) |
 | SONiC (community builds), preview | yes | yes | not applicable | yes | no | no |
 | Arista EOS (7000 series, cEOS / vEOS), preview | yes | yes | yes | yes | no | EOS (critical advisories) |
+| HPE Aruba AOS-CX (4100i, 6000-6300, 8xxx), preview: checked on the AOS-CX simulator, not yet on a physical switch | yes | yes | not yet | yes | no | no |
+| Huawei S series (VRP V200), preview: not yet validated on a device | yes | yes | not yet | yes | no | no |
+| Juniper EX (Junos), preview: not yet validated on a device | yes | yes | not yet | yes | no | no |
 | Zyxel GS1900, preview: **firmware only**, offline | no | no | no | no | no | GS1900 (CVE-2026-7273, CISA KEV) |
 
 Level 3 (Advanced: DHCP snooping, ARP inspection, 802.1X / MAC authentication, storm control,
@@ -111,7 +116,9 @@ end-of-support data for community builds). Arista EOS is validated on cEOS-lab 4
 (default, insecure and hardened configurations, LLDP topology between two switches). Its firmware
 check covers the critical EOS advisories with fixed releases (SA-0071, SA-0072); the one EOS flaw
 in the CISA KEV catalogue (CVE-2026-7473, Security Advisory 0137) has no fixed release, only a
-mitigation ACL, which the report explains.
+mitigation ACL, which the report explains. HPE Aruba AOS-CX is checked on the AOS-CX 10.17
+simulator, not yet on a physical switch; Juniper EX and Huawei S series are written from the
+vendors' documentation and synthetic configurations, not yet validated on a device.
 
 **Zyxel GS1900** (web-managed; Zyxel's CLI is a troubleshooting shell): LYSS checks the firmware
 against CVE-2026-7273, the web-interface flaw exploited on about 1,000 GS1900 switches since

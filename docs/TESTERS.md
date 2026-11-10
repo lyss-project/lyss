@@ -3,7 +3,7 @@
 Thank you for testing LYSS. This guide takes about 15 minutes: install, try the demo (no switch
 needed), then audit one real switch, and tell me what you found.
 
-LYSS is in preview (0.7.0). Your feedback decides what gets fixed and built next.
+LYSS is in preview (tool 0.17, specification 0.7.1-draft). Your feedback decides what gets fixed and built next.
 
 ## 1. Get the code
 
@@ -45,8 +45,8 @@ and sign in with it. Then try:
 
 Use a switch **you are responsible for**, ideally a lab or non-critical one first.
 
-**What LYSS does on the switch.** It connects over SSH and runs only `show` commands (the list is
-in `src/lyss/collector.py`). It never enters configuration mode, unless you enable Remediation
+**What LYSS does on the switch.** It connects over SSH and runs only read-only commands (`show`, `display`, `print`;
+the list is in `src/lyss/collector.py`). It never enters configuration mode, unless you enable Remediation
 yourself in Settings (it is off by default). Credentials are stored encrypted on your PC, and
 nothing is sent outside your network.
 
@@ -58,6 +58,11 @@ as soon as it logs in. Create a **dedicated account** for the test:
 - HPE Aruba AOS-S: a manager-level account.
 - MikroTik RouterOS: a group with `ssh,read` only (not the built-in `read` group, which can read secrets).
 - SONiC: a Linux user that is not in the `sudo` group.
+- Arista EOS: privilege 15 with the `network-operator` role, command authorization on.
+- HPE Aruba AOS-CX: a custom user group with `10 permit cli command "show .*"` (not the built-in
+  `operators` group, which cannot read the configuration).
+- Juniper EX: a login class with `view view-configuration` only.
+- Huawei S series: a local user of level 3 with SSH only.
 
 Details, commands and what was verified: [ACCOUNTS.md](ACCOUNTS.md).
 
@@ -70,7 +75,8 @@ only from your admin network, and delete the account when you have finished test
    **Linux / macOS**: `.venv/bin/python -m lyss ui`.
 2. The first start asks you to choose the LYSS administrator password.
 3. **Settings → Credential profiles**: add the switch account.
-4. **Add switch**: name, IP address, platform (Cisco IOS, Cisco Business or HPE Aruba), profile.
+4. **Add switch**: name, IP address, platform (Cisco IOS, Cisco Business, HPE Aruba AOS-S or AOS-CX, Arista EOS, Juniper EX, Huawei S
+   series, MikroTik RouterOS or SONiC), profile.
 5. **Scan**, then open the switch page.
 
 The demo and your real data are kept apart: the demo uses a temporary folder, your real data goes

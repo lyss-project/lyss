@@ -32,6 +32,30 @@ def test_site_metadata_states_the_current_version():
     assert f'"softwareVersion": "{__version__}"' in site
 
 
+def test_visible_version_mentions_are_current():
+    """The site headline said "preview 0.12" for five releases: every prose mention of the tool or
+    specification version must follow the package and the specification."""
+    minor = ".".join(__version__.split(".")[:2])
+    spec = load_spec()["spec_version"]
+    site = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
+    kicker = re.findall(r"(?:preview|préversion) (\d+\.\d+)", site)
+    assert kicker and set(kicker) == {minor}, kicker
+    mentions = {
+        "docs/TESTERS.md": r"tool (\d+\.\d+), specification (\S+?)\)",
+        "docs/VALIDATION.md": r"Last reviewed: [^(]*\(LYSS (\d+\.\d+)\)",
+        "docs/LYSS-Specification.md": r"assessed \S+ with LYSS (\d+\.\d+)\.",
+    }
+    for name, pattern in mentions.items():
+        m = re.search(pattern, (ROOT / name).read_text(encoding="utf-8"))
+        assert m, f"{name}: version mention not found"
+        assert m.group(1) == minor, f"{name}: says {m.group(1)}, package is {minor}"
+        if m.lastindex == 2:
+            assert m.group(2) == spec, f"{name}: says specification {m.group(2)}, current is {spec}"
+    for name in ("docs/CI.md", "docs/VERSIONING.md"):
+        pinned = set(re.findall(r'lyss==(\d+\.\d+\.\d+)|lyss@v(\d+\.\d+\.\d+)', (ROOT / name).read_text(encoding="utf-8")))
+        assert {v for pair in pinned for v in pair if v} == {__version__}, f"{name}: {pinned}"
+
+
 def test_changelog_has_an_entry_for_the_current_version():
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     assert re.search(rf"(?m)^## {re.escape(__version__)} \(\d{{4}}-\d{{2}}-\d{{2}}", changelog)

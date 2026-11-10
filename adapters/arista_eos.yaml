@@ -11,7 +11,7 @@
 #   username lyss-audit privilege 15 role network-operator secret <password>
 #   aaa authorization commands all default local      ! roles are enforced only with this
 adapter: arista_eos
-spec_version: "0.7.0-draft"
+spec_version: "0.7.1-draft"
 platform: Arista EOS
 status: preview, validated on cEOS-lab 4.37.0F (container, 2026-11)
 

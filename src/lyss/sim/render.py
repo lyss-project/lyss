@@ -436,6 +436,16 @@ def hp_show(sw: SimSwitch, command: str) -> str | None:
             "  Port   Device ID                     | Platform                     Capability",
             "  ------ ----------------------------- + ---------------------------- -----------",
         ])
+    if command == "show ntp status":
+        # AOS-S 16.x layout; the simulated clock is synchronized when NTP mode has a server
+        ntp = sw.has_line(r"^timesync ntp\b") and sw.has_line(r"^ntp server \S+")
+        return "\n".join([
+            " NTP Status Information",
+            "",
+            f"  NTP Status            : {'Enabled' if ntp else 'Disabled'}       NTP Mode        : Unicast",
+            f"  Synchronization Status : {'Synchronized' if ntp else 'Not Synced'}   Peer Dispersion : 0.00000 sec",
+            f"  Stratum Number         : {3 if ntp else 16}",
+        ])
     return None
 
 

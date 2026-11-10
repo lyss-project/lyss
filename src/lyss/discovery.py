@@ -33,7 +33,12 @@ MAX_HOSTS = 4096
 PLATFORMS = [
     (r"\b(S[GF]\d{3}|SRW\d{4}|CBS\d{3}|SG\d{3}X?)", "cisco_sb", "Cisco Small Business"),
     (r"Cisco IOS|C1000|WS-C|C9[23]00|Catalyst|cisco\s+C\d", "cisco_ios", "Cisco IOS / IOS-XE"),
+    # AOS-CX before AOS-S: both say "Aruba"; AOS-CX releases are XX.10.nn.nnnn (Virtual.10.17.1010 on the
+    # simulator), AOS-S releases XX.15 / XX.16
+    (r"AOS-CX|ArubaOS-CX|\b(?:[A-Z]{2}|Virtual)\.10\.\d{2}\.\d{4}\b", "aruba_aoscx", "HPE Aruba AOS-CX"),
     (r"ProCurve|Aruba|HP J\d|HPE?\b", "hp_procurve", "HP ProCurve / ArubaOS-Switch"),
+    (r"Juniper Networks|\bJUNOS\b", "juniper_junos", "Juniper EX (Junos)"),
+    (r"Huawei Versatile Routing Platform|\bHUAWEI S\d{4}", "huawei_vrp", "Huawei S series (VRP)"),
     (r"\bSONiC\b", "sonic", "SONiC"),   # LLDP system description "SONiC Software Version: ..."
     (r"Arista|\bcEOS|\bvEOS|\bEOS version", "arista_eos", "Arista EOS"),
     (r"MikroTik|RouterOS|\bCRS\d{3}", "mikrotik", "MikroTik RouterOS"),

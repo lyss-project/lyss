@@ -2,7 +2,7 @@
 # This file is the normative source: docs/LYSS-Specification.md is generated from it
 # (python tools/build_spec.py). It says WHAT must be true; HOW to check it on each platform
 # lives in adapters/. Licensed CC BY 4.0 (see LICENSE-SPEC).
-spec_version: "0.7.0-draft"
+spec_version: "0.7.1-draft"
 status: draft
 levels:
   1: Baseline
@@ -145,12 +145,12 @@ controls:
       A cleartext RADIUS key in a backup can be read by anyone who sees the file, and lets an
       attacker impersonate the AAA server or decrypt authentication traffic. Level 1 only removes
       the cleartext key: many switches can only store these keys in a reversible form, which is
-      weaker protection and is addressed separately.
+      weaker protection.
     test_procedure: >-
       Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding (e.g.
-      Cisco type 7) is not cleartext and passes this Level 1 control; it gives only weak protection,
-      and storing keys with a device-specific encryption key is planned as a separate Level 2
-      control.
+      Cisco type 7) is not cleartext and passes this Level 1 control, although it gives only weak
+      protection; storing keys with a device-specific encryption key may become a separate
+      Level 2 control.
     evidence: [config]
     mappings:
       iso27001_2022: [A.5.17, A.8.24]
@@ -327,9 +327,9 @@ controls:
     rationale: Without a reliable clock, logs cannot be correlated and certificates and schedules misbehave.
     test_procedure: >-
       Fail if no NTP or SNTP server is configured, or if the device state reports the clock as not
-      synchronized. Pass if a time server is configured and the device state does not report the
-      clock as unsynchronized. Unknown without device state: a configured server alone does not
-      show that the clock is synchronized.
+      synchronized. Pass if a time server is configured and the device's synchronization status
+      was collected and does not report the clock as unsynchronized. Unknown without that status:
+      a configured server alone does not show that the clock is synchronized.
     evidence: [config, state]
     mappings:
       iso27001_2022: [A.8.17]
@@ -355,7 +355,8 @@ controls:
     title: Edge ports are protected against rogue spanning-tree participants (BPDU guard)
     statement: >-
       Every edge port disables itself when it receives a spanning-tree BPDU. Links to other
-      switches are configured as such (trunks or link aggregations); every other port is an edge port.
+      switches are configured as such (trunks, or link aggregations that are trunks); every other
+      port is an edge port.
     rationale: A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
     test_procedure: >-
       Edge ports are all ports minus uplinks. Uplinks are only trunk ports (tagged on HPE AOS-S)

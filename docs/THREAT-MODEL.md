@@ -34,10 +34,10 @@ deploy it.
 - **Threat:** a downgrade to weak SSH algorithms. **Mitigation:** modern algorithms only. SHA-1 is
   used only for a switch that offers nothing else, after a modern-only attempt fails; the scan
   records it, and LYSS-MGMT-013 reports it (see SECURITY.md).
-- **Threat:** the switch account is abused. **Mitigation:** LYSS sends only the fixed `show` /
-  `print` commands of `collector.COMMANDS`; users cannot add commands. Use a read-only account:
-  [docs/ACCOUNTS.md](ACCOUNTS.md) shows the least-privilege account for each platform, verified in
-  the lab.
+- **Threat:** the switch account is abused. **Mitigation:** LYSS sends only the fixed read-only
+  commands (`show`, `display`, `print`) of `collector.COMMANDS`; users cannot add commands. Use a read-only account:
+  [docs/ACCOUNTS.md](ACCOUNTS.md) shows the least-privilege account for each platform and says
+  where it was verified (not yet for Juniper EX and Huawei).
 
 ### 2. Data coming from switches (untrusted input)
 - **Threat:** a malicious device sends crafted text (an LLDP/CDP name, a banner, a configuration) to

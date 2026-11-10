@@ -18,15 +18,15 @@ a support agreement or a schedule: LYSS is provided without warranty (see [LICEN
   CISO Assistant audits) keep them.
 - **Every result records the specification version** it was assessed against (`spec_version`
   in each switch result, in exported reports and in JSON output). A conformance level is only
-  meaningful together with that version: "Level 2 against 0.7.0-draft".
-- **Pin a version** for a stable baseline: `pip install "lyss==0.16.1"`. Upgrade on purpose,
+  meaningful together with that version: "Level 2 against 0.7.1-draft".
+- **Pin a version** for a stable baseline: `pip install "lyss==0.17.0"`. Upgrade on purpose,
   read the changelog, then rescan. The history keeps the previous results for comparison.
 
 ## Planned from 1.0
 
 - **Semantic versioning for the specification:**
-  - MAJOR: a control removed, made stricter in a way that can turn a pass into a fail, or moved
-    to another level;
+  - MAJOR: a control withdrawn (its ID stays, marked withdrawn), made stricter in a way that can
+    turn a pass into a fail, or moved to another level;
   - MINOR: a control added at the top level, a new level, or a wording that does not change any
     verdict;
   - PATCH: typos and references.
@@ -41,7 +41,8 @@ a support agreement or a schedule: LYSS is provided without warranty (see [LICEN
 ## Goals before calling it 1.0 (no date)
 
 - Every advertised platform validated on real hardware, not only simulators or virtual
-  appliances. HPE Aruba, MikroTik switch chips, SONiC and Arista still need this: reports from
+  appliances. HPE Aruba AOS-S and AOS-CX, MikroTik switch chips, SONiC, Arista, Juniper EX and
+  Huawei still need this: reports from
   owners are welcome.
 - The specification has been reviewed by people other than its author, and stays unchanged for one
   full release cycle.

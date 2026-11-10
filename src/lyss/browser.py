@@ -9,7 +9,7 @@ from dataclasses import asdict
 from . import PROJECT_NAME, __version__
 from .engine import audit, conformance, detect_vendor, load_spec
 
-VENDORS = ("arista_eos", "cisco_ios", "cisco_sb", "hp_procurve", "mikrotik", "sonic", "zyxel_gs1900")
+VENDORS = ("arista_eos", "aruba_aoscx", "cisco_ios", "cisco_sb", "hp_procurve", "huawei_vrp", "juniper_junos", "mikrotik", "sonic", "zyxel_gs1900")
 
 
 def run(text: str, vendor: str = "auto", level: int = 2, state_text: str = "") -> str:

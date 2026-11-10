@@ -65,10 +65,12 @@ MAX_EVIDENCE_LINE = 2000
 _QUOTED = r'"(?:[^"\\\n]|\\.)*"'
 _VALUE = rf'({_QUOTED}|[^\s"]+)'
 # type tokens before the value: "7", "level 15", "1 md5" (key id + algorithm), EOS "sha512" / "8a",
-# "ascii 0", IKEv2 "local" / "remote"
-_TYPE = r"(?:\d{1,2}|level \d+|sha512|sha\d*|md5|8a|ascii|hex|local|remote)"
+# "ascii 0", IKEv2 "local" / "remote", AOS-CX "plaintext" / "ciphertext", Huawei "simple" /
+# "cipher" / "irreversible-cipher"
+_TYPE = r"(?:\d{1,2}|level \d+|sha512|sha\d*|md5|8a|ascii|hex|local|remote|plaintext|ciphertext|simple|irreversible-cipher|cipher)"
 SECRET_VALUE = re.compile(
-    r'(?i)\b(secret|password|key-string|key|sha1|sha256|plaintext|encrypted|passphrase|psk|pre-shared-key|wpa-psk)'
+    r'(?i)\b(secret|password|key-string|key|sha1|sha256|plaintext|ciphertext|encrypted|passphrase|psk|pre-shared-key|wpa-psk'
+    r'|auth-pass|priv-pass)'
     # "Password: x", "Password : x", "password:x" in device output
     r'((?:[ \t]*:)?)'
     rf'((?:\s+{_TYPE}(?=\s)){{0,3}})(?:\s+|(?<=:))(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level|auth|priv)\b)'
@@ -265,6 +267,17 @@ def _edge_ports_missing(cfg: Config, spec: dict) -> tuple[bool, list[str]]:
                    f"{', '.join(sorted(uplinks & ports, key=_port_sort)) or 'none'}"]
 
 
+def _where_list(spec) -> list[re.Pattern]:
+    """A block filter "where": one pattern, or a list of patterns that must all match."""
+    if not spec:
+        return []
+    return [re.compile(p) for p in ([spec] if isinstance(spec, str) else spec)]
+
+
+def _block_has_all(block, patterns: list[re.Pattern]) -> bool:
+    return all(any(p.search(c) for c in block.children) for p in patterns)
+
+
 def _captures(cfg: Config, source) -> dict[str, list[str]]:
     """Values (regex group 1) captured by a source, with the evidence lines of each value.
     Sources: {line: R} any config line; {block: H, where: W} the block header itself;
@@ -299,12 +312,12 @@ def _captures(cfg: Config, source) -> dict[str, list[str]]:
                 found.setdefault(m.group(1), []).append(line)
         return found
     header = re.compile(source["block"])
-    where = re.compile(source["where"]) if source.get("where") else None
+    where = _where_list(source.get("where"))
     where_not = re.compile(source["where_not"]) if source.get("where_not") else None
     line = re.compile(source["line"]) if source.get("line") else None
     for b in cfg.blocks:
         hm = header.search(b.header)
-        if not hm or (where and not any(where.search(c) for c in b.children)):
+        if not hm or not _block_has_all(b, where):
             continue
         if where_not and any(where_not.search(c) for c in b.children):
             continue
@@ -334,11 +347,22 @@ def expand_numbers(text: str) -> set[str]:
 
 def _uncovered(cfg: Config, spec: dict) -> tuple[set[str], set[str], dict[str, list[str]]]:
     """(used values, uncovered values, evidence per used value): e.g. VLANs of access ports that a
-    "ip dhcp snooping vlan 10,20-30" list does not cover. "lists: true" expands covered lists."""
+    "ip dhcp snooping vlan 10,20-30" list does not cover. "lists: true" expands covered number
+    lists; "lists: ports" expands HP-style port lists ("1-24,Trk1") and compares port names
+    case-insensitively."""
     used = _captures(cfg, spec["used"])
+    if spec.get("lists") == "ports":
+        expanded: dict[str, list[str]] = {}
+        for value, evidence in used.items():
+            for port in expand_ports(value):
+                expanded.setdefault(port, []).extend(evidence)
+        used = expanded
     covered: set[str] = set()
     for value in _captures(cfg, spec["covered"]):
-        covered |= expand_numbers(value) if spec.get("lists") else {value}
+        if spec.get("lists") == "ports":
+            covered |= expand_ports(value)
+        else:
+            covered |= expand_numbers(value) if spec.get("lists") else {value}
     if spec.get("all_covered") and _captures(cfg, spec["all_covered"]):
         covered |= set(used)   # e.g. a setting that applies to every VLAN / port
     return set(used), set(used) - covered, used
@@ -394,6 +418,15 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
         results = [evaluate_rule(cfg, r) for r in rule["all"]]
         if all(matched for matched, _ in results):
             return True, list(dict.fromkeys(e for _, ev in results for e in ev))   # same line once
+        return False, []
+
+    if "first" in rule:
+        # an ordered list written one item per line (Junos "set system authentication-order radius"
+        # then "... password"): the FIRST line matching "first" decides, by its group 1 matching "is"
+        regex = re.compile(rule["first"])
+        for line in cfg.lines:
+            if m := regex.search(line):
+                return bool(re.search(rule["is"], m.group(1))), [line]
         return False, []
 
     if "comment" in rule:
@@ -452,9 +485,10 @@ def _evaluate_rule(cfg: Config, rule: dict) -> tuple[bool, list[str]]:
     header = re.compile(rule["block"])
     blocks = [b for b in cfg.blocks if header.search(b.header)]
     if "where" in rule:
-        # only blocks that contain a given line, e.g. access ports ("switchport mode access")
-        where = re.compile(rule["where"])
-        blocks = [b for b in blocks if any(where.search(c) for c in b.children)]
+        # only blocks that contain a given line, e.g. access ports ("switchport mode access");
+        # a list means every pattern must match a line of the block
+        where = _where_list(rule["where"])
+        blocks = [b for b in blocks if _block_has_all(b, where)]
     if "where_not" in rule:
         # only blocks WITHOUT a given line, e.g. a key in a block that does not mark it encrypted
         where_not = re.compile(rule["where_not"])
@@ -669,6 +703,14 @@ VENDOR_SIGNATURES = (
     ("cisco_sb", re.compile(r"(?m)^config-file-header\s*$|^v\d+\.\d+\.\d+\.\d+ / R\S+\s*$")),
     ("hp_procurve", re.compile(r'(?m)^; \S+ Configuration Editor; Created on release|^hostname "[^"]*"\s*$')),
     ("arista_eos", re.compile(r"(?m)^! device: \S+ \(.*\bEOS-\d|^management (?:api http-commands|telnet|ssh|console)\s*$")),
+    # Huawei VRP: header "!Software Version V200R021C10SPC600"; "stelnet" is Huawei's own keyword
+    # (H3C Comware, with a similar syntax, uses "ssh server enable")
+    # ([ \t]*, never \s*: \s crosses line breaks and makes a file of empty lines quadratic)
+    ("huawei_vrp", re.compile(r"(?m)^!Software Version V\d{3}R\d{3}|^[ \t]*stelnet server enable\b")),
+    ("aruba_aoscx", re.compile(r"(?m)^!Version (?:ArubaOS-CX|AOS-CX) \S+|^!export-password:")),
+    # Junos: "| display set" lines or the curly-brace format ("version 23.4R2-S2.1;", "system {")
+    ("juniper_junos", re.compile(r"(?m)^set (?:version \S+|system host-name \S+)\s*$|^## Last commit: \d{4}-\d\d-\d\d \d\d:\d\d:\d\d "
+                                 r"|^version \d+\.\d+[A-Z][\w.-]*;\s*$")),
     ("cisco_ios", re.compile(r"(?m)^version \d+\.\d+\s*$|^(?:no )?service (?:password-encryption|timestamps)\b"
                              r"|^line vty \d+")),
 )

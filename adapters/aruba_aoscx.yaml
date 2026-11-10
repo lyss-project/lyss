@@ -1,0 +1,264 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
+# LYSS adapter: HPE Aruba Networking CX switches (AOS-CX 10.x: 4100i, 6000, 6100, 6200, 6300, 8xxx).
+# Rule forms: see adapters/cisco_ios.yaml. "show running-config" starts with "!Version AOS-CX"
+# ("ArubaOS-CX" on older releases) and "!export-password" comment lines; interface settings are
+# indented under "interface 1/1/1", "interface lag 1", "interface vlan 99", "interface mgmt".
+# Checked on the AOS-CX 10.17 virtual platform (simulator): enabled ports show "no shutdown",
+# disabled ones show nothing; switched ports show "no routing" where ports are routed by default;
+# "session-timeout 10" is stored as "cli-session" / "timeout 10"; "logging <ip> severity info" is
+# stored without the default severity.
+# AOS-CX notes this adapter relies on: CLI access is SSH (version 2); the web UI is HTTPS
+# ("https-server vrf ..."); local passwords and server keys are exported as "ciphertext", encrypted
+# with the export password (not cleartext, but reversible by whoever knows that key).
+# Where an output format is not certain, the rules only decide on an explicit match, so a format
+# that differs gives "unknown", never a wrong pass.
+adapter: aruba_aoscx
+spec_version: "0.7.1-draft"
+platform: HPE Aruba Networking AOS-CX
+status: preview, written from the AOS-CX documentation; collection and Level 1-2 output formats checked on the AOS-CX 10.17 simulator, not yet on a physical switch
+
+facts:
+  model:
+    - {section: show system, line: '^Product Name\s*:\s*(.+?)\s*$'}
+  version:
+    - {section: show version, line: '^Version\s*:\s*(\S+)'}
+    - {section: config comments, line: '^!Version (?:ArubaOS-CX|AOS-CX) (\S+)'}
+
+checks:
+
+  # ---------------- Level 1 ----------------
+
+  LYSS-MGMT-001:
+    fail_if_any:
+      - {line: '^telnet server\b'}
+    otherwise: pass
+    note: AOS-CX CLI access is SSH; Telnet only runs if a Telnet server is configured. A reachability probe (lyss probe) also detects TCP 23.
+    remediation: |
+      no telnet server
+
+  LYSS-MGMT-002:
+    fail_if_any:
+      - {state: '^SSH-1\.', section: ssh banner}
+    otherwise: pass
+    note: AOS-CX supports SSH protocol version 2 only.
+    remediation: |
+      ! nothing to configure: AOS-CX offers SSH version 2 only
+
+  LYSS-MGMT-003:
+    fail_if_any:
+      - {line: '^http-server\b'}
+    otherwise: pass
+    note: The AOS-CX web interface is served over HTTPS ("https-server vrf ..."); limit it to the management VRF or remove it if unused.
+    remediation: |
+      no http-server
+      ! keep only "https-server vrf mgmt" if the web interface is needed
+
+  LYSS-MGMT-004:
+    fail_if_any:
+      - {line: '^session-timeout 0\s*$'}
+      - {line: '^session-timeout (\d+)', gt: 10}
+      - {block: '^cli-session$', line: '^timeout 0\s*$'}
+      - {block: '^cli-session$', line: '^timeout (\d+)', gt: 10}
+    pass_if_any:
+      - {line: '^session-timeout ([1-9]|10)\s*$'}
+      - {block: '^cli-session$', line: '^timeout ([1-9]|10)\s*$'}
+    otherwise: fail
+    note: The AOS-CX default CLI session timeout is 30 minutes; set 10 minutes or less.
+    remediation: |
+      cli-session
+          timeout 10
+
+  LYSS-AUTH-001:
+    fail_if_any:
+      - {line: '(?i)^snmp-server community (public|private)\b'}
+    otherwise: pass
+    remediation: |
+      no snmp-server community public
+      no snmp-server community private
+      ! then configure SNMPv3 (LYSS-AUTH-011)
+
+  LYSS-AUTH-002:
+    fail_if_any:
+      - {line: '^user \S+ group administrators\s*$', say: 'an administrator account without any password'}
+      - {line: '^user \S+ group administrators password plaintext\b'}
+    pass_if_any:
+      - {line: '^user \S+ group administrators password ciphertext \S+', say: 'administrator passwords stored as SHA-512 hashes (exported as ciphertext)'}
+    otherwise: unknown
+    note: AOS-CX has no enable password; administrator accounts are local users of the "administrators" group, whose passwords are stored as SHA-512 hashes.
+    remediation: |
+      user admin group administrators password
+      ! enter a strong password at the prompt
+
+  LYSS-AUTH-003:
+    fail_if_any:
+      - {line: '^user \S+ .*\bpassword plaintext\b'}
+    otherwise: pass
+    note: AOS-CX stores local passwords as one-way hashes; a "password plaintext" line only exists in a hand-made file.
+    remediation: |
+      user <name> group <group> password
+
+  LYSS-AUTH-004:
+    fail_if_any:
+      - {line: '^(radius|tacacs)-server host \S+ (.* )?key plaintext\b'}
+    otherwise: pass
+    note: >-
+      AOS-CX exports RADIUS / TACACS+ keys as "ciphertext", encrypted with the export password:
+      not cleartext, but reversible with that key. Set a custom export password and protect backups.
+    remediation: |
+      radius-server host <radius-ip> key plaintext <key>    ! stored and exported as ciphertext
+
+  LYSS-VULN-001:
+    firmware: true
+    otherwise: unknown
+    note: No AOS-CX release data yet in data/firmware.yaml; check the running release against HPE Aruba Networking security advisories and the CISA KEV catalogue.
+    remediation: |
+      ! upgrade to the latest AOS-CX release of your branch (HPE Networking Support Portal)
+
+  LYSS-BKP-001:
+    backup: true
+    otherwise: unknown
+    note: No backup evidence yet. Enable scheduled scans, or attest the external backup system on the switch page.
+    remediation: |
+      ! Settings > Scheduled scans (LYSS keeps every configuration version), or
+      ! attest the external backup (Oxidized, Aruba Central, NetEdit...) on the switch page.
+
+  # ---------------- Level 2 ----------------
+
+  LYSS-AUTH-010:
+    fail_if_any:
+      - {line: '^aaa authentication login (default|ssh) (group )?local\b', say: 'local accounts come first in the login method list'}
+      - {line: '^aaa authentication login (default|ssh) .*\bnone\b', say: 'the login method list falls back to no authentication ("none")'}
+    pass_if_all:
+      - {line: '^aaa authentication login (default|ssh) group (?!local\b)\S+'}
+      - {line: '^(radius|tacacs)-server host \S+'}
+    otherwise: fail
+    note: The login method list must start with a RADIUS / TACACS+ server group; "local" may only come after it. Console logins are not assessed.
+    remediation: |
+      radius-server host <radius-ip> key plaintext <key> vrf mgmt
+      aaa authentication login default group radius local
+
+  LYSS-AUTH-011:
+    fail_if_any:
+      - {line: '^snmp-server community '}
+      - {line: '^snmpv3 user \S+ (?!.*\bpriv\b)'}
+    otherwise: pass
+    remediation: |
+      no snmp-server community <name>
+      snmpv3 user <user> auth sha auth-pass plaintext <pw> priv aes priv-pass plaintext <pw>
+
+  LYSS-MGMT-010:
+    pass_if_any:
+      - {line: '^apply access-list ip \S+ control-plane(\s+vrf \S+)?\s*$'}
+    otherwise: fail
+    note: Apply an access list to the control plane (per VRF) that only accepts management protocols from the administration networks.
+    remediation: |
+      access-list ip MGMT
+          10 permit tcp <admin-subnet> any eq 22
+          20 permit tcp <admin-subnet> any eq 443
+          30 deny tcp any any eq 22
+          40 deny tcp any any eq 443
+          50 permit any any any
+      apply access-list ip MGMT control-plane vrf default
+
+  LYSS-MGMT-011:
+    fail_if_any:
+      - {block: '^interface vlan 1$', line: '^ip address \d'}
+      - captures_in_both:
+          - {block: '^interface vlan (\d+)$', where: '^ip address \d'}
+          - {block: '^interface \d+/\d+/\d+$', where: '^no shutdown\s*$', line: '^vlan access (\d+)'}
+    pass_if_any:
+      - {block: '^interface mgmt$', line: '^ip (static \d|dhcp)', say: 'out-of-band management port (interface mgmt) addressed'}
+      - {block: '^interface vlan (?!1$)\d+$', line: '^ip address \d'}
+    otherwise: unknown
+    remediation: |
+      interface mgmt
+          no shutdown
+          ip static <ip/prefix>
+      ! or an in-band management VLAN that no access port uses
+
+  LYSS-MGMT-012:
+    pass_if_all:
+      - {line: '^banner motd\b'}
+      - {line: '(?i)authori[sz]ed'}
+    otherwise: fail
+    note: The MOTD banner is shown before login; "banner exec" only after it.
+    remediation: |
+      banner motd !
+      Authorized access only. Activity is logged.
+      !
+
+  LYSS-MGMT-013:
+    fail_if_any:
+      - {state: '^kex: .*(sha1|group1\b)', section: ssh negotiated}
+      - {state: '^cipher: .*(cbc|3des|arcfour|blowfish)', section: ssh negotiated}
+      - {state: '^hostkey: (ssh-rsa|ssh-dss)\s*$', section: ssh negotiated}
+    pass_if_any:
+      - {state: '^kex: ', section: ssh negotiated}
+    otherwise: unknown
+    note: Needs the negotiated SSH algorithms (collector).
+    remediation: |
+      ssh key-exchange-algorithms curve25519-sha256 ecdh-sha2-nistp256 diffie-hellman-group16-sha512
+      ssh ciphers aes256-gcm@openssh.com aes256-ctr aes128-ctr
+
+  LYSS-LOG-010:
+    pass_if_any:
+      - {line: '^logging (\d+\.\d+\.\d+\.\d+|[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+)(\s|$)'}
+    otherwise: fail
+    remediation: |
+      logging <siem-ip> severity info vrf mgmt
+
+  LYSS-LOG-011:
+    fail_if_any:
+      - {line: '^ntp server \S+', absent: true, say: 'no NTP server configured'}
+      - {state: '(?i)\bnot synchroni[sz]ed\b|\bunsynchroni[sz]ed\b', section: show ntp status}
+    pass_if_all:
+      - {line: '^ntp server \S+'}
+      - {state: '(?i)\bsynchroni[sz]ed (to|with)\b', section: show ntp status}
+    otherwise: unknown
+    note: Synchronization is read from "show ntp status"; without device state (or with an output LYSS does not recognise) the verdict is unknown.
+    remediation: |
+      ntp server <ntp-ip> iburst
+      ntp enable
+
+  LYSS-ACC-010:
+    fail_if_any:
+      # "show interface brief": Enabled = yes, Status = down
+      - {state: '^\s*\d+/\d+/\d+\s.*\byes\s+down\b', section: show interface brief}
+    pass_if_any:
+      - {state: '^\s*\d+/\d+/\d+\s', section: show interface brief}
+    otherwise: unknown
+    note: Needs "show interface brief".
+    remediation: |
+      interface <unused-port>
+          shutdown
+
+  LYSS-ACC-011:
+    # access ports = enabled interfaces with "vlan access" that are not LAG members (a "lag N" with
+    # "vlan access", e.g. to a server, is an edge port itself). AOS-CX writes "no shutdown" on enabled
+    # ports and nothing on disabled ones (verified on the AOS-CX 10.17 virtual platform).
+    fail_if_any:
+      - uncovered:
+          what: access ports without BPDU guard
+          used: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$'}
+          covered: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: '^spanning-tree bpdu-guard\b'}
+    pass_if_any:
+      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', every_contains: '^spanning-tree bpdu-guard\b'}
+    otherwise: fail
+    note: Access ports are interfaces with "vlan access"; ports left at the default VLAN without that line are not counted yet.
+    remediation: |
+      interface <access-port>
+          spanning-tree port-type admin-edge
+          spanning-tree bpdu-guard
+
+  # ---------------- Level 3 ----------------
+  # AOS-CX Level 3 checks (DHCPv4 snooping, ARP inspection, port access, rate limits, LLDP) are not
+  # written yet; to be checked on the AOS-CX simulator or a real switch.
+
+  LYSS-ACC-020: &cx_l3
+    otherwise: unknown
+    note: Level 3 checks for AOS-CX are not written yet (help welcome, see CONTRIBUTING.md).
+  LYSS-ACC-021: *cx_l3
+  LYSS-ACC-022: *cx_l3
+  LYSS-ACC-023: *cx_l3
+  LYSS-ACC-024: *cx_l3
