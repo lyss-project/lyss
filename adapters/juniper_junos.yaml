@@ -18,7 +18,7 @@
 #   set system login class lyss-audit idle-timeout 10
 #   set system login user lyss-audit class lyss-audit authentication encrypted-password "<hash>"
 adapter: juniper_junos
-spec_version: "0.7.1-draft"
+spec_version: "0.8.0-draft"
 platform: Juniper EX (Junos)
 status: preview, written from the Junos documentation and synthetic configurations; not yet validated on a device
 support: preview          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -116,9 +116,10 @@ checks:
 
   LYSS-AUTH-004:
     fail_if_any:
-      - {line: '^set (system|access) (radius-server|tacplus-server) \S+ secret "?(?!\$9\$)[^\s"]'}
+      # "$9$" (reversible encoding) and "$8$" (AES with the system master password) are not cleartext
+      - {line: '^set (system|access) (radius-server|tacplus-server) \S+ secret "?(?!\$[89]\$)[^\s"]'}
     otherwise: pass
-    note: Junos stores RADIUS / TACACS+ secrets as "$9$" (reversible, never cleartext); protect configuration backups like the switch itself.
+    note: Junos stores RADIUS / TACACS+ secrets as "$9$" (reversible, never cleartext), or "$8$" (AES) with a system master password; protect configuration backups like the switch itself.
     remediation: |
       set system radius-server <radius-ip> secret <secret>    ! stored as $9$
 
@@ -191,6 +192,10 @@ checks:
       - captures_in_both:
           - {line: '^set vlans default l3-interface irb\.(\d+)$'}
           - {line: '^set interfaces irb unit (\d+) family inet address \d'}
+      # an access port in a VLAN that carries a switch address (VLANs compared by name)
+      - captures_in_both:
+          - {line: '^set vlans (\S+) l3-interface irb\.\d+$'}
+          - {block: '^interfaces ((?:ge|xe|mge|et|te)-\d+/\d+/\d+|ae\d+)$', where: '^unit 0 family ethernet-switching\b', where_not: '^(unit 0 family ethernet-switching (interface|port)-mode trunk|disable$|ether-options 802\.3ad )', line: '^unit 0 family ethernet-switching vlan members (\S+)$'}
     pass_if_any:
       - {line: '^set interfaces (me0|vme|em0|fxp0) unit 0 family inet address \d', say: 'out-of-band management port addressed'}
       - {line: '^set interfaces irb unit \d+ family inet address \d'}

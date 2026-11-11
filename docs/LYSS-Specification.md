@@ -2,7 +2,7 @@
 
 # LYSS Specification: security controls for network switches
 
-**Version 0.7.1-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
+**Version 0.8.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
 
 ## 1. Scope
 
@@ -25,6 +25,17 @@ RFC 2119 and RFC 8174 when, and only when, they appear in capitals.
   device state such as listening ports, SSH banner, port status), `external_data` (vendor advisories,
   end-of-life bulletins), `backup_system` (configuration archive or attested backup system).
 - **Verdict**: the result of one control on one device: `pass`, `fail`, `unknown` or `not_applicable`.
+- **Uplink**: a link to another switch: a port configured as a trunk (on platforms without a trunk
+  mode, a tagged port), or a member port of a link aggregation that is a trunk. Any port configured
+  this way is treated as an uplink, whatever is connected to it: review trunk ports separately.
+- **Edge port**: any switch port that is neither an uplink nor a routed port. A link aggregation that
+  is not a trunk (for example towards a server) is one edge port, assessed on its logical interface.
+- **Access port**: an edge port that is administratively enabled. Its untagged VLAN is a **user VLAN**.
+- **Management VLAN**: the VLAN that carries the switch's in-band management address. A dedicated
+  out-of-band management port belongs to no VLAN.
+- **Advisory control**: a control added within a MAJOR version (see section 8). It is assessed and
+  reported like any control but does not count for conformance until the next MAJOR version, where it
+  becomes a normal control or is withdrawn.
 
 ## 3. Verdicts
 
@@ -32,7 +43,9 @@ RFC 2119 and RFC 8174 when, and only when, they appear in capitals.
 - `fail`: the evidence shows that the control is not met.
 - `unknown`: the available evidence cannot decide. An assessment MUST report `unknown` rather than
   guess, and MUST NOT turn a missing evidence into a pass.
-- `not_applicable`: the control does not apply to the platform (e.g. the feature does not exist).
+- `not_applicable`: the control does not apply to the device, because what it protects does not
+  exist there, for example the Level 3 controls on a switch without access ports. A missing security
+  feature is not a reason for `not_applicable`: unless a control says otherwise, it fails.
 
 ## 4. Conformance levels
 
@@ -42,13 +55,18 @@ RFC 2119 and RFC 8174 when, and only when, they appear in capitals.
 | 2 | Hardened | a hardened management plane: central authentication, restricted and modern management access, remote logging and time, basic access-port hygiene. |
 | 3 | Advanced | access-layer protections against attacks from user ports: DHCP snooping, ARP inspection, port authentication, storm control, no neighbor discovery towards users. |
 
-A device is **LYSS Level N conformant** when every control of levels 1 to N is `pass` or
-`not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,
+A device is **LYSS Level N conformant** when every control of levels 1 to N, advisory controls
+aside, is `pass` or `not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST
+state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.7.1-draft), assessed 2026-11-11 with LYSS 0.18.
+> core-sw-01 is LYSS Level 1 conformant (specification 0.8.0-draft), assessed 2026-11-11 with LYSS 0.19.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
+
+Controls with parameters (for example `max_idle_minutes`) are assessed with the values given in
+this document. An organisation MAY assess with stricter values; the claim then states them. An
+assessment with a looser value does not support a LYSS conformance claim.
 
 ## 5. Control catalogue
 
@@ -137,7 +155,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Privileged-mode password is stored as a strong hash**
 
-- **Requirement.** The privileged (enable) credential is stored with a salted one-way hash based on SHA-256 or a stronger algorithm (e.g. scrypt, PBKDF2-SHA-256, SHA-256/SHA-512 crypt). Cleartext, reversible encodings, MD5- and SHA-1-based hashes and unsalted SHA-256 (Cisco type 4) are not accepted.
+- **Requirement.** The privileged (enable) credential, and the password of every local account with full privileges, is stored with a salted one-way hash based on SHA-256 or a stronger algorithm (e.g. scrypt, PBKDF2-SHA-256, SHA-256/SHA-512 crypt). Cleartext, reversible encodings, MD5- and SHA-1-based hashes and unsalted SHA-256 (Cisco type 4) are not accepted.
 - **Rationale.** Reversible encodings (e.g. Cisco type 7) are decoded instantly by public tools from any configuration backup, and MD5- or SHA-1-based hashes (e.g. Cisco type 5) are cracked quickly on commodity hardware.
 - **Test procedure.** Fail if the privileged credential, or a local account with full privileges, is stored in cleartext, a reversible form, or with MD5, SHA-1 or unsalted SHA-256 (e.g. Cisco "enable password", type 4 or 5, a 40-hex-digit SHA-1 value, HPE "sha1"). Pass if it uses an accepted salted algorithm (e.g. Cisco type 8 or 9), or if there is no privileged credential and privileged access is only granted through central AAA. Unknown if the algorithm cannot be identified.
 - **Evidence.** config
@@ -159,7 +177,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Keys shared with RADIUS or TACACS+ servers are never stored in cleartext in the configuration.
 - **Rationale.** A cleartext RADIUS key in a backup can be read by anyone who sees the file, and lets an attacker impersonate the AAA server or decrypt authentication traffic. Level 1 only removes the cleartext key: many switches can only store these keys in a reversible form, which is weaker protection.
-- **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding (e.g. Cisco type 7) is not cleartext and passes this Level 1 control, although it gives only weak protection; storing keys with a device-specific encryption key may become a separate Level 2 control.
+- **Test procedure.** Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding (e.g. Cisco type 7) is not cleartext and passes this control, although it gives only weak protection.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.5.17, A.8.24 · NIST SP 800-53 r5 IA-5, SC-28 · CIS Controls v8 3.11 · NIS2 Art. 21(2)(h)
 
@@ -212,17 +230,17 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Management protocols only accept connections from authorized administration networks.
 - **Rationale.** Limiting who can even reach the login prompt removes most password-guessing and exploit attempts.
-- **Test procedure.** Pass if every remote management access path is bound to an access list of authorized sources.
-- **Evidence.** config
+- **Test procedure.** Pass if every remote management access path is bound to an access list of authorized sources. A reachability test that shows a management service answering from a network that is not authorized for administration fails the control, whatever the configuration says.
+- **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.22 · NIST SP 800-53 r5 AC-17, SC-7 · CIS Controls v8 12.3 · NIS2 Art. 21(2)(i)
 
 #### LYSS-MGMT-011
 
 **Management interface is on a dedicated management VLAN**
 
-- **Requirement.** The switch management address is on a VLAN reserved for management: not the default VLAN (1), and no user access port is a member of it.
+- **Requirement.** The switch is managed through a dedicated out-of-band management port, or its management address is on a VLAN reserved for management: not the default VLAN (1), and no access port is an untagged member of it.
 - **Rationale.** Separating management from user networks prevents users from reaching the management plane.
-- **Test procedure.** Fail if VLAN 1 carries a management address, or if an access (untagged, non-uplink) port is a member of the management VLAN. Pass if the management address is on another VLAN with no access port.
+- **Test procedure.** Fail if VLAN 1 carries a management address, or if an access port is an untagged member of the management VLAN. Pass if the management address is on a dedicated out-of-band management port, or on another VLAN that no access port belongs to untagged.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.22 · NIST SP 800-53 r5 SC-7, AC-4 · CIS Controls v8 12.2 · NIS2 Art. 21(2)(i)
 
@@ -280,9 +298,9 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 **Edge ports are protected against rogue spanning-tree participants (BPDU guard)**
 
-- **Requirement.** Every edge port disables itself when it receives a spanning-tree BPDU. Links to other switches are configured as such (trunks, or link aggregations that are trunks); every other port is an edge port.
+- **Requirement.** Every access port disables itself when it receives a spanning-tree BPDU. Links to other switches are configured as such (trunks, or link aggregations that are trunks); every other port is an edge port, and an access port when it is enabled.
 - **Rationale.** A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
-- **Test procedure.** Edge ports are all ports minus uplinks. Uplinks are only trunk ports (tagged on HPE AOS-S) and the member ports of link aggregations that are trunks. A link aggregation that is not a trunk (for example towards a server) is an edge port. Spanning tree runs on its logical interface, so BPDU protection is checked there, and that check covers its member ports. Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection, unless a global default protects all edge ports.
+- **Test procedure.** Edge ports are all ports minus uplinks. Uplinks are only trunk ports (tagged on HPE AOS-S) and the member ports of link aggregations that are trunks. A link aggregation that is not a trunk (for example towards a server) is an edge port. Spanning tree runs on its logical interface, so BPDU protection is checked there, and that check covers its member ports. Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an access port (an enabled edge port) lacks BPDU protection, unless a global default protects all edge ports.
 - **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 SC-5, CM-6 · CIS Controls v8 12.2 · NIS2 Art. 21(2)(g)
 
@@ -324,7 +342,7 @@ A claim is valid for the configuration and firmware assessed; any change require
 
 - **Requirement.** Every access port limits the rate of broadcast traffic it accepts (storm control).
 - **Rationale.** A loop or a misbehaving device on one user port can flood broadcast traffic to every port of the VLAN and take the network down; a rate limit contains it on the offending port.
-- **Test procedure.** Fail if an access port has no broadcast rate limit, or a limit of 100 % (which limits nothing). Pass if every access port has an effective one. Unknown when the platform sets it on the switch chip and the setting cannot be read. Not applicable without access ports.
+- **Test procedure.** Fail if an access port has no broadcast rate limit, or a limit of 100 % (which limits nothing). Pass if every access port has an effective one. Unknown when the platform sets it on the switch chip, or applies a default that the configuration does not show, and the setting cannot be read. Not applicable without access ports.
 - **Evidence.** config
 - **References (informative).** ISO/IEC 27001:2022 A.8.20, A.8.6 · NIST SP 800-53 r5 SC-5 · CIS Controls v8 — · NIS2 Art. 21(2)(g)
 
@@ -374,9 +392,16 @@ A tool MAY offer to apply fixes. If it does, remediation:
 
 From 1.0.0 the specification follows semantic versioning:
 
-- **MAJOR**: a control is withdrawn, made stricter in a way that can turn a pass into a fail, or moved to another level.
-- **MINOR**: a control or a level is added, or a wording changes without changing any verdict.
+- **MAJOR**: a control is withdrawn, made stricter in a way that can turn a pass into a fail, or moved
+  to another level, or an advisory control becomes a normal control.
+- **MINOR**: an advisory control is added to an existing level, a level is added above the existing
+  ones (its controls are normal controls of that new level), or a wording changes without changing
+  any verdict.
 - **PATCH**: typos and references.
+
+A control added to an existing level within a MAJOR version is always advisory (section 2), so a device that conforms to
+1.x Level N still conforms to every later 1.y Level N with the same configuration and firmware
+(newly published vulnerabilities aside: LYSS-VULN-001 follows the vulnerability data, not the version).
 
 Control identifiers are never reused, renamed or renumbered. A withdrawn control keeps its identifier, marked withdrawn.
 While the version is below 1.0.0 the specification is a draft and MAY change without a MAJOR increment;

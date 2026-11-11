@@ -4,7 +4,7 @@ Where each platform's checks have been verified, and what has not been verified 
 means configurations and device outputs written for the test suite. "Simulator" means the LYSS
 switch simulator (`python -m lyss sim`), which answers over real SSH like the platform does.
 
-Last reviewed: November 2026 (LYSS 0.18). To add a platform or a model, see
+Last reviewed: November 2026 (LYSS 0.19). To add a platform or a model, see
 [TESTERS.md](TESTERS.md): a report from a real switch is the most useful contribution.
 
 | Platform | Support | Level 1–2 | Level 3 | Firmware data | Not validated yet |

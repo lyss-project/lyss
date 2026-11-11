@@ -77,6 +77,7 @@ EVIDENCE_TEXT = {
 LIBRARY_VERSIONS = {
     "0.7.0-draft": 1,
     "0.7.1-draft": 2,
+    "0.8.0-draft": 3,
 }
 
 

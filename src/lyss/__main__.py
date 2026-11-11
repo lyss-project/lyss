@@ -39,7 +39,8 @@ def print_text(name: str, findings, summary, accepted: dict | None = None) -> No
     print(f"\n=== {name}  ->  {PROJECT_NAME} Level {summary['achieved_level']} "
           f"(pass {summary['pass']}, fail {summary['fail']}, unknown {summary['unknown']})")
     for f in findings:
-        print(f"  [{ICONS[f.verdict]}] {f.control_id}  {f.title}")
+        print(f"  [{ICONS[f.verdict]}] {f.control_id}  {f.title}"
+              + ("  (advisory: not counted for the level)" if getattr(f, "advisory", False) else ""))
         if f.control_id in accepted:
             a = accepted[f.control_id]
             print(f"           accepted risk until {a['expires']} ({a['approved_by']}): {a['reason']}")

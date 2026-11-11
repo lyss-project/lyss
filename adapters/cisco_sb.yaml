@@ -6,7 +6,7 @@
 # families and firmware versions, so config-only checks often end as "unknown";
 # device state (tools/Collect-State.ps1) resolves them.
 adapter: cisco_sb
-spec_version: "0.7.1-draft"
+spec_version: "0.8.0-draft"
 platform: Cisco Small Business / Business switches
 status: stable, validated on SG300 1.4.11.5, SRW2024P, SG350 2.5.0.83 (real devices, 2026-11)
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -184,7 +184,7 @@ checks:
       - {block: '^interface vlan 1$', line: '^ip address (\d|dhcp)'}
       - captures_in_both:
           - {block: '^interface vlan (\d+)$', where: '^ip address \d'}
-          - {block: '(?i)^interface (?:gi|te|fa)', line: '^switchport access vlan (\d+)'}
+          - {block: '(?i)^interface (?:gi|te|fa)', where_not: '^(switchport mode (trunk|general)\b|shutdown\s*$)', line: '^switchport access vlan (\d+)'}
     pass_if_any:
       - {block: '^interface vlan (?!1$)\d+$', line: '^ip address \d'}
     otherwise: unknown
@@ -265,6 +265,7 @@ checks:
       - edge_ports_missing: &edge
           ports: {section: show interfaces status, line: '^((?:gi|te|fa)\S+)\s'}
           uplink_config: '^(switchport mode (trunk|general)|channel-group)\b'
+          disabled_config: '^shutdown\s*$'
           require: '^spanning-tree bpduguard enable'
       # a port-channel that is neither trunk nor general goes to an end device (e.g. a server): it is
       # an edge port, protected on the port-channel interface itself

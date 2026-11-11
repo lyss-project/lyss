@@ -11,7 +11,7 @@
 #   username lyss-audit privilege 15 role network-operator secret <password>
 #   aaa authorization commands all default local      ! roles are enforced only with this
 adapter: arista_eos
-spec_version: "0.7.1-draft"
+spec_version: "0.8.0-draft"
 platform: Arista EOS
 status: stable, validated on cEOS-lab 4.37.0F (container, 2026-11)
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -178,6 +178,15 @@ checks:
       snmp-server user <user> LYSS v3 auth sha256 <pw> priv aes <pw>
 
   LYSS-MGMT-010:
+    fail_if_any:
+      # eAPI needs the control-plane ACL (which covers every service); SNMP may have its own
+      - all:
+          - {not: {block: '^system control-plane$', line: '^ip access-group \S+ (vrf \S+ )?in\s*$'}}
+          - {block: '^management api http-commands$', line: '^no shutdown\s*$', say: 'eAPI is enabled without a control-plane access list'}
+      - all:
+          - {not: {block: '^system control-plane$', line: '^ip access-group \S+ (vrf \S+ )?in\s*$'}}
+          - {not: {line: '^snmp-server (ipv4 access-list \S+|community \S+ (ro|rw) \S+)'}}
+          - {line: '^snmp-server (community|group|user) ', say: 'SNMP is configured without an access list'}
     pass_if_any:
       - {block: '^management ssh$', line: '^ip access-group \S+ (vrf \S+ )?in\s*$'}
       - {block: '^system control-plane$', line: '^ip access-group \S+ (vrf \S+ )?in\s*$'}
@@ -195,7 +204,7 @@ checks:
       - captures_in_both:
           - {block: '^interface Vlan(\d+)$', where: '^ip address \d'}
           # EOS switchports are access ports unless "switchport mode trunk" (mode access is not shown)
-          - {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport)\b', line: '^switchport access vlan (\d+)'}
+          - {block: '^interface Ethernet', where_not: '^(switchport mode (trunk|routed)|no switchport|shutdown)\b', line: '^switchport access vlan (\d+)'}
     pass_if_any:
       - {block: '^interface Management\d', line: '^ip address \d', say: 'out-of-band management port (Management interface) addressed'}
       - {block: '^interface Vlan(?!1$)\d+$', line: '^ip address \d'}
@@ -271,7 +280,7 @@ checks:
       - {line: '^spanning-tree edge-port bpduguard default'}
       # a Port-Channel that is not a trunk (e.g. to a server) is an edge port, checked on the
       # Port-Channel itself; its members ("channel-group") are not checked one by one
-      - {block: '^interface (Ethernet|Port-Channel)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group)\b', every_contains: '^spanning-tree bpduguard enable'}
+      - {block: '^interface (Ethernet|Port-Channel)', where_not: '^(switchport mode (trunk|routed)|no switchport|channel-group|shutdown)\b', every_contains: '^spanning-tree bpduguard enable'}
     otherwise: fail
     remediation: |
       spanning-tree edge-port bpduguard default

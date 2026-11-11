@@ -2,6 +2,64 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.19.0 (2026-11-11)
+
+Specification 0.8.0-draft: review before the 1.0 release candidate. No control added or removed,
+no identifier changed. Several checks are stricter: a switch that passed can now fail (listed below).
+
+- **Advisory controls** (specification sections 2 and 8, docs/VERSIONING.md): from 1.0, a control
+  added within a MAJOR version is advisory: assessed and reported, but it never decides a level or
+  a CI gate until the next MAJOR version. This keeps the promise that a switch conforming to 1.x
+  Level N still conforms to every later 1.y Level N (the previous text allowed adding normal
+  controls in a MINOR version, which contradicted that promise). The engine, the CI gate and the
+  specification document support the `status: advisory` field; no control is advisory yet.
+- **Terms defined in the specification** (section 2): uplink, edge port, access port, user VLAN,
+  management VLAN, advisory control (they were only in a source comment).
+- **`not_applicable`** (section 3) now says what it means: what the control protects does not
+  exist on the device (e.g. Level 3 without access ports); a missing security feature fails.
+- **Parameters** (section 4): assessed with the documented values; stricter values are allowed
+  and stated in the claim; a looser value does not support a conformance claim.
+- Wording, no verdict change: LYSS-AUTH-002 statement names local accounts with full privileges
+  (as its test procedure did); LYSS-MGMT-011 accepts a dedicated out-of-band management port (as
+  the adapters did); LYSS-MGMT-010 lists a reachability test as evidence; LYSS-ACC-023 is unknown
+  when a platform default is not shown in the configuration (Junos); LYSS-AUTH-004 no longer
+  announces a future control.
+- **Junos fix**: a RADIUS / TACACS+ secret stored as "$8$" (AES with the system master password)
+  was taken for cleartext by LYSS-AUTH-004; it passes now.
+- CISO Assistant library version 3 (wording only), Wazuh rules regenerated.
+
+Fixes from the verification of that draft (verdicts can change):
+
+- **Level 3 on a switch without access ports**: a level whose controls are all not applicable is
+  now met, as the specification says (a core switch stayed at Level 2 before).
+- **Disabled ports are not access ports**, on every platform: LYSS-ACC-011 and LYSS-MGMT-011 are
+  about access ports (enabled edge ports). Cisco IOS, Arista, Cisco Business and HPE AOS-S no
+  longer count disabled ports; the other platforms already did not.
+- **Cisco IOS LYSS-ACC-011** also counts enabled ports left at the default mode (no "switchport
+  mode access" line): they act as access ports and need BPDU guard. Can turn a pass into a fail.
+- **LYSS-MGMT-011** now also fails an access port in a VLAN that carries a switch address on
+  Juniper EX and MikroTik (only the default VLAN was checked). On SONiC the adapter says why the
+  check does not apply (management is on eth0). Cisco Business: a trunk port with a leftover
+  access VLAN line is no longer counted.
+- **Huawei**: access ports are every enabled port that is not a trunk, a hybrid port with tagged
+  VLANs, a routed port or an Eth-Trunk member (only "port link-type access" ports were counted).
+- **SONiC Level 3**: not applicable only when the switch has no untagged VLAN member port;
+  otherwise unknown (LYSS has no Level 3 checks for SONiC yet).
+- A control that an adapter does not implement is unknown, not "not applicable".
+- Advisory controls are labelled in the command line, the web interface, reports, the CI summary,
+  SARIF (level "note") and GitLab Code Quality (severity "info").
+- Specification wording: a level added in a MINOR version has normal controls; any port
+  configured as a trunk is treated as an uplink (review trunk ports separately).
+- **LYSS-MGMT-010 covers every remote management path**, not only SSH: on Cisco IOS the web
+  interface ("ip http access-class") and SNMP communities and groups need an access list; on
+  Arista, eAPI needs the control-plane ACL and SNMP an access list; on Huawei the web interface
+  ("http acl") and SNMP need an ACL; on SONiC, SNMP needs a control-plane ACL. Can turn a pass
+  into a fail.
+- **HPE Aruba AOS-CX**: an enabled switched port ("no routing") without a "vlan access" line is
+  an access port too (default VLAN).
+- Known limits, unchanged: on MikroTik and SONiC, LYSS-ACC-011 only sees the ports the
+  administrator marked as edge ports.
+
 ## 0.18.0 (2026-11-11)
 
 Level 3 on every platform with configuration checks (Zyxel GS1900 is firmware only; not applicable

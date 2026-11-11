@@ -8,7 +8,7 @@
 #     3     name=telnet port=23 proto=tcp available-from= vrf=main max-sessions=20
 #     5  X  name=www-ssl port=443 ...                 (flag X = disabled, R = running, D = dynamic)
 adapter: mikrotik
-spec_version: "0.7.1-draft"
+spec_version: "0.8.0-draft"
 platform: MikroTik RouterOS
 status: stable, validated on CHR 7.25.1 (2026-11)
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -209,6 +209,10 @@ checks:
     fail_if_any:
       # the management address on the bridge itself = untagged default VLAN of the switch
       - {line: '^/ip (?:address|dhcp-client) add .*\binterface=bridge\S*(\s|$)'}
+      # a bridge port whose untagged VLAN (pvid) is a VLAN that carries a switch address
+      - captures_in_both:
+          - {line: '^/interface vlan add .*\bvlan-id=(\d+)'}
+          - {line: '^/interface bridge port add (?!.*\bdisabled=yes\b).*\bpvid=(\d+)'}
     pass_if_any:
       - captures_in_both:
           - {line: '^/ip (?:address|dhcp-client) add .*\binterface=(\S+)'}

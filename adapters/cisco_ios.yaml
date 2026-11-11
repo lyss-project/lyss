@@ -22,7 +22,7 @@
 # Per control: fail_if_any -> fail; firmware -> data/firmware.yaml; pass_if_all / pass_if_any -> pass;
 # else `otherwise`. A state rule never matches when that state was not collected.
 adapter: cisco_ios
-spec_version: "0.7.1-draft"
+spec_version: "0.8.0-draft"
 platform: Cisco IOS / IOS-XE
 status: stable, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -194,14 +194,24 @@ checks:
       snmp-server user <user> LYSS v3 auth sha <pw> priv aes 128 <pw>
 
   LYSS-MGMT-010:
+    fail_if_any:
+      # every remote management path: the web interface and SNMP too, not only the CLI lines
+      - all:
+          - {line: '^ip http (secure-)?server\s*$'}
+          - {not: {line: '^ip http access-class '}, say: 'the web interface is enabled without "ip http access-class"'}
+      - {line: '^snmp-server community \S+( view \S+)?( (RO|RW|ro|rw))?\s*$', say: 'an SNMP community without an access list'}
+      - {line: '^snmp-server group \S+ v3 (?!.*\baccess\b)', say: 'an SNMPv3 group without an access list ("access <acl>")'}
     pass_if_all:
       - {block: '^line vty', every_contains: '^access-class \S+ in'}
     otherwise: fail
+    note: Every management path needs a source restriction, the vty lines ("access-class"), the web interface ("ip http access-class") and SNMP (an access list on each community or group).
     remediation: |
       ip access-list standard MGMT
        permit <admin-subnet> <wildcard>
       line vty 0 15
        access-class MGMT in
+      ip http access-class ipv4 MGMT
+      snmp-server group <group> v3 priv access MGMT
 
   LYSS-MGMT-011:
     fail_if_any:
@@ -210,7 +220,7 @@ checks:
       - captures_in_both:
           - {block: '^interface Vlan(\d+)$', where: '^ip address \d'}
           # also ports without "switchport mode access" (IOS default "dynamic" acts as access towards a host)
-          - {block: '^interface \S*Ethernet', where_not: '^switchport mode trunk', line: '^switchport access vlan (\d+)'}
+          - {block: '^interface \S*Ethernet', where_not: '^(switchport mode trunk|shutdown\s*$)', line: '^switchport access vlan (\d+)'}
     pass_if_any:
       - {block: '^interface Vlan(?!1$)\d+$', line: '^ip address \d'}
     otherwise: unknown
@@ -285,7 +295,9 @@ checks:
       - {line: '^spanning-tree portfast (edge )?bpduguard default'}
       # an access-mode port-channel (e.g. to a server) is an edge port, checked on the port-channel
       # itself; its members ("channel-group") are not checked one by one
-      - {block: '^interface (\S*Ethernet|Port-channel)', where: '^switchport mode access', where_not: '^channel-group\b', every_contains: '^spanning-tree bpduguard enable'}
+      # also ports without "switchport mode access": the IOS default (dynamic) acts as an access
+      # port towards a host. Disabled ports are not access ports.
+      - {block: '^interface (\S*Ethernet|Port-channel)', where_not: '^(switchport mode trunk|no switchport|channel-group\b|shutdown\s*$)', every_contains: '^spanning-tree bpduguard enable'}
     otherwise: fail
     remediation: |
       spanning-tree portfast edge bpduguard default

@@ -131,7 +131,7 @@
     </table>
     {% for f in res.findings if f.verdict in ("fail", "unknown") %}
     <div class="finding {{ f.verdict }}">
-      <h4><span class="pill pill-{{ f.verdict }}">{{ f.verdict|upper }}</span> <span class="mono">{{ f.control_id }}</span> · {{ f.title }}</h4>
+      <h4><span class="pill pill-{{ f.verdict }}">{{ f.verdict|upper }}</span> <span class="mono">{{ f.control_id }}</span> · {{ f.title }}{% if f.advisory %} <em>(advisory: not counted for the level)</em>{% endif %}</h4>
       {% if f.evidence %}<div class="label">Evidence</div><pre>{% for e in f.evidence %}{{ e }}
 {% endfor %}</pre>{% endif %}
       {% if f.note %}<div class="note">{{ f.note }}</div>{% endif %}

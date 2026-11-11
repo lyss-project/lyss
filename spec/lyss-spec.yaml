@@ -2,7 +2,7 @@
 # This file is the normative source: docs/LYSS-Specification.md is generated from it
 # (python tools/build_spec.py). It says WHAT must be true; HOW to check it on each platform
 # lives in adapters/. Licensed CC BY 4.0 (see LICENSE-SPEC).
-spec_version: "0.7.1-draft"
+spec_version: "0.8.0-draft"
 status: draft
 levels:
   1: Baseline
@@ -103,8 +103,8 @@ controls:
     level: 1
     title: Privileged-mode password is stored as a strong hash
     statement: >-
-      The privileged (enable) credential is stored with a salted one-way hash based on SHA-256 or a
-      stronger algorithm (e.g. scrypt, PBKDF2-SHA-256, SHA-256/SHA-512 crypt). Cleartext,
+      The privileged (enable) credential, and the password of every local account with full
+      privileges, is stored with a salted one-way hash based on SHA-256 or a stronger algorithm (e.g. scrypt, PBKDF2-SHA-256, SHA-256/SHA-512 crypt). Cleartext,
       reversible encodings, MD5- and SHA-1-based hashes and unsalted SHA-256 (Cisco type 4) are
       not accepted.
     rationale: >-
@@ -148,9 +148,8 @@ controls:
       weaker protection.
     test_procedure: >-
       Fail if a RADIUS or TACACS+ shared key appears in cleartext. A reversible encoding (e.g.
-      Cisco type 7) is not cleartext and passes this Level 1 control, although it gives only weak
-      protection; storing keys with a device-specific encryption key may become a separate
-      Level 2 control.
+      Cisco type 7) is not cleartext and passes this control, although it gives only weak
+      protection.
     evidence: [config]
     mappings:
       iso27001_2022: [A.5.17, A.8.24]
@@ -246,8 +245,11 @@ controls:
     title: Management access is restricted to authorized source networks
     statement: Management protocols only accept connections from authorized administration networks.
     rationale: Limiting who can even reach the login prompt removes most password-guessing and exploit attempts.
-    test_procedure: Pass if every remote management access path is bound to an access list of authorized sources.
-    evidence: [config]
+    test_procedure: >-
+      Pass if every remote management access path is bound to an access list of authorized
+      sources. A reachability test that shows a management service answering from a network that
+      is not authorized for administration fails the control, whatever the configuration says.
+    evidence: [config, state]
     mappings:
       iso27001_2022: [A.8.20, A.8.22]
       nist_800_53r5: [AC-17, SC-7]
@@ -258,13 +260,14 @@ controls:
     level: 2
     title: Management interface is on a dedicated management VLAN
     statement: >-
-      The switch management address is on a VLAN reserved for management: not the default VLAN (1),
-      and no user access port is a member of it.
+      The switch is managed through a dedicated out-of-band management port, or its management
+      address is on a VLAN reserved for management: not the default VLAN (1), and no access port is
+      an untagged member of it.
     rationale: Separating management from user networks prevents users from reaching the management plane.
     test_procedure: >-
-      Fail if VLAN 1 carries a management address, or if an access (untagged, non-uplink) port is a
-      member of the management VLAN. Pass if the management address is on another VLAN with no
-      access port.
+      Fail if VLAN 1 carries a management address, or if an access port is an untagged member of the
+      management VLAN. Pass if the management address is on a dedicated out-of-band management
+      port, or on another VLAN that no access port belongs to untagged.
     evidence: [config]
     mappings:
       iso27001_2022: [A.8.22]
@@ -354,9 +357,9 @@ controls:
     level: 2
     title: Edge ports are protected against rogue spanning-tree participants (BPDU guard)
     statement: >-
-      Every edge port disables itself when it receives a spanning-tree BPDU. Links to other
+      Every access port disables itself when it receives a spanning-tree BPDU. Links to other
       switches are configured as such (trunks, or link aggregations that are trunks); every other
-      port is an edge port.
+      port is an edge port, and an access port when it is enabled.
     rationale: A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
     test_procedure: >-
       Edge ports are all ports minus uplinks. Uplinks are only trunk ports (tagged on HPE AOS-S)
@@ -364,8 +367,8 @@ controls:
       trunk (for example towards a server) is an edge port. Spanning tree runs on its logical
       interface, so BPDU protection is checked there, and that check covers its member ports.
       Neighbour discovery never exempts a port:
-      a rogue device can advertise bridge capability. Fail if an edge port lacks BPDU protection,
-      unless a global default protects all edge ports.
+      a rogue device can advertise bridge capability. Fail if an access port (an enabled edge port)
+      lacks BPDU protection, unless a global default protects all edge ports.
     evidence: [config, state]
     mappings:
       iso27001_2022: [A.8.20]
@@ -374,10 +377,9 @@ controls:
       nis2_art21: [g]
 
   # ---------------- Level 3: Advanced ----------------
-  # Access-layer protections against attacks from user ports. "Access ports" are the ports that are
-  # neither links to other switches (trunks, link aggregations, tagged/uplink ports) nor routed
-  # ports, as defined for LYSS-ACC-011; "user VLANs" are the VLANs those access ports belong to.
-  # Each control is not applicable on a switch without access ports (core, aggregation, spine).
+  # Access-layer protections against attacks from user ports ("access port", "user VLAN": see the
+  # terms in section 2 of the generated document, tools/build_spec.py). Each control is not
+  # applicable on a switch without access ports (core, aggregation, spine).
 
   - id: LYSS-ACC-020
     level: 3
@@ -452,9 +454,9 @@ controls:
       the VLAN and take the network down; a rate limit contains it on the offending port.
     test_procedure: >-
       Fail if an access port has no broadcast rate limit, or a limit of 100 % (which limits
-      nothing). Pass if every access port has an effective one.
-      Unknown when the platform sets it on the switch chip and the setting cannot be read. Not
-      applicable without access ports.
+      nothing). Pass if every access port has an effective one. Unknown when the platform sets it
+      on the switch chip, or applies a default that the configuration does not show, and the
+      setting cannot be read. Not applicable without access ports.
     evidence: [config]
     mappings:
       iso27001_2022: [A.8.20, A.8.6]

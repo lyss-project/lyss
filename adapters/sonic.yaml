@@ -8,7 +8,7 @@
 # Device state: SONiC "show" commands, plus "ss -tlnH" (listening TCP ports; read-only, no sudo).
 # Local account password hashes live in /etc/shadow, which a read-only account cannot read.
 adapter: sonic
-spec_version: "0.7.1-draft"
+spec_version: "0.8.0-draft"
 platform: SONiC (community)
 status: stable, validated on SONiC-VS 202505 (virtual switch, 2026-11)
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -139,10 +139,15 @@ checks:
       sudo config snmp user add <user> Priv RW SHA <auth-password> AES <priv-password>
 
   LYSS-MGMT-010:
+    fail_if_any:
+      # SNMP configured without a control-plane ACL for the SNMP service
+      - all:
+          - {line: '^(SNMP_COMMUNITY|SNMP_USER)\|', say: 'SNMP is configured without a control-plane ACL for the SNMP service'}
+          - {not: {block: '^ACL_TABLE\|', where: '^type=CTRLPLANE$', line: '^services=.*\bSNMP\b'}}
     pass_if_any:
       - {block: '^ACL_TABLE\|', where: '^type=CTRLPLANE$', line: '^services=.*\bSSH\b'}
     otherwise: fail
-    note: Restrict SSH with a control-plane ACL (ACL_TABLE type CTRLPLANE, services SSH).
+    note: Restrict SSH, and SNMP when it is configured, with control-plane ACLs (ACL_TABLE type CTRLPLANE, services SSH / SNMP).
     remediation: |
       ! ACL_TABLE "SSH_ONLY": {"type": "CTRLPLANE", "services": ["SSH"], "stage": "ingress"}
       ! ACL_RULE  "SSH_ONLY|RULE_1": {"PRIORITY": "9999", "SRC_IP": "<admin-subnet>", "PACKET_ACTION": "ACCEPT"}
@@ -150,6 +155,8 @@ checks:
 
   LYSS-MGMT-011:
     fail_if_any:
+      # SONiC is managed through eth0 (MGMT_INTERFACE); VLAN interfaces are data-plane gateways, not
+      # management addresses, so untagged ports in a VLAN with an address are not a finding here.
       # an address on the default VLAN: the entry key is "Vlan1|<ip>/<prefix>"
       - {line: '^VLAN_INTERFACE\|Vlan1\|\d'}
     pass_if_any:
@@ -227,8 +234,10 @@ checks:
   # does not apply; storm control (PORT_STORM_CONTROL) would, but only with user ports.
 
   LYSS-ACC-020: &sonic_l3
-    otherwise: not_applicable
-    note: Data-centre platform without user access ports; Level 3 access-layer controls apply to campus access switches.
+    not_applicable_if_any:
+      - {not: {block: '^VLAN_MEMBER\|', where: '^tagging_mode=untagged$'}, say: 'no untagged VLAN member port (data-centre fabric without access ports)'}
+    otherwise: unknown
+    note: This switch has untagged VLAN member ports; LYSS has no Level 3 checks for SONiC yet.
   LYSS-ACC-021: *sonic_l3
   LYSS-ACC-022: *sonic_l3
   LYSS-ACC-023: *sonic_l3

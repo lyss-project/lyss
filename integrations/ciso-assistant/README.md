@@ -16,7 +16,7 @@ version 1, specification 0.7.0-draft) were merged into CISO Assistant on 2026-11
 ([intuitem/ciso-assistant-community#5246](https://github.com/intuitem/ciso-assistant-community/pull/5246)).
 From the CISO Assistant release that follows v4.2.2, load them from the built-in libraries store
 (search "LYSS"); the manual import below is only needed for older versions or newer LYSS drafts.
-The files in this folder are library version 2 (specification 0.7.1-draft, wording only), an
+The files in this folder are library version 3 (specification 0.8.0-draft, wording only), an
 update of the merged version 1; CISO Assistant itself still ships version 1.
 
 ## Import into CISO Assistant (v4.x)

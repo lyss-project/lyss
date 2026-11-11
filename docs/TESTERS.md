@@ -3,7 +3,7 @@
 Thank you for testing LYSS. This guide takes about 15 minutes: install, try the demo (no switch
 needed), then audit one real switch, and tell me what you found.
 
-LYSS is in preview (tool 0.18, specification 0.7.1-draft). Your feedback decides what gets fixed and built next.
+LYSS is in preview (tool 0.19, specification 0.8.0-draft). Your feedback decides what gets fixed and built next.
 
 ## 1. Get the code
 

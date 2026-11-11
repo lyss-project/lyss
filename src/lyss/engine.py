@@ -43,6 +43,9 @@ class Finding:
     note: str
     remediation: str
     mappings: dict
+    # an advisory control (added within a MAJOR version, see the specification's versioning rules)
+    # is assessed and reported but never counts for conformance or a CI gate
+    advisory: bool = False
 
 
 def load_spec(path: Path = SPEC_FILE) -> dict:
@@ -256,6 +259,10 @@ def _edge_ports_missing(cfg: Config, spec: dict) -> tuple[bool, list[str]]:
         uplinks |= {p for p, children in blocks.items() if any(uplink_config.search(c) for c in children)}
     if spec.get("uplink_lists"):
         uplinks |= _listed_ports(cfg, spec["uplink_lists"])
+    if spec.get("disabled_config"):
+        # administratively disabled ports are not access ports: nothing is required on them
+        disabled = re.compile(spec["disabled_config"])
+        ports -= {p for p, children in blocks.items() if any(disabled.search(c) for c in children)}
     covered = _listed_ports(cfg, spec["require_lists"]) if spec.get("require_lists") else set()
     missing = [p for p in sorted(ports - uplinks, key=_port_sort)
                if p not in covered and not (require and any(require.search(c) for c in blocks.get(p, [])))]
@@ -577,10 +584,11 @@ def evaluate_control(cfg: Config, control: dict, check: dict | None, facts: dict
             note=(check or {}).get("note", "") if show_note else "",
             remediation=(check or {}).get("remediation", "").strip() if verdict == "fail" else "",
             mappings=control.get("mappings", {}),
+            advisory=control.get("status") == "advisory",
         )
 
     if check is None:
-        return finding("not_applicable", [])
+        return finding("unknown", ["this platform's adapter has no check for this control yet"])
 
     # e.g. an access-layer control on a switch without any access port (core, aggregation)
     for rule in check.get("not_applicable_if_any", []):
@@ -748,11 +756,13 @@ def audit(text: str, vendor: str, max_level: int = 1, state_text: str = "",
 
 
 def conformance(findings: list[Finding]) -> dict:
-    """Highest level for which every applicable control passes (0 if Level 1 is not met)."""
+    """Highest level for which every applicable control passes (0 if Level 1 is not met).
+    Advisory controls are counted in the totals but never decide the level."""
     achieved = 0
-    for level in sorted({f.level for f in findings}):
-        relevant = [f for f in findings if f.level == level and f.verdict != "not_applicable"]
-        if relevant and all(f.verdict == "pass" for f in relevant):
+    normative = [f for f in findings if not getattr(f, "advisory", False)]
+    for level in sorted({f.level for f in normative}):
+        # every control pass or not applicable: a switch without access ports can reach Level 3
+        if all(f.verdict in ("pass", "not_applicable") for f in normative if f.level == level):
             achieved = level
         else:
             break

@@ -47,7 +47,8 @@ MIN_ASSESSED = 0.5   # share of the applicable controls up to the required level
 def not_assessable(result: dict, required: int) -> bool:
     """True when most controls up to the required level could not be decided (pass or fail) from
     the file: e.g. a firmware-only platform, or a file mistaken for one. The gate cannot vouch for it."""
-    relevant = [f for f in result["findings"] if f["level"] <= required and f["verdict"] != "not_applicable"]
+    relevant = [f for f in result["findings"] if f["level"] <= required and f["verdict"] != "not_applicable"
+                and not f.get("advisory")]
     decided = [f for f in relevant if f["verdict"] in ("pass", "fail")]
     return bool(relevant) and len(decided) < MIN_ASSESSED * len(relevant)
 
@@ -59,7 +60,8 @@ def failing(results: list[dict], required: int | None) -> list[dict]:
     if not required:
         return []
     return [r for r in results
-            if any(f["verdict"] == "fail" and f["level"] <= required and not f.get("accepted") for f in r["findings"])
+            if any(f["verdict"] == "fail" and f["level"] <= required and not f.get("accepted") and not f.get("advisory")
+                   for f in r["findings"])
             or not_assessable(r, required)]
 
 
@@ -120,6 +122,8 @@ def sarif(results: list[dict], spec: dict, uri_of) -> dict:
     for r, f in _failures(results):
         level, _, _ = SEVERITY[int(f["level"])]
         evidence = f["evidence"][0] if f.get("evidence") else "setting missing from the configuration"
+        if f.get("advisory"):   # reported, never an error: it does not count for conformance
+            level, evidence = "note", f"{evidence} (advisory control: not counted for the level)"
         result = {
             "ruleId": f["control_id"], "level": level,
             "message": {"text": f"{f['title']}: {evidence}"[:1000]},
@@ -154,7 +158,7 @@ def codequality(results: list[dict], uri_of) -> list[dict]:
         out.append({
             "type": "issue", "check_name": f["control_id"],
             "description": f"{f['control_id']} {f['title']}: {evidence}"[:1000],
-            "categories": ["Security"], "severity": SEVERITY[int(f["level"])][2],
+            "categories": ["Security"], "severity": "info" if f.get("advisory") else SEVERITY[int(f["level"])][2],
             "fingerprint": hashlib.sha256(f"{path}:{f['control_id']}".encode()).hexdigest(),
             "location": {"path": path, "lines": {"begin": f.get("line") or 1}},
         })
@@ -196,7 +200,8 @@ def summary_markdown(results: list[dict], spec_version: str, level: int, require
         mark = ""
         if id(r) in bad_ids:
             mark = (f" **not assessable at Level {required}**" if not any(
-                f["verdict"] == "fail" and f["level"] <= required and not f.get("accepted") for f in r["findings"])
+                f["verdict"] == "fail" and f["level"] <= required and not f.get("accepted") and not f.get("advisory")
+                for f in r["findings"])
                 else f" **fails Level {required}**")
         out.append(f"| {md_text(r['device'], MAX_NAME)}{mark} | {md_text(r['vendor'])} | {s['achieved_level']} "
                    f"| {s['pass']} | {s['fail']} | {s['unknown']} |")
@@ -216,7 +221,9 @@ def summary_markdown(results: list[dict], spec_version: str, level: int, require
             a = f.get("accepted")
             accepted = (f" _(accepted risk until {md_text(a['expires'])}, {md_text(a['approved_by'], 120)}: "
                         f"{md_text(a['reason'], 300)})_") if a else ""
-            block.append(f"- **{md_text(f['control_id'])}** {md_text(f['title'])}" + (f": {evidence}" if evidence else "") + accepted)
+            advisory = " _(advisory: not counted for the level)_" if f.get("advisory") else ""
+            block.append(f"- **{md_text(f['control_id'])}** {md_text(f['title'])}" + (f": {evidence}" if evidence else "")
+                         + accepted + advisory)
         block.append("")
         block_size = sum(len(l.encode()) + 1 for l in block)
         if size + block_size > MAX_SUMMARY:

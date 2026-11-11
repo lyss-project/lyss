@@ -31,7 +31,7 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   ARP inspection, 802.1X / MAC authentication, storm control, no CDP/LLDP towards users
   (opt-in: `lyss audit --level 3`, or Settings > Assessment).
 
-> Status: **0.18, draft specification 0.7.1.** The specification may still change before 1.0
+> Status: **0.19, draft specification 0.8.** The specification may still change before 1.0
 > (control IDs stay stable). Each platform is labelled **stable** or **preview** (see
 > [Platform support](#platform-support)). Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).

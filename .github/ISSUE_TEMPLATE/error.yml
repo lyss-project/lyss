@@ -26,6 +26,6 @@ body:
     id: env
     attributes:
       label: Environment
-      placeholder: Windows 11, Python 3.12, LYSS 0.18.0
+      placeholder: Windows 11, Python 3.12, LYSS 0.19.0
     validations:
       required: true

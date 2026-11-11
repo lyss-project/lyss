@@ -92,7 +92,10 @@ def test_sonic_level_3_not_applicable_with_reason():
     text = (HERE / "cases" / "sonic-hardened" / "config.cfg").read_text(encoding="utf-8")
     found = _verdicts(text, "sonic")
     assert {f.verdict for f in found.values()} == {"not_applicable"}
-    assert "Data-centre platform" in found["LYSS-ACC-020"].note
+    assert "no untagged VLAN member port" in found["LYSS-ACC-020"].evidence[0]
+    # a SONiC switch that does have untagged ports is not waved through: LYSS cannot check it yet
+    access = text.rstrip().rstrip("}") + ', "VLAN_MEMBER": {"Vlan10|Ethernet0": {"tagging_mode": "untagged"}}}'
+    assert {f.verdict for f in _verdicts(access, "sonic").values()} == {"unknown"}
 
 
 def test_uncovered_vlan_is_named():

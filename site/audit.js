@@ -213,7 +213,7 @@ function finding(f) {
   const sum = el("summary");
   sum.append(el("span", "pill pill-" + f.verdict, { fail: "FAIL", unknown: "?", pass: "PASS", not_applicable: "N/A" }[f.verdict]),
              el("code", "", f.control_id.replace(/^LYSS-/, "")), el("span", "f-title", f.title),
-             el("span", "f-level", "L" + f.level));
+             el("span", "f-level", "L" + f.level + (f.advisory ? " · advisory" : "")));
   d.appendChild(sum);
   const body = el("div", "f-body");
   if (f.evidence && f.evidence.length) {

@@ -14,7 +14,7 @@
 # Where an output format is not certain, the rules only decide on an explicit match, so a format
 # that differs gives "unknown", never a wrong pass.
 adapter: aruba_aoscx
-spec_version: "0.7.1-draft"
+spec_version: "0.8.0-draft"
 platform: HPE Aruba Networking AOS-CX
 status: stable, collection and Level 1-3 output formats checked on the AOS-CX 10.17 simulator (2026-11), not yet on a physical switch; ARP inspection from the documentation
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -242,12 +242,12 @@ checks:
     fail_if_any:
       - uncovered:
           what: access ports without BPDU guard
-          used: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$'}
+          used: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^(vlan access \d+|no routing)\s*$', '^no shutdown\s*$'], where_not: '^(lag \d+\s*$|vlan trunk )'}
           covered: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: '^spanning-tree bpdu-guard\b'}
     pass_if_any:
-      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', every_contains: '^spanning-tree bpdu-guard\b'}
+      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^(vlan access \d+|no routing)\s*$', '^no shutdown\s*$'], where_not: '^(lag \d+\s*$|vlan trunk )', every_contains: '^spanning-tree bpdu-guard\b'}
     otherwise: fail
-    note: Access ports are interfaces with "vlan access"; ports left at the default VLAN without that line are not counted yet.
+    note: Access ports are enabled switched ports ("vlan access" or "no routing") that are not trunks or LAG members.
     remediation: |
       interface <access-port>
           spanning-tree port-type admin-edge
@@ -268,14 +268,14 @@ checks:
 
   LYSS-ACC-020:
     not_applicable_if_any: &cx_no_access
-      - {not: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$'}, say: 'no enabled access port (no enabled interface with "vlan access")'}
+      - {not: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^(vlan access \d+|no routing)\s*$', '^no shutdown\s*$'], where_not: '^(lag \d+\s*$|vlan trunk )'}, say: 'no enabled access port (no enabled interface with "vlan access")'}
     fail_if_any:
       - {not: {block: '^dhcpv4-snooping\s*$'}, say: 'DHCP snooping is not enabled globally ("dhcpv4-snooping")'}
       # a trusted access port accepts DHCP server messages
-      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', line: '^dhcpv4-snooping trust\b'}
+      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^(vlan access \d+|no routing)\s*$', '^no shutdown\s*$'], where_not: '^(lag \d+\s*$|vlan trunk )', line: '^dhcpv4-snooping trust\b'}
       - uncovered: &cx_snooping
           what: access VLANs without DHCP snooping
-          used: &cx_access_vlans {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', line: '^vlan access (\d+)'}
+          used: &cx_access_vlans {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^(vlan access \d+|no routing)\s*$', '^no shutdown\s*$'], where_not: '^(lag \d+\s*$|vlan trunk )', line: '^vlan access (\d+)'}
           covered: {block: '^vlan (\d+)$', where: '^dhcpv4-snooping\s*$'}
     pass_if_any:
       - {uncovered: *cx_snooping, absent: true}
@@ -290,7 +290,7 @@ checks:
   LYSS-ACC-021:
     not_applicable_if_any: *cx_no_access
     fail_if_any:
-      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', line: '^arp inspection trust\b'}
+      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^(vlan access \d+|no routing)\s*$', '^no shutdown\s*$'], where_not: '^(lag \d+\s*$|vlan trunk )', line: '^arp inspection trust\b'}
       - uncovered: &cx_dai
           what: access VLANs without ARP inspection
           used: *cx_access_vlans
@@ -313,7 +313,7 @@ checks:
       - {not: {block: '^aaa authentication port-access (dot1x authenticator|mac-auth)$', line: '^enable\s*$'}, say: '802.1X / MAC authentication is not enabled globally ("aaa authentication port-access ... / enable")'}
       - uncovered: &cx_nac
           what: access ports without 802.1X / MAC authentication
-          used: &cx_access_ports {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$'}
+          used: &cx_access_ports {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^(vlan access \d+|no routing)\s*$', '^no shutdown\s*$'], where_not: '^(lag \d+\s*$|vlan trunk )'}
           covered: {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^aaa authentication port-access (dot1x authenticator|mac-auth)$', '^enable\s*$']}
     pass_if_any:
       - {uncovered: *cx_nac, absent: true}
@@ -331,7 +331,7 @@ checks:
     not_applicable_if_any: *cx_no_access
     fail_if_any:
       # a 100 % limit limits nothing
-      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^vlan access \d+', '^no shutdown\s*$'], where_not: '^lag \d+\s*$', line: '^rate-limit broadcast 100 percent\b'}
+      - {block: '^interface (\d+/\d+/\d+|lag \d+)$', where: ['^(vlan access \d+|no routing)\s*$', '^no shutdown\s*$'], where_not: '^(lag \d+\s*$|vlan trunk )', line: '^rate-limit broadcast 100 percent\b'}
       - uncovered: &cx_storm
           what: access ports without a broadcast rate limit
           used: *cx_access_ports

@@ -82,6 +82,17 @@ def build() -> str:
         "  device state such as listening ports, SSH banner, port status), `external_data` (vendor advisories,",
         "  end-of-life bulletins), `backup_system` (configuration archive or attested backup system).",
         "- **Verdict**: the result of one control on one device: `pass`, `fail`, `unknown` or `not_applicable`.",
+        "- **Uplink**: a link to another switch: a port configured as a trunk (on platforms without a trunk",
+        "  mode, a tagged port), or a member port of a link aggregation that is a trunk. Any port configured",
+        "  this way is treated as an uplink, whatever is connected to it: review trunk ports separately.",
+        "- **Edge port**: any switch port that is neither an uplink nor a routed port. A link aggregation that",
+        "  is not a trunk (for example towards a server) is one edge port, assessed on its logical interface.",
+        "- **Access port**: an edge port that is administratively enabled. Its untagged VLAN is a **user VLAN**.",
+        "- **Management VLAN**: the VLAN that carries the switch's in-band management address. A dedicated",
+        "  out-of-band management port belongs to no VLAN.",
+        "- **Advisory control**: a control added within a MAJOR version (see section 8). It is assessed and",
+        "  reported like any control but does not count for conformance until the next MAJOR version, where it",
+        "  becomes a normal control or is withdrawn.",
         "",
         "## 3. Verdicts",
         "",
@@ -89,7 +100,9 @@ def build() -> str:
         "- `fail`: the evidence shows that the control is not met.",
         "- `unknown`: the available evidence cannot decide. An assessment MUST report `unknown` rather than",
         "  guess, and MUST NOT turn a missing evidence into a pass.",
-        "- `not_applicable`: the control does not apply to the platform (e.g. the feature does not exist).",
+        "- `not_applicable`: the control does not apply to the device, because what it protects does not",
+        "  exist there, for example the Level 3 controls on a switch without access ports. A missing security",
+        "  feature is not a reason for `not_applicable`: unless a control says otherwise, it fails.",
         "",
         "## 4. Conformance levels",
         "",
@@ -100,13 +113,18 @@ def build() -> str:
         out.append(f"| {level} | {name} | {LEVEL_PROSE.get(level, '')} |")
     out += [
         "",
-        "A device is **LYSS Level N conformant** when every control of levels 1 to N is `pass` or",
-        "`not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST state the device,",
+        "A device is **LYSS Level N conformant** when every control of levels 1 to N, advisory controls",
+        "aside, is `pass` or `not_applicable`. An `unknown` verdict is not a pass. A conformance claim MUST",
+        "state the device,",
         "the specification version, the assessment date and the tool and version used, for example:",
         "",
-        f"> core-sw-01 is LYSS Level 1 conformant (specification {spec['spec_version']}), assessed 2026-11-11 with LYSS 0.18.",
+        f"> core-sw-01 is LYSS Level 1 conformant (specification {spec['spec_version']}), assessed 2026-11-11 with LYSS 0.19.",
         "",
         "A claim is valid for the configuration and firmware assessed; any change requires a new assessment.",
+        "",
+        "Controls with parameters (for example `max_idle_minutes`) are assessed with the values given in",
+        "this document. An organisation MAY assess with stricter values; the claim then states them. An",
+        "assessment with a looser value does not support a LYSS conformance claim.",
         "",
         "## 5. Control catalogue",
         "",
@@ -114,13 +132,17 @@ def build() -> str:
         "|---|---|---|",
     ]
     for c in controls:
-        out.append(f"| [{c['id']}](#{c['id'].lower()}) | {c['level']} | {c['title']} |")
+        advisory = " (advisory)" if c.get("status") == "advisory" else ""
+        out.append(f"| [{c['id']}](#{c['id'].lower()}) | {c['level']}{advisory} | {c['title']} |")
     out.append("")
     for level, name in spec["levels"].items():
         out += [f"### Level {level}: {name}", ""]
         for c in (c for c in controls if c["level"] == level):
             m = c.get("mappings", {})
             out += [f"#### {c['id']}", "", f"**{c['title']}**", ""]
+            if c.get("status") == "advisory":
+                out += [f"*Advisory control (added in {c.get('added', 'this version')}): reported, not counted for "
+                        "conformance until the next MAJOR version.*", ""]
             if c.get("statement"):
                 out += [f"- **Requirement.** {c['statement']}"]
             if c.get("rationale"):
@@ -173,9 +195,16 @@ def build() -> str:
         "",
         "From 1.0.0 the specification follows semantic versioning:",
         "",
-        "- **MAJOR**: a control is withdrawn, made stricter in a way that can turn a pass into a fail, or moved to another level.",
-        "- **MINOR**: a control or a level is added, or a wording changes without changing any verdict.",
+        "- **MAJOR**: a control is withdrawn, made stricter in a way that can turn a pass into a fail, or moved",
+        "  to another level, or an advisory control becomes a normal control.",
+        "- **MINOR**: an advisory control is added to an existing level, a level is added above the existing",
+        "  ones (its controls are normal controls of that new level), or a wording changes without changing",
+        "  any verdict.",
         "- **PATCH**: typos and references.",
+        "",
+        "A control added to an existing level within a MAJOR version is always advisory (section 2), so a device that conforms to",
+        "1.x Level N still conforms to every later 1.y Level N with the same configuration and firmware",
+        "(newly published vulnerabilities aside: LYSS-VULN-001 follows the vulnerability data, not the version).",
         "",
         "Control identifiers are never reused, renamed or renumbered. A withdrawn control keeps its identifier, marked withdrawn.",
         "While the version is below 1.0.0 the specification is a draft and MAY change without a MAJOR increment;",

@@ -1,8 +1,8 @@
 urn: urn:lyss:risk:library:lyss
 locale: en
 ref_id: LYSS
-name: "LYSS \u2014 Lyaazale Switch Security (draft 0.7.1)"
-description: 'LYSS (Lyaazale Switch Security) specification 0.7.1-draft (draft): vendor-neutral
+name: "LYSS \u2014 Lyaazale Switch Security (draft 0.8.0)"
+description: 'LYSS (Lyaazale Switch Security) specification 0.8.0-draft (draft): vendor-neutral
   security controls for managed network switches, in three cumulative conformance
   levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is one control (LYSS-<DOMAIN>-<NNN>);
   its annotation gives the rationale, vendor-neutral test procedure and informative
@@ -12,16 +12,16 @@ description: 'LYSS (Lyaazale Switch Security) specification 0.7.1-draft (draft):
   Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py
   in the LYSS repository (https://github.com/lyss-project/lyss).'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
-version: 2
-publication_date: 2026-11-10
+version: 3
+publication_date: 2026-11-11
 provider: Mouad Lyaazale
 packager: LYSS project
 objects:
   framework:
     urn: urn:lyss:risk:framework:lyss
     ref_id: LYSS
-    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.7.1)"
-    description: 'LYSS (Lyaazale Switch Security) specification 0.7.1-draft (draft):
+    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.8.0)"
+    description: 'LYSS (Lyaazale Switch Security) specification 0.8.0-draft (draft):
       vendor-neutral security controls for managed network switches, in three cumulative
       conformance levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is
       one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, vendor-neutral
@@ -220,10 +220,11 @@ objects:
       parent_urn: urn:lyss:risk:req_node:lyss:l1.auth
       ref_id: LYSS-AUTH-002
       name: Privileged-mode password is stored as a strong hash
-      description: The privileged (enable) credential is stored with a salted one-way
-        hash based on SHA-256 or a stronger algorithm (e.g. scrypt, PBKDF2-SHA-256,
-        SHA-256/SHA-512 crypt). Cleartext, reversible encodings, MD5- and SHA-1-based
-        hashes and unsalted SHA-256 (Cisco type 4) are not accepted.
+      description: The privileged (enable) credential, and the password of every local
+        account with full privileges, is stored with a salted one-way hash based on
+        SHA-256 or a stronger algorithm (e.g. scrypt, PBKDF2-SHA-256, SHA-256/SHA-512
+        crypt). Cleartext, reversible encodings, MD5- and SHA-1-based hashes and unsalted
+        SHA-256 (Cisco type 4) are not accepted.
       annotation: 'Rationale: Reversible encodings (e.g. Cisco type 7) are decoded
         instantly by public tools from any configuration backup, and MD5- or SHA-1-based
         hashes (e.g. Cisco type 5) are cracked quickly on commodity hardware.
@@ -287,8 +288,7 @@ objects:
 
         Test procedure: Fail if a RADIUS or TACACS+ shared key appears in cleartext.
         A reversible encoding (e.g. Cisco type 7) is not cleartext and passes this
-        Level 1 control, although it gives only weak protection; storing keys with
-        a device-specific encryption key may become a separate Level 2 control.
+        control, although it gives only weak protection.
 
 
         Informative references: ISO/IEC 27001:2022 A.5.17, A.8.24; NIST SP 800-53
@@ -421,12 +421,17 @@ objects:
 
 
         Test procedure: Pass if every remote management access path is bound to an
-        access list of authorized sources.
+        access list of authorized sources. A reachability test that shows a management
+        service answering from a network that is not authorized for administration
+        fails the control, whatever the configuration says.
 
 
         Informative references: ISO/IEC 27001:2022 A.8.20, A.8.22; NIST SP 800-53
         r5 AC-17, SC-7; CIS Controls v8 12.3.'
       typical_evidence: '- Running configuration of the switch
+
+        - Read-only device state (listening services, SSH identification and algorithms,
+        port status)
 
         - LYSS assessment report showing the verdict and evidence for LYSS-MGMT-010'
       implementation_groups:
@@ -438,15 +443,17 @@ objects:
       parent_urn: urn:lyss:risk:req_node:lyss:l2.mgmt
       ref_id: LYSS-MGMT-011
       name: Management interface is on a dedicated management VLAN
-      description: 'The switch management address is on a VLAN reserved for management:
-        not the default VLAN (1), and no user access port is a member of it.'
+      description: 'The switch is managed through a dedicated out-of-band management
+        port, or its management address is on a VLAN reserved for management: not
+        the default VLAN (1), and no access port is an untagged member of it.'
       annotation: 'Rationale: Separating management from user networks prevents users
         from reaching the management plane.
 
 
         Test procedure: Fail if VLAN 1 carries a management address, or if an access
-        (untagged, non-uplink) port is a member of the management VLAN. Pass if the
-        management address is on another VLAN with no access port.
+        port is an untagged member of the management VLAN. Pass if the management
+        address is on a dedicated out-of-band management port, or on another VLAN
+        that no access port belongs to untagged.
 
 
         Informative references: ISO/IEC 27001:2022 A.8.22; NIST SP 800-53 r5 SC-7,
@@ -680,9 +687,10 @@ objects:
       ref_id: LYSS-ACC-011
       name: Edge ports are protected against rogue spanning-tree participants (BPDU
         guard)
-      description: Every edge port disables itself when it receives a spanning-tree
+      description: Every access port disables itself when it receives a spanning-tree
         BPDU. Links to other switches are configured as such (trunks, or link aggregations
-        that are trunks); every other port is an edge port.
+        that are trunks); every other port is an edge port, and an access port when
+        it is enabled.
       annotation: 'Rationale: A rogue or misconnected switch on an access port can
         take over the spanning tree or create a loop.
 
@@ -693,8 +701,8 @@ objects:
         server) is an edge port. Spanning tree runs on its logical interface, so BPDU
         protection is checked there, and that check covers its member ports. Neighbour
         discovery never exempts a port: a rogue device can advertise bridge capability.
-        Fail if an edge port lacks BPDU protection, unless a global default protects
-        all edge ports.
+        Fail if an access port (an enabled edge port) lacks BPDU protection, unless
+        a global default protects all edge ports.
 
 
         Informative references: ISO/IEC 27001:2022 A.8.20; NIST SP 800-53 r5 SC-5,
@@ -824,8 +832,9 @@ objects:
 
         Test procedure: Fail if an access port has no broadcast rate limit, or a limit
         of 100 % (which limits nothing). Pass if every access port has an effective
-        one. Unknown when the platform sets it on the switch chip and the setting
-        cannot be read. Not applicable without access ports.
+        one. Unknown when the platform sets it on the switch chip, or applies a default
+        that the configuration does not show, and the setting cannot be read. Not
+        applicable without access ports.
 
 
         Informative references: ISO/IEC 27001:2022 A.8.20, A.8.6; NIST SP 800-53 r5
