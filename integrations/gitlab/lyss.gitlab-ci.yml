@@ -17,7 +17,7 @@ lyss-audit:
   stage: test
   image: python:3.12-slim
   variables:
-    LYSS_VERSION: "0.19.0"          # pin: upgrade on purpose, after reading the changelog
+    LYSS_VERSION: "0.19.1"          # pin: upgrade on purpose, after reading the changelog
     LYSS_PATH: "."                  # file or folder of saved configurations
     LYSS_LEVEL: "2"                 # highest level to assess (1, 2 or 3)
     LYSS_REQUIRE_LEVEL: ""          # "1", "2" or "3": fail the job on a failed control up to it

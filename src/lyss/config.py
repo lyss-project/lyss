@@ -294,14 +294,16 @@ def junos_normalize(text: str) -> str:
     return "\n".join(out) + "\n"
 
 
-BANNER_START = re.compile(r"^banner\s+(?:motd|login|exec|incoming|slip-ppp|config-save|prompt-timeout)\b[ \t]*(.*)$")
+BANNER_START = re.compile(r"^banner\s+(motd|login|exec|incoming|slip-ppp|config-save|prompt-timeout)\b[ \t]*(.*)$")
 MACRO_START = re.compile(r"^macro name \S+\s*$")
 BANNER_TEXT = "banner-text "
 
 
 def _text_blocks(lines: list[str]) -> tuple[list[str], bool]:
-    """(lines with free-text bodies marked, True if a body is still open at the end)."""
-    out, delim = [], None
+    """(lines with free-text bodies marked, True if a body is still open at the end). Each body line
+    says which banner it belongs to ("banner-text login ...", "banner-text exec ..."): only a banner
+    shown before login may satisfy the warning-banner control."""
+    out, delim, kind = [], None, ""
     for raw in lines:
         s = raw.strip()
         if delim is not None:
@@ -310,14 +312,14 @@ def _text_blocks(lines: list[str]) -> tuple[list[str], bool]:
             end = (s == delim) if delim in ("EOF", "@") else s.endswith(delim)
             text = s[:-len(delim)].rstrip() if end and delim not in ("EOF", "@") else ("" if end else s)
             if text:
-                out.append(BANNER_TEXT + text)
+                out.append(f"{BANNER_TEXT}{kind} {text}")
             if end:
                 delim = None
             continue
         if MACRO_START.match(raw):
-            delim = "@"                      # IOS "macro name X": commands of a macro until "@"
+            delim, kind = "@", "macro"       # IOS "macro name X": commands of a macro until "@"
         elif m := BANNER_START.match(raw):   # never indented in a running configuration
-            rest = m.group(1).strip()
+            kind, rest = m.group(1), m.group(2).strip()
             if not rest:
                 delim = "EOF"                # Arista: text lines until "EOF"
             else:

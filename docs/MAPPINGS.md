@@ -2,7 +2,7 @@
 
 # Crosswalk: frameworks to LYSS controls
 
-Specification 0.8.0-draft. For each requirement of a framework, the LYSS controls
+Specification 0.8.1-draft. For each requirement of a framework, the LYSS controls
 whose results can serve as **part** of the evidence for it.
 
 **Informative only.**

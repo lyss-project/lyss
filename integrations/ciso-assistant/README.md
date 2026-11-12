@@ -14,9 +14,9 @@ Both are generated from `spec/lyss-spec.yaml`; do not edit them by hand.
 **Included in CISO Assistant:** the LYSS framework and its ISO/IEC 27001:2022 mapping (library
 version 1, specification 0.7.0-draft) were merged into CISO Assistant on 2026-11-09
 ([intuitem/ciso-assistant-community#5246](https://github.com/intuitem/ciso-assistant-community/pull/5246)).
-From the CISO Assistant release that follows v4.2.2, load them from the built-in libraries store
+From CISO Assistant v4.2.3, load them from the built-in libraries store
 (search "LYSS"); the manual import below is only needed for older versions or newer LYSS drafts.
-The files in this folder are library version 3 (specification 0.8.0-draft, wording only), an
+The files in this folder are library version 4 (specification 0.8.1-draft, wording only), an
 update of the merged version 1; CISO Assistant itself still ships version 1.
 
 ## Import into CISO Assistant (v4.x)

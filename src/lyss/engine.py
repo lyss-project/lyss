@@ -603,6 +603,13 @@ def evaluate_control(cfg: Config, control: dict, check: dict | None, facts: dict
     if failed or observed:
         return finding("fail", [e for ev in failed for e in ev] + observed)
 
+    # something the configuration cannot decide, e.g. a link aggregation that may go to a server or
+    # to another switch: unknown with that evidence (and the adapter's note), never a pass
+    for rule in check.get("unknown_if_any", []):
+        matched, evidence = evaluate_rule(cfg, rule)
+        if matched:
+            return finding("unknown", evidence, from_default=True)
+
     if check.get("backup") and (context or {}).get("backup") is not None:
         max_age = (control.get("parameters") or {}).get("max_age_days", 7)
         verdict, evidence = backup_verdict(context["backup"], max_age)

@@ -6,7 +6,7 @@
 # "spanning-tree 1-24 bpdu-protection"): edge-port rules use uplink_lists / require_lists.
 # Credentials only appear in the config when "include-credentials" is enabled.
 adapter: hp_procurve
-spec_version: "0.8.0-draft"
+spec_version: "0.8.1-draft"
 platform: HP ProCurve / HPE Aruba AOS-S
 status: preview, validated on the LYSS simulator and synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
 support: preview          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -17,6 +17,10 @@ facts:
     - {section: show modules, line: 'Chassis:\s+(.+?)\s{2,}'}
     # configuration header: "; JL253A Configuration Editor; Created on release #WC.16.11.0032"
     - {section: config comments, line: '^;\s*(J[A-Z]?\d{3,4}[A-Z])\s+Configuration Editor'}
+    # stacked / VSF switches ("; hpStack_KB Configuration Editor"): the first member's model, from
+    # "stacking / member 1 type \"JL075A\" ..." or "vsf / member 1 / type \"JL256A\" ..."
+    - {section: config, line: '^member \d+ type "(J[A-Z]?\d{3,4}[A-Z])"'}
+    - {section: config, line: '^type "(J[A-Z]?\d{3,4}[A-Z])"'}
   version:
     - {section: show version, line: '^\s*([A-Z]{1,2}\.\d{2}\.\d{2}\.\d{4})\s*$'}
     - {section: show system, line: 'Software revision\s*:\s*([A-Z]{1,2}\.[\d.]+)'}
@@ -186,7 +190,8 @@ checks:
   LYSS-MGMT-012:
     pass_if_all:
       - {line: '^banner motd\b'}
-      - {line: '(?i)authori[sz]ed'}
+      # the word inside the MOTD banner itself ("ip authorized-managers" must not count)
+      - {line: '(?i)^(banner motd\b|banner-text motd ).*authori[sz]ed'}
     otherwise: fail
     note: Only the MOTD banner is shown before authentication ("banner exec" comes after login).
     remediation: |
@@ -259,10 +264,12 @@ checks:
           uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
           disabled_config: '^disable\s*$'
           require_lists: '^spanning-tree (\S+) bpdu-protection'
-      # a trunk group (link aggregation) tagged in no VLAN goes to an end device such as a server:
-      # it is an edge port itself and needs "spanning-tree TrkN bpdu-protection"
+    unknown_if_any:
+      # a trunk group (link aggregation) tagged in no VLAN may go to a server (an edge port that needs
+      # "spanning-tree TrkN bpdu-protection") or to another switch carrying only untagged VLAN 1,
+      # where BPDU protection would cut the link: the configuration cannot tell them apart
       - uncovered:
-          what: trunk groups to end devices (tagged in no VLAN) without BPDU protection
+          what: trunk groups tagged in no VLAN, without BPDU protection (to a server or to another switch?)
           used: {line: '(?i)^trunk \S+ (trk\d+)\b'}
           covered: [{block: '^vlan \d+$', line: '^tagged (\S+)'}, {line: '^spanning-tree (\S+) bpdu-protection'}]
           lists: ports
@@ -270,8 +277,9 @@ checks:
       - {edge_ports_missing: *edge, absent: true}
     otherwise: unknown
     note: >-
-      Needs "show interfaces brief" to know the ports; trunk and tagged ports count as uplinks, and a
-      trunk group tagged in no VLAN (e.g. to a server) is an edge port.
+      Needs "show interfaces brief" to know the ports; trunk and tagged ports count as uplinks. A trunk
+      group tagged in no VLAN is unknown: protect it with "spanning-tree TrkN bpdu-protection" only if
+      it goes to an end device such as a server, never if it links two switches (it would cut the link).
     remediation: |
       ! only on edge ports (users, printers, APs, servers) - never on links to other switches
       spanning-tree <edge-ports> bpdu-protection

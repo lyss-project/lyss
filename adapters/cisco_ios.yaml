@@ -21,8 +21,10 @@
 #                                   (port-list platforms) or a list of these
 # Per control: fail_if_any -> fail; firmware -> data/firmware.yaml; pass_if_all / pass_if_any -> pass;
 # else `otherwise`. A state rule never matches when that state was not collected.
+#   unknown_if_any: rules checked after fail_if_any; a match gives "unknown" with its evidence
+#   (the configuration cannot decide, e.g. a link aggregation to a server or to a switch).
 adapter: cisco_ios
-spec_version: "0.8.0-draft"
+spec_version: "0.8.1-draft"
 platform: Cisco IOS / IOS-XE
 status: stable, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
@@ -234,7 +236,8 @@ checks:
   LYSS-MGMT-012:
     pass_if_all:
       - {line: '^banner (login|motd) '}
-      - {line: '(?i)authori[sz]ed'}
+      # the word inside the login / MOTD banner itself (an exec banner comes after login)
+      - {line: '(?i)^(banner (login|motd) |banner-text (login|motd) ).*authori[sz]ed'}
     otherwise: fail
     note: The login or MOTD banner (shown before authentication) must state the authorized-use restriction.
     remediation: |

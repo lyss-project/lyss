@@ -2,6 +2,26 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.19.1 (2026-11-12)
+
+Fixes from the first field report on real HPE AOS-S switches (a 2930F and a 3810M stack), by
+@jaba0x, maintainer of SwitchDesk (jaba0x/SwitchDesk discussion #29). Thank you! Specification
+0.8.1-draft (one sentence added to LYSS-ACC-011); no control added or removed, no identifier changed;
+CISO Assistant library version 4.
+
+- **LYSS-MGMT-012** (warning banner): the authorized-use word must now be inside a banner shown
+  before login. On HPE AOS-S, "ip authorized-managers" made a "Welcome" banner pass; an exec banner
+  (shown after login) no longer counts either. Cisco IOS, Cisco Business, Arista, AOS-CX, AOS-S and
+  Huawei. Can turn a pass into a fail.
+- **HPE AOS-S stacks and VSF**: the configuration header of a stack ("; hpStack_KB Configuration
+  Editor") has no part number; the model is now read from the members ("member 1 type ..." or
+  "type ..."), so LYSS-VULN-001 is decided instead of unknown.
+- **HPE AOS-S LYSS-ACC-011**: a trunk group tagged in no VLAN may link two switches that carry only
+  VLAN 1, where BPDU protection would cut the link, or go to a server. The configuration cannot
+  tell them apart: it is now unknown, with a note, instead of failing. The specification says so.
+- Adapters: new rule form `unknown_if_any` (the configuration cannot decide).
+- CISO Assistant: the LYSS library ships in CISO Assistant v4.2.3 (README of the integration).
+
 ## 0.19.0 (2026-11-11)
 
 Specification 0.8.0-draft: review before the 1.0 release candidate. No control added or removed,

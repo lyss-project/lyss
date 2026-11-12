@@ -1,8 +1,8 @@
 urn: urn:lyss:risk:library:lyss
 locale: en
 ref_id: LYSS
-name: "LYSS \u2014 Lyaazale Switch Security (draft 0.8.0)"
-description: 'LYSS (Lyaazale Switch Security) specification 0.8.0-draft (draft): vendor-neutral
+name: "LYSS \u2014 Lyaazale Switch Security (draft 0.8.1)"
+description: 'LYSS (Lyaazale Switch Security) specification 0.8.1-draft (draft): vendor-neutral
   security controls for managed network switches, in three cumulative conformance
   levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is one control (LYSS-<DOMAIN>-<NNN>);
   its annotation gives the rationale, vendor-neutral test procedure and informative
@@ -12,16 +12,16 @@ description: 'LYSS (Lyaazale Switch Security) specification 0.8.0-draft (draft):
   Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py
   in the LYSS repository (https://github.com/lyss-project/lyss).'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
-version: 3
-publication_date: 2026-11-11
+version: 4
+publication_date: 2026-11-12
 provider: Mouad Lyaazale
 packager: LYSS project
 objects:
   framework:
     urn: urn:lyss:risk:framework:lyss
     ref_id: LYSS
-    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.8.0)"
-    description: 'LYSS (Lyaazale Switch Security) specification 0.8.0-draft (draft):
+    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.8.1)"
+    description: 'LYSS (Lyaazale Switch Security) specification 0.8.1-draft (draft):
       vendor-neutral security controls for managed network switches, in three cumulative
       conformance levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is
       one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, vendor-neutral
@@ -701,8 +701,11 @@ objects:
         server) is an edge port. Spanning tree runs on its logical interface, so BPDU
         protection is checked there, and that check covers its member ports. Neighbour
         discovery never exempts a port: a rogue device can advertise bridge capability.
-        Fail if an access port (an enabled edge port) lacks BPDU protection, unless
-        a global default protects all edge ports.
+        On platforms without a trunk mode (HPE AOS-S), a link aggregation that carries
+        only untagged VLANs cannot be told apart from a link to another switch from
+        the configuration: its verdict is unknown unless it is protected. Fail if
+        an access port (an enabled edge port) lacks BPDU protection, unless a global
+        default protects all edge ports.
 
 
         Informative references: ISO/IEC 27001:2022 A.8.20; NIST SP 800-53 r5 SC-5,

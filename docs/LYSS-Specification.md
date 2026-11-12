@@ -2,7 +2,7 @@
 
 # LYSS Specification: security controls for network switches
 
-**Version 0.8.0-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
+**Version 0.8.1-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
 
 ## 1. Scope
 
@@ -60,7 +60,7 @@ aside, is `pass` or `not_applicable`. An `unknown` verdict is not a pass. A conf
 state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.8.0-draft), assessed 2026-11-11 with LYSS 0.19.
+> core-sw-01 is LYSS Level 1 conformant (specification 0.8.1-draft), assessed 2026-11-11 with LYSS 0.19.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
 
@@ -300,7 +300,7 @@ assessment with a looser value does not support a LYSS conformance claim.
 
 - **Requirement.** Every access port disables itself when it receives a spanning-tree BPDU. Links to other switches are configured as such (trunks, or link aggregations that are trunks); every other port is an edge port, and an access port when it is enabled.
 - **Rationale.** A rogue or misconnected switch on an access port can take over the spanning tree or create a loop.
-- **Test procedure.** Edge ports are all ports minus uplinks. Uplinks are only trunk ports (tagged on HPE AOS-S) and the member ports of link aggregations that are trunks. A link aggregation that is not a trunk (for example towards a server) is an edge port. Spanning tree runs on its logical interface, so BPDU protection is checked there, and that check covers its member ports. Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. Fail if an access port (an enabled edge port) lacks BPDU protection, unless a global default protects all edge ports.
+- **Test procedure.** Edge ports are all ports minus uplinks. Uplinks are only trunk ports (tagged on HPE AOS-S) and the member ports of link aggregations that are trunks. A link aggregation that is not a trunk (for example towards a server) is an edge port. Spanning tree runs on its logical interface, so BPDU protection is checked there, and that check covers its member ports. Neighbour discovery never exempts a port: a rogue device can advertise bridge capability. On platforms without a trunk mode (HPE AOS-S), a link aggregation that carries only untagged VLANs cannot be told apart from a link to another switch from the configuration: its verdict is unknown unless it is protected. Fail if an access port (an enabled edge port) lacks BPDU protection, unless a global default protects all edge ports.
 - **Evidence.** config, state
 - **References (informative).** ISO/IEC 27001:2022 A.8.20 · NIST SP 800-53 r5 SC-5, CM-6 · CIS Controls v8 12.2 · NIS2 Art. 21(2)(g)
 

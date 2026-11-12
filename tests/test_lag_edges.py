@@ -41,10 +41,13 @@ def test_hp_uplink_trunk_group_is_not_an_edge_port():
     assert verdict(config, "hp_procurve", state, "LYSS-ACC-011", context=ctx)[0] == "pass"
 
 
-def test_hp_trunk_group_to_a_server_needs_bpdu_protection():
+def test_hp_trunk_group_tagged_in_no_vlan_is_unknown_until_protected():
+    # field report 12/11/2026: a trunk group carrying only untagged VLAN 1 may link two switches
+    # (BPDU protection would cut it) or go to a server: the configuration cannot tell, so unknown
     _, state, ctx = case("hp-hardened")
-    v, ev = verdict(hp_with_server_trunk(False), "hp_procurve", state, "LYSS-ACC-011", context=ctx)
-    assert v == "fail" and any("trk2" in e for e in ev), ev
+    f = next(f for f in audit(hp_with_server_trunk(False), "hp_procurve", 2, state, ctx) if f.control_id == "LYSS-ACC-011")
+    assert f.verdict == "unknown" and any("trk2" in e for e in f.evidence), f.evidence
+    assert "never if it links two switches" in f.note
     assert verdict(hp_with_server_trunk(True), "hp_procurve", state, "LYSS-ACC-011", context=ctx)[0] == "pass"
 
 

@@ -13,7 +13,7 @@
 # Configuration controls stay "unknown" until a real GS1900 configuration export is available:
 # reports and sanitized samples are welcome (see CONTRIBUTING.md).
 adapter: zyxel_gs1900
-spec_version: "0.8.0-draft"
+spec_version: "0.8.1-draft"
 platform: Zyxel GS1900 (firmware check only)
 status: preview, firmware data from the Zyxel advisory of 2026-06-16 (CVE-2026-7273, CISA KEV)
 support: preview          # stable: Level 1-2 verified on the vendor's own software; preview: not yet
