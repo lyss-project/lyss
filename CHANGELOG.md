@@ -2,6 +2,20 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.20.0 (2026-11-13)
+
+Specification **1.0.0-rc.1**: the release candidate of LYSS 1.0, open for public review
+([docs/REVIEW-1.0.md](docs/REVIEW-1.0.md)). The controls, levels, statements and test procedures are
+those of 0.8.1-draft: no control added, removed or changed, no identifier changed, no verdict changed.
+
+- Specification status "release candidate"; section 8 says how a release candidate can still change
+  (a new rc number for each change, listed here) before 1.0.0.
+- docs/REVIEW-1.0.md: what to review, how to comment, how comments are handled.
+- CISO Assistant library version 5 ("release candidate" in its name and description; same
+  requirements, URNs and reference IDs as version 4).
+- Validation matrix: HPE Aruba AOS-S configurations checked on a real 2930F and 3810M stack
+  (field report of 0.19.1); the platform stays preview until a live collection is confirmed.
+
 ## 0.19.1 (2026-11-12)
 
 Fixes from the first field report on real HPE AOS-S switches (a 2930F and a 3810M stack), by

@@ -24,7 +24,7 @@
 #   unknown_if_any: rules checked after fail_if_any; a match gives "unknown" with its evidence
 #   (the configuration cannot decide, e.g. a link aggregation to a server or to a switch).
 adapter: cisco_ios
-spec_version: "0.8.1-draft"
+spec_version: "1.0.0-rc.1"
 platform: Cisco IOS / IOS-XE
 status: stable, validated on Catalyst C1000 15.2(7)E (real devices, 2026-11)
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet

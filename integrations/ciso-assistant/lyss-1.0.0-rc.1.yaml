@@ -1,35 +1,38 @@
 urn: urn:lyss:risk:library:lyss
 locale: en
 ref_id: LYSS
-name: "LYSS \u2014 Lyaazale Switch Security (draft 0.8.1)"
-description: 'LYSS (Lyaazale Switch Security) specification 0.8.1-draft (draft): vendor-neutral
-  security controls for managed network switches, in three cumulative conformance
-  levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is one control (LYSS-<DOMAIN>-<NNN>);
-  its annotation gives the rationale, vendor-neutral test procedure and informative
-  references. A device is LYSS Level N conformant when every control of levels 1 to
-  N is met or not applicable. DRAFT: controls and mappings may still change before
-  LYSS 1.0, but control identifiers are stable: never renamed, renumbered or reused.
-  Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py
-  in the LYSS repository (https://github.com/lyss-project/lyss).'
+name: "LYSS \u2014 Lyaazale Switch Security (release candidate 1.0.0-rc.1)"
+description: 'LYSS (Lyaazale Switch Security) specification 1.0.0-rc.1 (release candidate):
+  vendor-neutral security controls for managed network switches, in three cumulative
+  conformance levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is one
+  control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, vendor-neutral
+  test procedure and informative references. A device is LYSS Level N conformant when
+  every control of levels 1 to N is met or not applicable. RELEASE CANDIDATE: the
+  text proposed for LYSS 1.0.0, open for public review; controls and test procedures
+  may still change before 1.0.0, but control identifiers are stable: never renamed,
+  renumbered or reused. Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml
+  by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss).'
 copyright: "LYSS specification \xA9 2026 Mouad Lyaazale, CC BY 4.0"
-version: 4
-publication_date: 2026-11-12
+version: 5
+publication_date: 2026-11-13
 provider: Mouad Lyaazale
 packager: LYSS project
 objects:
   framework:
     urn: urn:lyss:risk:framework:lyss
     ref_id: LYSS
-    name: "LYSS \u2014 Lyaazale Switch Security (draft 0.8.1)"
-    description: 'LYSS (Lyaazale Switch Security) specification 0.8.1-draft (draft):
-      vendor-neutral security controls for managed network switches, in three cumulative
-      conformance levels (1 Baseline, 2 Hardened, 3 Advanced). Each requirement is
-      one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, vendor-neutral
-      test procedure and informative references. A device is LYSS Level N conformant
-      when every control of levels 1 to N is met or not applicable. DRAFT: controls
-      and mappings may still change before LYSS 1.0, but control identifiers are stable:
-      never renamed, renumbered or reused. Author: Mouad Lyaazale. Generated from
-      spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss).'
+    name: "LYSS \u2014 Lyaazale Switch Security (release candidate 1.0.0-rc.1)"
+    description: 'LYSS (Lyaazale Switch Security) specification 1.0.0-rc.1 (release
+      candidate): vendor-neutral security controls for managed network switches, in
+      three cumulative conformance levels (1 Baseline, 2 Hardened, 3 Advanced). Each
+      requirement is one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale,
+      vendor-neutral test procedure and informative references. A device is LYSS Level
+      N conformant when every control of levels 1 to N is met or not applicable. RELEASE
+      CANDIDATE: the text proposed for LYSS 1.0.0, open for public review; controls
+      and test procedures may still change before 1.0.0, but control identifiers are
+      stable: never renamed, renumbered or reused. Author: Mouad Lyaazale. Generated
+      from spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository
+      (https://github.com/lyss-project/lyss).'
     implementation_groups_definition:
     - ref_id: L1
       name: Level 1 - Baseline

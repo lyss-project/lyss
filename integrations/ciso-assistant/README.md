@@ -15,9 +15,10 @@ Both are generated from `spec/lyss-spec.yaml`; do not edit them by hand.
 version 1, specification 0.7.0-draft) were merged into CISO Assistant on 2026-11-09
 ([intuitem/ciso-assistant-community#5246](https://github.com/intuitem/ciso-assistant-community/pull/5246)).
 From CISO Assistant v4.2.3, load them from the built-in libraries store
-(search "LYSS"); the manual import below is only needed for older versions or newer LYSS drafts.
-The files in this folder are library version 4 (specification 0.8.1-draft, wording only), an
-update of the merged version 1; CISO Assistant itself still ships version 1.
+(search "LYSS"); the manual import below is only needed for older versions or newer LYSS versions.
+The files in this folder are library version 5 (specification 1.0.0-rc.1, the 1.0 release
+candidate; same requirements as version 4), an update of the merged version 1; CISO Assistant
+itself still ships version 1.
 
 ## Import into CISO Assistant (v4.x)
 

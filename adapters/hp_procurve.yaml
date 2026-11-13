@@ -6,7 +6,7 @@
 # "spanning-tree 1-24 bpdu-protection"): edge-port rules use uplink_lists / require_lists.
 # Credentials only appear in the config when "include-credentials" is enabled.
 adapter: hp_procurve
-spec_version: "0.8.1-draft"
+spec_version: "1.0.0-rc.1"
 platform: HP ProCurve / HPE Aruba AOS-S
 status: preview, validated on the LYSS simulator and synthetic AOS-S 16.10 / 16.11 outputs (no real device yet)
 support: preview          # stable: Level 1-2 verified on the vendor's own software; preview: not yet

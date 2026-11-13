@@ -2,7 +2,7 @@
 
 # LYSS Specification: security controls for network switches
 
-**Version 0.8.1-draft** · Status: draft · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
+**Version 1.0.0-rc.1** · Status: release candidate · Licence: [CC BY 4.0](../LICENSE-SPEC) · Author: Mouad Lyaazale
 
 ## 1. Scope
 
@@ -60,7 +60,7 @@ aside, is `pass` or `not_applicable`. An `unknown` verdict is not a pass. A conf
 state the device,
 the specification version, the assessment date and the tool and version used, for example:
 
-> core-sw-01 is LYSS Level 1 conformant (specification 0.8.1-draft), assessed 2026-11-11 with LYSS 0.19.
+> core-sw-01 is LYSS Level 1 conformant (specification 1.0.0-rc.1), assessed 2026-11-11 with LYSS 0.20.
 
 A claim is valid for the configuration and firmware assessed; any change requires a new assessment.
 
@@ -404,8 +404,10 @@ A control added to an existing level within a MAJOR version is always advisory (
 (newly published vulnerabilities aside: LYSS-VULN-001 follows the vulnerability data, not the version).
 
 Control identifiers are never reused, renamed or renumbered. A withdrawn control keeps its identifier, marked withdrawn.
-While the version is below 1.0.0 the specification is a draft and MAY change without a MAJOR increment;
-every change is listed in the changelog (see docs/VERSIONING.md).
+Versions below 1.0.0 were drafts and could change without a MAJOR increment. A release candidate
+(1.0.0-rc.N) is the text proposed for 1.0.0, open for public review (docs/REVIEW-1.0.md): it MAY still
+change; each change gives a new release-candidate number and is listed in the changelog (see
+docs/VERSIONING.md).
 
 ## 9. References (informative)
 

@@ -2,8 +2,8 @@
 # This file is the normative source: docs/LYSS-Specification.md is generated from it
 # (python tools/build_spec.py). It says WHAT must be true; HOW to check it on each platform
 # lives in adapters/. Licensed CC BY 4.0 (see LICENSE-SPEC).
-spec_version: "0.8.1-draft"
-status: draft
+spec_version: "1.0.0-rc.1"
+status: release candidate
 levels:
   1: Baseline
   2: Hardened

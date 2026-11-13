@@ -14,7 +14,7 @@
 # Where an output format is not certain, the rules only decide on an explicit match, so a format
 # that differs gives "unknown", never a wrong pass.
 adapter: aruba_aoscx
-spec_version: "0.8.1-draft"
+spec_version: "1.0.0-rc.1"
 platform: HPE Aruba Networking AOS-CX
 status: stable, collection and Level 1-3 output formats checked on the AOS-CX 10.17 simulator (2026-11), not yet on a physical switch; ARP inspection from the documentation
 support: stable          # stable: Level 1-2 verified on the vendor's own software; preview: not yet

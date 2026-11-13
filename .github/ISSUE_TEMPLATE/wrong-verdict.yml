@@ -55,4 +55,4 @@ body:
     attributes:
       label: LYSS version
       description: Shown in the footer of the web interface.
-      placeholder: 0.19.1
+      placeholder: 0.20.0

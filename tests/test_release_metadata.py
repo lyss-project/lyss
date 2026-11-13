@@ -21,7 +21,7 @@ def test_pyproject_and_package_versions_agree():
 
 def test_readme_status_states_the_current_versions():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    status = re.search(r"Status: \*\*(\d+\.\d+), draft specification (\d+\.\d+)", readme)
+    status = re.search(r"Status: \*\*(\d+\.\d+), (?:draft )?specification (\d+\.\d+)", readme)
     assert status, "README status line not found"
     assert status.group(1) == ".".join(__version__.split(".")[:2])
     assert status.group(2) == ".".join(load_spec()["spec_version"].split(".")[:2])

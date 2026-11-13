@@ -79,6 +79,7 @@ LIBRARY_VERSIONS = {
     "0.7.1-draft": 2,
     "0.8.0-draft": 3,
     "0.8.1-draft": 4,
+    "1.0.0-rc.1": 5,
 }
 
 
@@ -146,14 +147,32 @@ DRAFT_NOTE = ("DRAFT: controls and mappings may still change before LYSS 1.0, bu
               "are stable: never renamed, renumbered or reused. ")
 
 
+RC_NOTE = ("RELEASE CANDIDATE: the text proposed for LYSS 1.0.0, open for public review; controls and test "
+           "procedures may still change before 1.0.0, but control identifiers are stable: never renamed, "
+           "renumbered or reused. ")
+
+
 def spec_is_draft(spec: dict) -> bool:
     return "draft" in str(spec.get("spec_version", "")) or spec.get("status", "draft") == "draft"
 
 
+def spec_is_rc(spec: dict) -> bool:
+    return "-rc" in str(spec.get("spec_version", ""))
+
+
+def spec_note(spec: dict) -> str:
+    return DRAFT_NOTE if spec_is_draft(spec) else RC_NOTE if spec_is_rc(spec) else ""
+
+
 def display_name(spec: dict) -> str:
-    """Library / framework name; drafts say so in the name, visible in every list of the UI."""
+    """Library / framework name; drafts and release candidates say so in the name, visible in every
+    list of the UI."""
     number = str(spec["spec_version"]).split("-")[0]
-    return f"{NAME} (draft {number})" if spec_is_draft(spec) else f"{NAME} {number}"
+    if spec_is_draft(spec):
+        return f"{NAME} (draft {number})"
+    if spec_is_rc(spec):
+        return f"{NAME} (release candidate {spec['spec_version']})"
+    return f"{NAME} {number}"
 
 
 def library_header(ref_id: str, name: str, description: str, version: int, date) -> dict:
@@ -177,7 +196,7 @@ def build_framework_library(spec: dict, date) -> dict:
         "Each requirement is one control (LYSS-<DOMAIN>-<NNN>); its annotation gives the rationale, "
         "vendor-neutral test procedure and informative references. A device is LYSS Level N "
         "conformant when every control of levels 1 to N is met or not applicable. "
-        + (DRAFT_NOTE if spec_is_draft(spec) else "")
+        + spec_note(spec)
         + "Author: Mouad Lyaazale. Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss)."
     )
     lib = library_header("LYSS", display_name(spec), description, library_version(version), date)
@@ -243,7 +262,7 @@ def build_mapping_library(spec: dict, date) -> dict:
         "requirements give at most partial coverage of the ISO control. Non-compliant ones make it "
         "non-compliant when no other mapped LYSS requirement is compliant; if some are compliant and "
         "some are not, the ISO control is partially compliant. One direction only: an ISO control "
-        "judged compliant proves nothing about a given switch. " + (DRAFT_NOTE if spec_is_draft(spec) else "")
+        "judged compliant proves nothing about a given switch. " + spec_note(spec)
         + "Generated from spec/lyss-spec.yaml by tools/build_ciso_library.py in the LYSS repository (https://github.com/lyss-project/lyss)."
     )
     name = f"{display_name(spec).replace(NAME, 'LYSS')} -> ISO/IEC 27001:2022"

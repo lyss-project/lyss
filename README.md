@@ -31,8 +31,8 @@ LYSS defines **what** a securely managed switch looks like, once, independently 
   ARP inspection, 802.1X / MAC authentication, storm control, no CDP/LLDP towards users
   (opt-in: `lyss audit --level 3`, or Settings > Assessment).
 
-> Status: **0.19, draft specification 0.8.** The specification may still change before 1.0
-> (control IDs stay stable). Each platform is labelled **stable** or **preview** (see
+> Status: **0.20, specification 1.0 release candidate (1.0.0-rc.1).** The specification is open
+> for [public review](docs/REVIEW-1.0.md) before 1.0 and may still change (control IDs stay stable). Each platform is labelled **stable** or **preview** (see
 > [Platform support](#platform-support)). Feedback and adapters for other platforms are welcome.
 > Author: Mouad Lyaazale (معاد اليازل).
 
@@ -202,7 +202,7 @@ Deliberate exceptions go in a dated accepted-risks file. See [docs/CI.md](docs/C
 
 Before production use, read the [threat model](docs/THREAT-MODEL.md), the
 [scale figures](docs/SCALE.md) (1,008 simulated switches collected and assessed by one instance)
-and the [versioning policy](docs/VERSIONING.md) (draft specification until 1.0: pin a version).
+and the [versioning policy](docs/VERSIONING.md) (release candidate until 1.0: pin a version).
 LYSS watches itself: `/health` reports when scheduled scans have stopped, and an optional
 heartbeat URL alerts an external monitor.
 

@@ -9,8 +9,11 @@ a support agreement or a schedule: LYSS is provided without warranty (see [LICEN
 
 ## Before 1.0 (now)
 
-- **The specification is a draft** (`0.x.y-draft`). Controls can still be added, reworded,
-  re-levelled or removed, and a verdict can change between versions when a test procedure becomes
+- **The specification is a release candidate** (`1.0.0-rc.N`): the text proposed for 1.0.0, open
+  for public review ([REVIEW-1.0.md](REVIEW-1.0.md)). It can still change after review comments;
+  each change gives a new release-candidate number and is listed in the changelog.
+- **Earlier versions were drafts** (`0.x.y-draft`). Controls could be added, reworded,
+  re-levelled or removed, and a verdict could change between versions when a test procedure became
   stricter. Every change is listed in [CHANGELOG.md](../CHANGELOG.md), with the reason.
 - **Control IDs are never reused, renamed or renumbered.** A new control gets a new ID. If a control
   is removed, its ID (`LYSS-MGMT-001`, …) stays retired and the control is marked withdrawn, so an
@@ -18,8 +21,8 @@ a support agreement or a schedule: LYSS is provided without warranty (see [LICEN
   CISO Assistant audits) keep them.
 - **Every result records the specification version** it was assessed against (`spec_version`
   in each switch result, in exported reports and in JSON output). A conformance level is only
-  meaningful together with that version: "Level 2 against 0.8.1-draft".
-- **Pin a version** for a stable baseline: `pip install "lyss==0.19.1"`. Upgrade on purpose,
+  meaningful together with that version: "Level 2 against 1.0.0-rc.1".
+- **Pin a version** for a stable baseline: `pip install "lyss==0.20.0"`. Upgrade on purpose,
   read the changelog, then rescan. The history keeps the previous results for comparison.
 
 ## Planned from 1.0
@@ -62,8 +65,8 @@ incompatible ways. It does not wait for every platform to be stable; the labels 
 
 - Level 3 assessed on every platform where it applies, or reported as not applicable with the
   reason.
-- A release candidate of the specification (1.0.0-rc) published for public review; comments from
-  people other than its author answered.
+- A release candidate of the specification published for public review (1.0.0-rc.1); comments
+  from people other than its author answered.
 - No change to the controls or their test procedures for about four weeks after the release
   candidate (one full release cycle).
 - Scale figures published ([docs/SCALE.md](SCALE.md)) and a threat model for the tool
