@@ -433,7 +433,7 @@ def test_hand_made_file_with_unindented_block_commands_is_refused(tmp_path, caps
                              "line vty 0 4\n access-class MGMT in\nexec-timeout 0 0")])
     (tmp_path / "crafted.cfg").write_text(config, encoding="utf-8")
     assert main(["audit", "--vendor", "cisco_ios", str(tmp_path)]) == 2
-    assert "not indented" in capsys.readouterr().err
+    assert "not as the switch prints it" in capsys.readouterr().err
     (tmp_path / "crafted.cfg").write_text(_ios_hardened(), encoding="utf-8")   # device output: accepted
     assert main(["audit", "--vendor", "cisco_ios", str(tmp_path)]) == 0
 

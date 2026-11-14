@@ -45,15 +45,22 @@ def version() -> str:
 
 
 def text_files(dest: Path):
+    """Every file that is text, whatever its suffix (device state captures, RouterOS exports, sample
+    logs and XML carry names and addresses too); files that are not UTF-8 text are binaries."""
     for path in dest.rglob("*"):
-        if path.is_file() and ".git" not in path.parts and path.suffix.lower() in TEXT_SUFFIXES:
-            yield path, path.read_text(encoding="utf-8", errors="replace")
+        if path.is_file() and ".git" not in path.parts:
+            try:
+                yield path, path.read_bytes().decode("utf-8")
+            except UnicodeDecodeError:
+                if path.suffix.lower() in TEXT_SUFFIXES:
+                    yield path, path.read_text(encoding="utf-8", errors="replace")
 
 
 def scan(dest: Path, terms: list[re.Pattern]) -> list[str]:
     problems = []
     for path, text in text_files(dest):
         rel = path.relative_to(dest).as_posix()
+        problems += [f"{rel}: internal term /{term.pattern}/ in the file name" for term in terms if term.search(rel)]
         for n, line in enumerate(text.splitlines(), 1):
             for term in terms:
                 if term.search(line):

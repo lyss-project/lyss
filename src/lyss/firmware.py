@@ -25,7 +25,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from . import collector, inventory
+from . import collector, inventory, locks
 
 IMAGE_NAME = re.compile(r"^c1000-universalk9-tar\.(\d{3})-(\d+)\.(E\d+[a-z]?)\.tar\Z")
 MODELS = re.compile(r"^(NAL-)?C1000(FE)?-")
@@ -163,12 +163,16 @@ def stage(device: dict, image: dict, jump, step) -> dict:
         if not re.search(r"(?m)^aaa new-model", config) or not re.search(r"(?m)^aaa authorization exec ", config):
             raise RuntimeError("the switch SCP server needs 'aaa new-model' and 'aaa authorization exec': "
                                "LYSS does not change authentication, configure it first or copy the image manually")
+        # an SCP server the administrator enabled (backup tools) is left as it is afterwards
+        had_scp = bool(re.search(r"(?m)^ip scp server enable\s*$", config))
         step("saving the configuration (write memory)")
         s.save()
-        step("temporary SCP server on")
-        done = s.configure(["ip scp server enable"])
-        if any(collector.CLI_ERROR.search(o) for _, o in done):
-            raise RuntimeError("the switch refused 'ip scp server enable'")
+        step("SCP server already on" if had_scp else "temporary SCP server on")
+        if not had_scp:
+            done = s.configure(["ip scp server enable"])
+            if any(collector.CLI_ERROR.search(o) for _, o in done):
+                raise RuntimeError("the switch refused 'ip scp server enable'")
+        staged = False
         try:
             step("copying the image to flash")
             scp_put(s.transport, local, f"flash:/{name}", step)
@@ -184,10 +188,17 @@ def stage(device: dict, image: dict, jump, step) -> dict:
                 raise RuntimeError("the new image is not in flash after installation")
             step("removing the copied tar")
             s.conn.send_command_timing(f"delete /force flash:/{name}", read_timeout=120)
+            staged = True
         finally:
-            step("temporary SCP server off")
-            s.configure(["no ip scp server enable"])
-            s.save()
+            if not had_scp:
+                step("temporary SCP server off")
+                try:
+                    s.configure(["no ip scp server enable"])
+                    s.save()
+                except Exception:
+                    if staged:      # otherwise the staging error is the one to report
+                        raise RuntimeError("the image is staged, but the temporary SCP server could not be "
+                                           "turned off: remove 'ip scp server enable' on the switch")
         boot_after = _boot_path(s.run("show boot", 60))
         if boot_after != boot_before:
             raise RuntimeError(f"the boot variable changed unexpectedly ({boot_before} -> {boot_after})")
@@ -287,14 +298,15 @@ def start(action: str, device_id: str, image_name: str = "") -> str | None:
     if previous:   # staging and activation save the running configuration
         raise ValueError("the last change on this switch may be incomplete (" + previous[:120]
                          + "): check the switch and run a scan first")
-    sj = scan.current_job()
-    remediation_busy = remediate.running()   # before taking our lock: remediate.start does the reverse
-    with _lock:
-        if (_job and not _job["finished"]) or remediation_busy or (sj and not sj["finished"]):
-            return None
-        _job = {"id": uuid.uuid4().hex[:8], "action": action, "device": device_id, "status": "running",
-                "message": "", "outcome": "", "started": time.time(), "finished": None}
-        job_id = _job["id"]
+    with locks.job_start:                    # check and registration in one step, for the three kinds of job
+        sj = scan.current_job()
+        remediation_busy = remediate.running()   # before taking our lock: remediate.start does the reverse
+        with _lock:
+            if (_job and not _job["finished"]) or remediation_busy or (sj and not sj["finished"]):
+                return None
+            _job = {"id": uuid.uuid4().hex[:8], "action": action, "device": device_id, "status": "running",
+                    "message": "", "outcome": "", "started": time.time(), "finished": None}
+            job_id = _job["id"]
 
     def step(message):
         with _lock:

@@ -10,7 +10,7 @@ import uuid
 from dataclasses import asdict
 from datetime import datetime
 
-from . import collector, discovery, health, history, inventory, notify, reachability, sealed
+from . import collector, discovery, health, history, inventory, locks, notify, reachability, sealed
 from .config import parse
 from .engine import audit, conformance, extract_facts, load_adapter, load_spec
 
@@ -66,19 +66,20 @@ def start(device_ids: list[str], trigger: str = "manual") -> str | None:
         raise ValueError(f"unknown trigger {trigger}")
     devices = [d for d in inventory.load_devices() if d["id"] in device_ids]
     from . import firmware, remediate  # late import: both import scan
-    if remediate.running() or firmware.running():
-        return None  # never collect while fixes or a firmware upgrade are in progress
-    with _lock:
-        if _job and not _job["finished"]:
-            return None
-        _job = {
-            "id": uuid.uuid4().hex[:8],
-            "trigger": trigger,
-            "started": time.time(),
-            "finished": None,
-            "items": {d["id"]: {"status": "queued", "message": ""} for d in devices},
-        }
-        job_id = _job["id"]
+    with locks.job_start:   # check and registration in one step, for the three kinds of job
+        if remediate.running() or firmware.running():
+            return None  # never collect while fixes or a firmware upgrade are in progress
+        with _lock:
+            if _job and not _job["finished"]:
+                return None
+            _job = {
+                "id": uuid.uuid4().hex[:8],
+                "trigger": trigger,
+                "started": time.time(),
+                "finished": None,
+                "items": {d["id"]: {"status": "queued", "message": ""} for d in devices},
+            }
+            job_id = _job["id"]
 
     def update(device_id, status, message):
         with _lock:

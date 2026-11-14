@@ -112,7 +112,11 @@ async def _security(request: Request, call_next):
         size = request.headers.get("content-length", "")
         limit = (firmware.MAX_IMAGE + MAX_BODY if request.url.path == "/firmware/upload"
                  else 16 * MAX_BODY if request.url.path == "/reachability/import" else MAX_BODY)
-        if size and (not size.isdigit() or int(size) > limit):
+        # a declared length is required: a chunked body has none and would be parsed (and file
+        # parts spooled to disk) without any limit, even on the public /login and /setup
+        if not size or "transfer-encoding" in request.headers:
+            return PlainTextResponse("Content-Length required", status_code=411)
+        if not size.isdigit() or int(size) > limit:
             return PlainTextResponse("Request too large", status_code=413)
         if request.url.path not in PUBLIC_POSTS and not _valid_session(request.cookies.get(SESSION_COOKIE, "")):
             # refused before the body is read: no upload is spooled to disk without a session
@@ -178,8 +182,8 @@ def _vendors() -> list[str]:
 
 def _unc(path: str) -> bool:
     """A Windows network path: merely checking it would open an SMB connection (and send NTLM)."""
-    p = (path or "").strip()
-    return p.startswith("\\\\") or p.startswith("//")
+    # Windows accepts any mix of the two slashes ("\/server/share", "/\server\share")
+    return (path or "").strip().replace("/", "\\").startswith("\\\\")
 
 
 # ---------------- login ----------------
@@ -434,6 +438,10 @@ def update_device(request: Request, device_id: str, csrf: str = Form(""), host: 
     errors = inventory.validate_device(data, _vendors()) if data["port"].isdigit() else ["SSH port: 1-65535."]
     if not profile and not password and not old.get("secret"):
         errors.append("Password: required when not using a credential profile.")
+    elif not profile and not password and (data["host"], str(data["port"]), data["username"]) != (
+            old.get("host"), str(old.get("port")), old.get("username")):
+        # the stored password is only ever sent to the address it was saved for
+        errors.append("Password: enter it again when the address, port or username changes.")
     if errors:
         return _device_form(request, session, data, editing=True, status=400, errors=errors)
     inventory.save_device(data, password or None, original_id=device_id)
@@ -589,12 +597,21 @@ def save_schedule(request: Request, csrf: str = Form(""), enabled: str | None = 
     return _settings_page(request, session, saved=f"Scheduled scans {state}. They run while LYSS is open.")
 
 
-def _save_integration(key: str, values: dict, secret: str) -> None:
+def _save_integration(key: str, values: dict, secret: str, destination: tuple = ()) -> bool:
+    """Save an integration. An empty secret keeps the stored one, but only while the destination
+    fields are unchanged: otherwise a stolen session could point the integration at its own server
+    and have LYSS send the stored secret there. Returns False when the stored secret was dropped."""
     settings = inventory.load_settings()
     old = settings.get(key, {})
-    values["secret"] = vault.protect(secret) if secret else old.get("secret", "")
+    same = all(old.get(f) == values.get(f) for f in destination)
+    kept = bool(secret) or same or not old.get("secret")
+    values["secret"] = vault.protect(secret) if secret else (old.get("secret", "") if same else "")
     settings[key] = values
     inventory.save_settings(settings)
+    return kept
+
+
+REENTER = " The destination changed: the stored password or token was removed, enter it again."
 
 
 @app.post("/settings/smtp")
@@ -614,10 +631,11 @@ def save_smtp(request: Request, csrf: str = Form(""), enabled: str | None = Form
         errors.append("E-mail: invalid option.")
     if errors:
         return _settings_page(request, session, status=400, errors=errors)
-    _save_integration("smtp", {"enabled": enabled == "on", "host": host.strip(), "port": int(port or 587),
-                               "security": security, "username": username.strip(), "sender": sender.strip(),
-                               "recipients": rcpt, "mode": mode}, password)
-    return _settings_page(request, session, saved="E-mail alerts saved.")
+    kept = _save_integration("smtp", {"enabled": enabled == "on", "host": host.strip(), "port": int(port or 587),
+                                      "security": security, "username": username.strip(), "sender": sender.strip(),
+                                      "recipients": rcpt, "mode": mode}, password,
+                             destination=("host", "port", "security", "username"))
+    return _settings_page(request, session, saved="E-mail alerts saved." + ("" if kept else REENTER))
 
 
 @app.post("/settings/smtp/test")
@@ -647,10 +665,10 @@ def save_ciso(request: Request, csrf: str = Form(""), enabled: str | None = Form
         errors.append("CISO Assistant: evidence id is required (copy it from the evidence URL).")
     if errors:
         return _settings_page(request, session, status=400, errors=errors)
-    _save_integration("ciso", {"enabled": enabled == "on", "url": url.strip().rstrip("/"),
-                               "evidence_id": evidence_id.strip(), "verify_tls": verify_tls == "on",
-                               "auto_push": auto_push == "on"}, token)
-    return _settings_page(request, session, saved="CISO Assistant settings saved.")
+    kept = _save_integration("ciso", {"enabled": enabled == "on", "url": url.strip().rstrip("/"),
+                                      "evidence_id": evidence_id.strip(), "verify_tls": verify_tls == "on",
+                                      "auto_push": auto_push == "on"}, token, destination=("url", "verify_tls"))
+    return _settings_page(request, session, saved="CISO Assistant settings saved." + ("" if kept else REENTER))
 
 
 @app.post("/settings/ciso/test")
@@ -683,6 +701,12 @@ def save_siem(request: Request, csrf: str = Form(""), enabled: str | None = Form
         errors.append("SIEM: invalid option.")
     if file and (_unc(file) or not (Path(file).is_absolute() and Path(file).suffix.lower() in (".jsonl", ".json", ".log"))):
         errors.append("SIEM: the events file must be a local absolute path ending in .jsonl, .json or .log.")
+    elif file and Path(os.path.abspath(file)).is_relative_to(Path(os.path.abspath(inventory.PRIVATE))) and not (
+            Path(os.path.abspath(file)).parent == Path(os.path.abspath(inventory.PRIVATE))
+            and Path(file).name.lower().startswith("lyss-events")):
+        # appending events to settings.json or devices.json would break every page
+        errors.append("SIEM: inside the LYSS data folder, the events file must be named lyss-events*.jsonl "
+                      "(in the folder itself).")
     if enabled == "on" and not (host or file):
         errors.append("SIEM: give a syslog server, an events file, or both.")
     if errors:
@@ -726,11 +750,12 @@ def save_changes(request: Request, csrf: str = Form(""), enabled: str | None = F
     if errors:
         return _settings_page(request, session, status=400, errors=errors)
     old = inventory.load_settings().get("change_watch", {})
-    _save_integration("change_watch", {"enabled": enabled == "on", "url": url.strip().rstrip("/"),
-                                       "username": username.strip(), "interval_minutes": int(interval),
-                                       "verify_tls": verify_tls == "on",
-                                       "last_checked": old.get("last_checked")}, password)
-    return _settings_page(request, session, saved="Rescan on change saved.")
+    kept = _save_integration("change_watch", {"enabled": enabled == "on", "url": url.strip().rstrip("/"),
+                                              "username": username.strip(), "interval_minutes": int(interval),
+                                              "verify_tls": verify_tls == "on",
+                                              "last_checked": old.get("last_checked")}, password,
+                             destination=("url", "username", "verify_tls"))
+    return _settings_page(request, session, saved="Rescan on change saved." + ("" if kept else REENTER))
 
 
 @app.post("/settings/changes/test")

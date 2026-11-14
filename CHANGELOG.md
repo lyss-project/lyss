@@ -2,6 +2,54 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.20.1 (2026-11-14)
+
+Security review of the whole tool (web interface, collector, offline audit and CI). No change to the
+specification (1.0.0-rc.1), to control identifiers or to the CISO Assistant library. Upgrade
+recommended, above all if you assess Huawei configurations or use LYSS as a CI gate.
+
+Secrets in reports:
+- **Huawei SNMP communities were not redacted** ("snmp-agent community read|write [cipher] X": the
+  access right was redacted instead of the community). They appeared in evidence, JSON, SARIF and
+  summaries. If you published such a report, change the community.
+- More formats redacted: Huawei "authentication-mode" / "privacy-mode" keys, Junos
+  "plain-text-password-value" and "ascii-text" keys, passwords inside URLs, RouterOS
+  "trap-community=", SONiC community, CAK and hash fields. The "public"/"private" exception now
+  applies to that value only, not to the whole line.
+
+CI gate (a pull request could make a weak configuration pass):
+- A banner whose text contains its own delimiter is refused: the switch ends it at the first
+  delimiter, LYSS read on, and configuration lines could hide in between. A banner that never ends
+  is now refused on every platform, not only Cisco and Arista.
+- `--skip-unrecognised` no longer skips a file that matches two platforms; skipped files are listed
+  in the summary.
+- `--require-level N` now assesses up to Level N (before, `--level 2 --require-level 3` passed
+  without assessing Level 3).
+
+Hostile input (a crafted file, or a compromised switch):
+- Slow regular expressions fixed (neighbour details, RouterOS and Zyxel state rules, locating
+  evidence lines for SARIF): a crafted line could keep LYSS or a CI job busy for minutes or hours.
+- Output read from a switch is capped at 20 MB on every platform (it was only on Cisco Small Business).
+- Terminal escape sequences are removed from evidence and error messages.
+- Deeply nested JSON and odd accepted-risk values give an error message instead of a traceback.
+
+Web interface:
+- A stored password or token is removed when its destination changes (SMTP server, CISO Assistant or
+  Wazuh URL, a switch's address, port or user name): with a stolen session, LYSS could be made to
+  send it to another server. Enter it again after such a change.
+- Requests without a declared length are refused (an unauthenticated client could fill the disk).
+- Network paths written with mixed slashes are refused; a site range that cannot be read back is
+  refused when saved; the SIEM events file cannot be one of LYSS's own data files.
+
+Collection, remediation, firmware:
+- A switch marked "through the jump host" is never contacted directly when no jump host is configured.
+- Remediation: if the configuration cannot be saved after the fixes, they are rolled back.
+- Firmware staging leaves an SCP server that was already enabled as it found it.
+- A scan, a remediation and a firmware job cannot start in the same instant.
+
+Known limits are listed in docs/THREAT-MODEL.md (prompt imitation by a neighbour, cookies shared
+between local ports, login lock in remote mode, forged syslog triggering rescans).
+
 ## 0.20.0 (2026-11-13)
 
 Specification **1.0.0-rc.1**: the release candidate of LYSS 1.0, open for public review

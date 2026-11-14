@@ -21,14 +21,14 @@ tested_on: synthetic
 
 facts:
   model:
-    - {section: show version, line: '(?i)Model Name\s*:?\s*(GS1900-\S+(?: v\d)?)'}
-    - {section: config, line: '(?i)Model Name\s*:?\s*(GS1900-\S+(?: v\d)?)'}
-    - {section: show version, line: 'Firmware Version\s*:?\s*V?\d+\.\d+\(([A-Z]{4})\.\d+\)', format: 'GS1900 firmware code {0}'}
-    - {section: config, line: 'Firmware Version\s*:?\s*V?\d+\.\d+\(([A-Z]{4})\.\d+\)', format: 'GS1900 firmware code {0}'}
+    - {section: show version, line: '(?i)Model Name[ \t]*(?::[ \t]*)?(GS1900-\S+(?: v\d)?)'}
+    - {section: config, line: '(?i)Model Name[ \t]*(?::[ \t]*)?(GS1900-\S+(?: v\d)?)'}
+    - {section: show version, line: 'Firmware Version[ \t]*(?::[ \t]*)?V?\d+\.\d+\(([A-Z]{4})\.\d+\)', format: 'GS1900 firmware code {0}'}
+    - {section: config, line: 'Firmware Version[ \t]*(?::[ \t]*)?V?\d+\.\d+\(([A-Z]{4})\.\d+\)', format: 'GS1900 firmware code {0}'}
   version:
     # "V2.90(AAHK.1)C0" -> 2.90(AAHK.1): the "C0" suffix is not part of the comparison
-    - {section: show version, line: 'Firmware Version\s*:?\s*V?(\d+\.\d+\([A-Z]{4}\.\d+\))'}
-    - {section: config, line: 'Firmware Version\s*:?\s*V?(\d+\.\d+\([A-Z]{4}\.\d+\))'}
+    - {section: show version, line: 'Firmware Version[ \t]*(?::[ \t]*)?V?(\d+\.\d+\([A-Z]{4}\.\d+\))'}
+    - {section: config, line: 'Firmware Version[ \t]*(?::[ \t]*)?V?(\d+\.\d+\([A-Z]{4}\.\d+\))'}
 
 checks:
 

@@ -72,17 +72,38 @@ def accepted_count(results: list[dict]) -> int:
 def locate(text: str, evidence: list[str]) -> int | None:
     """Line number (1-based) of the first evidence line found in the configuration file. Evidence is
     "line", "block header / line" or a sentence; redacted parts ("<redacted>") match anything."""
-    lines = [l.strip() for l in text.splitlines()]
+    lines = [l[:MAX_LOCATE_LINE].strip() for l in text.splitlines()]
     for item in evidence:
         part = item.rsplit(" / ", 1)[-1].strip()
         if not part:
             continue
-        pieces = [re.escape(p) for p in part.split("<redacted>")]
-        pattern = re.compile("^" + ".*".join(pieces) + "$")
+        pieces = part.split("<redacted>")
         for n, line in enumerate(lines, 1):
-            if line and pattern.match(line):
+            if line and _matches(line, pieces):
                 return n
     return None
+
+
+MAX_LOCATE_LINE = 4096
+
+
+def _matches(line: str, pieces: list[str]) -> bool:
+    """line == pieces joined by "anything", in linear time (a regular expression with one ".*" per
+    redacted value backtracks polynomially on a crafted line: the job would never finish)."""
+    if len(pieces) == 1:
+        return line == pieces[0]
+    if not line.startswith(pieces[0]) or len(line) < len(pieces[0]) + len(pieces[-1]):
+        return False
+    end = len(line) - len(pieces[-1])
+    if not line.endswith(pieces[-1]):
+        return False
+    pos = len(pieces[0])
+    for piece in pieces[1:-1]:
+        pos = line.find(piece, pos, end)
+        if pos < 0:
+            return False
+        pos += len(piece)
+    return pos <= end
 
 
 SEVERITY = {1: ("error", "8.0", "critical"), 2: ("warning", "5.0", "major"), 3: ("note", "3.0", "minor")}

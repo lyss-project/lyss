@@ -93,6 +93,15 @@ COMMENT_PREFIXES = ("!", "#", ";")
 _LINE_BREAKS = re.compile(r"[\x00-\x1f\x7f\x85  ]")   # everything str.splitlines() splits on, and more
 
 
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def printable(text) -> str:
+    """Text that is safe to print: control characters (terminal escape sequences sent by a switch
+    or written in a configuration file) become "?". Tabs and line breaks are kept."""
+    return _CONTROL.sub("?", str(text))
+
+
 def _one_line(value) -> str:
     """JSON text kept on one line: a table, key or field name with a line break could otherwise
     inject configuration lines (e.g. a fake "AAA|authentication" table)."""
@@ -299,14 +308,27 @@ MACRO_START = re.compile(r"^macro name \S+\s*$")
 BANNER_TEXT = "banner-text "
 
 
-def _text_blocks(lines: list[str]) -> tuple[list[str], bool]:
+def _ambiguous_end(text: str, delim: str) -> bool:
+    """True when the delimiter also appears before the end of a banner line. The device that printed
+    the text and the device that loads the file can then disagree on where the banner ends (IOS
+    reads a typed or loaded banner up to the FIRST delimiter character; for "^C" that character
+    is "^"): lines after it could be configuration for one and banner text for the other."""
+    mark = "^" if delim == "^C" else delim
+    body = text[:-len(delim)] if text.endswith(delim) else text
+    return mark in body
+
+
+def _text_blocks(lines: list[str], report: list | None = None) -> tuple[list[str], bool]:
     """(lines with free-text bodies marked, True if a body is still open at the end). Each body line
     says which banner it belongs to ("banner-text login ...", "banner-text exec ..."): only a banner
-    shown before login may satisfy the warning-banner control."""
+    shown before login may satisfy the warning-banner control. report, when given, receives the
+    banner lines whose end is ambiguous (see _ambiguous_end)."""
     out, delim, kind = [], None, ""
     for raw in lines:
         s = raw.strip()
         if delim is not None:
+            if report is not None and delim not in ("EOF", "@") and _ambiguous_end(s, delim):
+                report.append(s[:80])
             # the body ends on the line that ENDS with the delimiter ("Press ^C to quit" inside
             # the text does not end it); Arista "EOF" and IOS macro "@" stand alone on their line
             end = (s == delim) if delim in ("EOF", "@") else s.endswith(delim)
@@ -324,6 +346,8 @@ def _text_blocks(lines: list[str]) -> tuple[list[str], bool]:
                 delim = "EOF"                # Arista: text lines until "EOF"
             else:
                 d = "^C" if rest.startswith("^C") else rest[0]
+                if report is not None and _ambiguous_end(rest[len(d):], d):
+                    report.append(raw.strip()[:80])
                 if not (len(rest) > len(d) and rest.endswith(d)):
                     delim = d                # the closing delimiter comes on a later line
         out.append(raw)
@@ -360,19 +384,23 @@ HEADER_ONLY = re.compile(r"^(line (con|vty|aux)\b|interface \S|radius server |ta
 def structure_problems(text: str, vendor: str) -> list[str]:
     """What a device would never print, in a hand-made file (offline audit, CI): block commands
     not indented, block headers indented, a banner or macro that never ends."""
+    if vendor == "mikrotik" or text.lstrip("﻿").lstrip().startswith("{"):
+        return []       # RouterOS exports and JSON have no banner blocks (parse() does not mark any)
     pattern = CHILD_ONLY.get(vendor)
-    if pattern is None:
-        return []
-    lines, still_open = _text_blocks([raw[:MAX_LINE] for raw in text.lstrip("﻿").splitlines()])
+    ambiguous: list[str] = []
+    lines, still_open = _text_blocks([raw[:MAX_LINE] for raw in text.lstrip("﻿").splitlines()], ambiguous)
     problems = []
     for raw in lines:
-        if raw.startswith(BANNER_TEXT):
+        if pattern is None or raw.startswith(BANNER_TEXT):
             continue
         indented = raw[:1] in (" ", "\t")
         if (not indented and pattern.match(raw.strip())) or (indented and HEADER_ONLY.match(raw.strip())):
             problems.append(raw.strip()[:80])
+    # every platform whose banners are marked: text hidden in a banner is never assessed
     if still_open:
         problems.append("a banner or macro that never ends")
+    if ambiguous:
+        problems.append(f"a banner whose text contains its own delimiter ({ambiguous[0]!r}): where it ends is ambiguous")
     return problems
 
 
@@ -384,8 +412,8 @@ def parse(text: str, state_text: str = "", vendor: str | None = None) -> Config:
     if text.lstrip().startswith("{"):
         try:
             text = flatten_json(json.loads(text))
-        except ValueError:
-            pass  # not JSON after all: parsed as text
+        except (ValueError, RecursionError):
+            pass  # not JSON after all (or nested beyond any real configuration): parsed as text
     elif vendor in (None, "mikrotik") and re.search(r"(?m)^/[a-z]", text):
         text = routeros_terse(text)
     elif vendor == "juniper_junos":

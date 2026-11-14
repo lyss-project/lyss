@@ -21,6 +21,7 @@ from pathlib import Path
 import paramiko
 
 from . import inventory, legacy_ssh, locks, sealed  # legacy_ssh: SHA-1 algorithms for old switches, opt-in per connection
+from .config import printable
 
 # Read-only commands per adapter. Nothing here may change configuration.
 COMMANDS = {
@@ -106,6 +107,9 @@ CONFIG_REFUSED = re.compile(r"(?i)^\s*%|invalid input|unrecognized command|incom
                             r"|not authori[sz]ed|insufficient privilege|access denied|cannot execute|unknown command")
 
 
+MAX_OUTPUT = 20 * 1024 * 1024   # characters kept per command: a switch cannot fill the memory
+
+
 def config_refusal(output: str) -> str | None:
     """Why a configuration command's output is not a configuration, or None. Only an empty answer or a
     short answer that starts with an error counts: a real configuration may quote such words (banners)."""
@@ -113,7 +117,7 @@ def config_refusal(output: str) -> str | None:
     if not lines:
         return "the switch returned an empty configuration"
     if len(lines) <= 5 and CONFIG_REFUSED.search(lines[0]):
-        return (f"the configuration command was refused ({lines[0][:80]}): check the account's rights "
+        return (f"the configuration command was refused ({printable(lines[0][:80])}): check the account's rights "
                 "(docs/ACCOUNTS.md); nothing was assessed")
     return None
 
@@ -337,8 +341,24 @@ class NetmikoSession:
         finally:
             os.unlink(snapshot)
         self.transport = self.conn.remote_conn.get_transport()
+        self._bound_output()
+
+    def _bound_output(self) -> None:
+        """netmiko accumulates what it reads until the prompt or the timeout, without a limit: a
+        hostile switch that never prints its prompt could fill the memory. Count what is read."""
+        self._seen = 0
+        read = self.conn.read_channel
+
+        def bounded(*args, **kwargs):
+            data = read(*args, **kwargs)
+            self._seen += len(data)
+            if self._seen > MAX_OUTPUT:
+                raise RuntimeError("output larger than 20 MB: stopped")
+            return data
+        self.conn.read_channel = bounded
 
     def run(self, command: str, timeout: int) -> str:
+        self._seen = 0
         return self.conn.send_command(command, read_timeout=timeout)
 
     # ---- remediation only (never used by collection) ----
@@ -361,7 +381,10 @@ class NetmikoSession:
         return done
 
     def save(self) -> str:
-        return self.conn.save_config()
+        out = self.conn.save_config()
+        if CLI_ERROR.search(out or ""):
+            raise RuntimeError(f"saving the configuration failed: {printable(out).strip()[-200:]}")
+        return out
 
     def close(self):
         self.conn.disconnect()
@@ -406,7 +429,7 @@ class ShellSession:
                 self.prompt = re.compile(rf"(?:^|\n)(?:{re.escape(name.group(1))}(?:\([^)\n]*\))?[#>])+ ?$")
         self.run("terminal datadump", 10)
 
-    MAX_OUTPUT = 20 * 1024 * 1024   # characters kept per command: a switch cannot fill the memory
+    MAX_OUTPUT = MAX_OUTPUT
 
     def _read_until(self, pattern: re.Pattern, timeout: float) -> str:
         buf, deadline = "", time.monotonic() + timeout
@@ -501,6 +524,11 @@ def open_session(device: dict, jump: JumpHost | None):
     cmds = COMMANDS.get(device["vendor"])
     if cmds is None:
         raise ValueError(f"no collector for platform '{device['vendor']}' yet")
+    if device.get("via_jump") and jump is None:
+        # never contact such a switch directly: the same address may be another machine here, and
+        # it would receive the credentials (first contact trusts the key it presents)
+        raise ValueError("this switch is reached through the jump host, which is not configured (Settings > Jump host)")
+
     def new_sock():
         return jump.channel(device["host"], device["port"]) if device.get("via_jump") and jump else None
     if cmds["netmiko"] == "cisco_s300":
@@ -558,7 +586,7 @@ def detect_platform(device: dict, jump: JumpHost | None) -> dict:
                                int(device.get("port") or 22)) or ""
     adapter, label = discovery.guess_platform(banner, discovery.SSH_FINGERPRINTS)
     if adapter is None:
-        raise ValueError(f"platform not recognised from SSH banner '{banner or 'none'}': choose it manually")
+        raise ValueError(f"platform not recognised from SSH banner '{printable(banner[:120]) or 'none'}': choose it manually")
     device = {**device, "vendor": adapter}
     inventory.set_vendor(device["id"], adapter)
     return device
@@ -578,11 +606,12 @@ def collect_many(devices: list[dict], jump_settings: dict, on_update, workers: i
                 # slow or busy legacy switch: one retry. Never retry authentication failures
                 # (that could lock the account).
                 if attempt == 2:
-                    on_update(device["id"], "error", f"{type(exc).__name__}: {exc}"[:300])
+                    on_update(device["id"], "error", printable(f"{type(exc).__name__}: {exc}")[:300])
                 else:
                     on_update(device["id"], "running", "retrying")
             except Exception as exc:  # report and continue with the other devices
-                on_update(device["id"], "error", f"{type(exc).__name__}: {exc}"[:300])
+                # the text may quote what the switch sent: no control character reaches a terminal
+                on_update(device["id"], "error", printable(f"{type(exc).__name__}: {exc}")[:300])
                 return
 
     try:

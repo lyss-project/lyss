@@ -18,8 +18,8 @@ facts:
   # device state first; then the comments of a saved export: Oxidized's "routeros" model keeps
   # "/system resource print" as "# version: ..." / "# board-name: ..." comments
   model:
-    - {section: /system resource print, line: '^\s*board-name: (.+?)\s*$'}
-    - {section: config comments, line: '^#\s*board-name:\s*(.+?)\s*$'}
+    - {section: /system resource print, line: '^\s*board-name: (\S(?:.*\S)?)\s*$'}
+    - {section: config comments, line: '^#\s*board-name:\s*(\S(?:.*\S)?)\s*$'}
     - {section: config comments, line: '^#\s*model\s*=\s*(\S+)'}
     - {section: config comments, line: 'by RouterOS', format: 'RouterOS'}
     - {section: config comments, line: '^#\s*installed-version:', format: 'RouterOS'}
@@ -35,7 +35,7 @@ checks:
 
   LYSS-MGMT-001:
     fail_if_any:
-      - {state: '^\s*\d+\s+(?![^=]*\bX\b)[^=]*?\bname=telnet\s', section: /ip service print terse}
+      - {state: '^\s*\d+\s(?![^=]*\bX\b)[^=]*?\bname=telnet\s', section: /ip service print terse}
       # configuration only (e.g. Oxidized): the export lists every non-default setting; a later
       # "enable" or "disabled=no" turns it back on; quoted values (comment="...") never count
       - {line: '^/ip service (enable telnet\b|set telnet(\s+[\w-]+=("[^"]*"|\S+))*\s+disabled=no\b)'}
@@ -58,7 +58,7 @@ checks:
 
   LYSS-MGMT-003:
     fail_if_any:
-      - {state: '^\s*\d+\s+(?![^=]*\bX\b)[^=]*?\bname=www\s', section: /ip service print terse}
+      - {state: '^\s*\d+\s(?![^=]*\bX\b)[^=]*?\bname=www\s', section: /ip service print terse}
       - {line: '^/ip service (enable www\b|set www(\s+[\w-]+=("[^"]*"|\S+))*\s+disabled=no\b)'}
       - {line: '^/ip service set www(\s+[\w-]+=("[^"]*"|\S+))*\s+disabled=yes\b', absent: true, say: 'HTTP (www) not disabled in the configuration (enabled by factory default)'}
     pass_if_any:
@@ -192,7 +192,7 @@ checks:
   LYSS-MGMT-010:
     fail_if_any:
       # an enabled management service open to every address (empty available-from, "address" before 7.2x)
-      - {state: '^\s*\d+\s+(?![^=]*\b[XD]\b)[^=]*?\bname=(ssh|telnet|ftp|www|www-ssl|winbox|api|api-ssl|reverse-proxy)\s.*\b(available-from|address)=(\s|$)', section: /ip service print terse}
+      - {state: '^\s*\d+\s(?![^=]*\b[XD]\b)[^=]*?\bname=(ssh|telnet|ftp|www|www-ssl|winbox|api|api-ssl|reverse-proxy)\s.*\b(available-from|address)=(\s|$)', section: /ip service print terse}
       - {state: '^\s*allowed-interface-list: all\b', section: /tool mac-server mac-winbox print}
     pass_if_any:
       - {state: '\b(available-from|address)=\S', section: /ip service print terse}
@@ -287,7 +287,7 @@ checks:
   LYSS-ACC-010:
     fail_if_any:
       # flags column: R = running, X = disabled; an Ethernet port with neither is up but unused
-      - {state: '^\s*\d+\s+(?![^=]*\b[RX]\b)[^=]*?\bname=\S+', section: /interface ethernet print terse}
+      - {state: '^\s*\d+\s(?![^=]*\b[RX]\b)[^=]*?\bname=\S+', section: /interface ethernet print terse}
     pass_if_any:
       - {state: '\bname=', section: /interface ethernet print terse}
     otherwise: unknown

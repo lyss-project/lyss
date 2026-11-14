@@ -10,6 +10,10 @@ import threading
 import time
 from pathlib import Path
 
+# Held while a scan, a remediation or a firmware job checks that no other job runs and registers
+# itself: two starts in the same instant cannot both pass the check.
+job_start = threading.Lock()
+
 _thread_locks: dict[str, threading.Lock] = {}
 _guard = threading.Lock()
 

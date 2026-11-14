@@ -19,7 +19,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from . import collector, inventory, topology
+from . import collector, inventory, sites, topology
 
 def _store():
     return inventory.PRIVATE / "discovery.json"
@@ -140,12 +140,9 @@ def parse_ranges(text: str) -> tuple[list[str], list[str]]:
         if not raw:
             continue
         try:
-            m = re.match(r"^(\d+\.\d+\.\d+\.)(\d+)-(\d+)$", raw)
-            if m:
-                lo, hi = int(m.group(2)), int(m.group(3))
-                if not 0 <= lo <= hi <= 255:
-                    raise ValueError
-                nets.append(raw)
+            ab = sites.normalise_range(raw)     # both ends checked: no leading zeros, no 300
+            if ab:
+                nets.append(ab)
             else:
                 net = ipaddress.ip_network(raw, strict=False)
                 if net.version != 4 or net.prefixlen < 20:

@@ -24,7 +24,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import PROJECT_LONG_NAME, PROJECT_NAME, __version__, ci
-from .engine import ADAPTER_DIR, audit, conformance, detect_vendor, load_spec
+from .engine import ADAPTER_DIR, audit, conformance, detect_vendor, load_spec, vendor_candidates
 
 def yaml_error():
     import yaml
@@ -123,8 +123,11 @@ def cmd_audit(args) -> int:
         except (OSError, ValueError, yaml_error()) as e:
             print(f"accepted risks: {e}", file=sys.stderr)
             return 2
+    if args.require_level and args.require_level > args.level:
+        # a gate on Level 3 must assess Level 3: otherwise "no failed control up to Level 3" is empty
+        args.level = args.require_level
     files = config_files(args.path, args.pattern, args.recursive)
-    results, problems = [], []
+    results, problems, skipped = [], [], []
     status = 0
     for path in files:
         name = path.relative_to(args.path).as_posix() if args.path.is_dir() else path.name
@@ -140,8 +143,11 @@ def cmd_audit(args) -> int:
         text = path.read_text(encoding="utf-8", errors="replace")
         vendor = detect_vendor(text) if args.vendor == "auto" else args.vendor
         if vendor is None:
-            if args.skip_unrecognised:
+            # only a file that looks like no platform at all may be skipped (a README): one that
+            # matches two platforms could be a configuration made ambiguous to leave the gate
+            if args.skip_unrecognised and not vendor_candidates(text):
                 print(f"{name}: platform not recognised, skipped", file=sys.stderr)
+                skipped.append(name)
             else:
                 print(f"{name}: platform not recognised, give it with --vendor", file=sys.stderr)
                 problems.append(f"{name}: platform not recognised")
@@ -166,9 +172,9 @@ def cmd_audit(args) -> int:
         odd = structure_problems(text, vendor)
         if odd:
             # not a configuration printed by the device: a line outside its block could hide a failure
-            print(f"{name}: not as the switch prints it, {len(odd)} block command(s) not indented "
+            print(f"{name}: not as the switch prints it, {len(odd)} problem(s) "
                   f"(e.g. {odd[0]!r}): use the device's own output", file=sys.stderr)
-            problems.append(f"{name}: block commands not indented, e.g. {odd[0]!r}")
+            problems.append(f"{name}: not as the switch prints it, e.g. {odd[0]!r}")
             status = 2
             continue
         findings = audit(text, vendor, args.level, state_text)
@@ -200,11 +206,15 @@ def cmd_audit(args) -> int:
     if args.json_file:
         args.json_file.write_text(json.dumps(document, indent=2, ensure_ascii=False), encoding="utf-8")
     if args.sarif:
-        args.sarif.write_text(json.dumps(ci.sarif(results, load_spec(), lambda r: r["file"]), indent=2,
+        from urllib.parse import quote   # a file name with "%2e", "#" or "?" stays that file's own URI
+        args.sarif.write_text(json.dumps(ci.sarif(results, load_spec(), lambda r: quote(r["file"], safe="/")), indent=2,
                                          ensure_ascii=False), encoding="utf-8")
     if args.codequality:
         args.codequality.write_text(json.dumps(ci.codequality(results, lambda r: r["file"]), indent=2,
                                                ensure_ascii=False), encoding="utf-8")
+    if skipped:   # visible in the summary: a file that left the assessment is never silent
+        problems.append(f"skipped, platform not recognised ({len(skipped)}): " + ", ".join(skipped[:20])
+                        + (" ..." if len(skipped) > 20 else ""))
     bad = ci.failing(results, args.require_level)
     if args.require_level and not results:
         problems.append("no switch configuration found")

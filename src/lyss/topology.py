@@ -75,11 +75,19 @@ EOS_INTERFACE = re.compile(r"^Interface (\S+) detected \d+ LLDP neighbors?:")
 EOS_NEIGHBOR = re.compile(r'^\s+Neighbor (\S+)/"?([^",]*)"?, age')
 EOS_FIELDS = {
     "chassis": re.compile(r"^\s+Chassis ID\s*:\s*(\S+)"),
-    "remote_port": re.compile(r'^\s+Port ID\s*:\s*"?([^"]+?)"?\s*$'),
-    "name": re.compile(r'^\s+- System Name:\s*"?([^"]+?)"?\s*$'),
-    "platform": re.compile(r'^\s+- System Description:\s*"?([^"]+?)"?\s*$'),
-    "caps": re.compile(r"^\s+Enabled Capabilities:\s*(.+?)\s*$"),
+    # the value is the rest of the line; quotes and spaces are removed in Python (_eos_value): a
+    # lazy group followed by "\s*$" takes quadratic time on a long line of spaces sent by a switch
+    "remote_port": re.compile(r"^\s+Port ID\s*:(.*)$"),
+    "name": re.compile(r"^\s+- System Name:(.*)$"),
+    "platform": re.compile(r"^\s+- System Description:(.*)$"),
+    "caps": re.compile(r"^\s+Enabled Capabilities:(.*)$"),
 }
+
+
+def _eos_value(text: str) -> str:
+    """Field value without surrounding spaces and quotes; "" when a quote remains inside."""
+    value = text.strip().removeprefix('"').removesuffix('"').strip()
+    return "" if '"' in value else value
 
 
 def parse_eos_lldp(lines: list[str]) -> list[dict]:
@@ -99,8 +107,9 @@ def parse_eos_lldp(lines: list[str]) -> list[dict]:
             continue
         for key, pattern in EOS_FIELDS.items():
             # first value only: "Port ID : 0" also appears later, under IEEE802.3 Link Aggregation
-            if (m := pattern.match(line)) and not rows[-1].get(f"_{key}"):
-                rows[-1][key] = m.group(1).strip()
+            if (m := pattern.match(line)) and not rows[-1].get(f"_{key}") and (
+                    value := m.group(1).strip() if key == "chassis" else _eos_value(m.group(1))):
+                rows[-1][key] = value
                 rows[-1][f"_{key}"] = True
         if m := re.match(r"^\s+Management Address\s*:\s*(\d{1,3}(?:\.\d{1,3}){3})\s*$", line):
             rows[-1]["ips"].append(m.group(1))
@@ -169,7 +178,7 @@ DETAIL_FIELDS = {
     "sysname": re.compile(r"^\s*(?:SysName|System Name):\s*(\S+)", re.I),
     "device_id": re.compile(r"^\s*Device[- ]ID:\s*(\S+)", re.I),
     "chassis": re.compile(r"^\s*Chassis id:\s*(\S+)", re.I),
-    "platform": re.compile(r"^\s*Platform:\s*([^,]+?)\s*(?:,|$)", re.I),
+    "platform": re.compile(r"^\s*Platform:([^,]*)", re.I),   # stripped in Python: no lazy group before "\s*"
     "caps": re.compile(r"Capabilities:\s*(.+)$", re.I),
     "version": re.compile(r"^\s*Version\s*:\s*(\S.*)$", re.I),
 }
@@ -194,7 +203,7 @@ def parse_neighbor_details(lines: list[str]) -> list[dict]:
         for i, line in enumerate(block):
             for key, pattern in DETAIL_FIELDS.items():
                 m = pattern.search(line)
-                if m and key not in rec:
+                if m and key not in rec and m.group(1).strip():
                     rec[key] = m.group(1).strip()
             m = IP_LINE.match(line)
             if m and m.group(1) not in rec["ips"]:

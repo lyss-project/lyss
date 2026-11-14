@@ -94,7 +94,7 @@ def load(path: Path, today: date | None = None) -> list[Acceptance]:
                 ([f"missing {', '.join(sorted(missing))}"] if missing else [])
                 + ([f"unknown {', '.join(sorted(map(str, extra)))}"] if extra else [])))
         control = entry["control"]
-        if control not in controls:
+        if not isinstance(control, str) or control not in controls:
             raise ValueError(f"{where}: unknown control {control!r}")
         switches = entry["switches"]
         if isinstance(switches, str):
@@ -108,7 +108,7 @@ def load(path: Path, today: date | None = None) -> list[Acceptance]:
                 expires = date.fromisoformat(expires)
             except ValueError:
                 expires = None
-        if not isinstance(expires, date):
+        if type(expires) is not date:      # a YAML date-time is not a date (and cannot be compared with one)
             raise ValueError(f"{where}: 'expires' must be a date (YYYY-MM-DD)")
         if expires > today + timedelta(days=MAX_DAYS):
             raise ValueError(f"{where}: expires {expires.isoformat()}, more than one year ahead: "

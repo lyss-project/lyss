@@ -22,7 +22,7 @@ tested_on: virtual        # AOS-CX 10.17 simulator
 
 facts:
   model:
-    - {section: show system, line: '^Product Name\s*:\s*(.+?)\s*$'}
+    - {section: show system, line: '^Product Name\s*:\s*(\S(?:.*\S)?)\s*$'}
   version:
     - {section: show version, line: '^Version\s*:\s*(\S+)'}
     - {section: config comments, line: '^!Version (?:ArubaOS-CX|AOS-CX) (\S+)'}

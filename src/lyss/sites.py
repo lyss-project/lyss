@@ -13,7 +13,19 @@ import re
 from . import inventory
 
 NAME = re.compile(r"^[^\x00-\x1f<>]{1,60}$")
-RANGE_TOKEN = re.compile(r"^(\d+\.\d+\.\d+\.)(\d+)-(\d+)$")
+RANGE_TOKEN = re.compile(r"^([0-9]+\.[0-9]+\.[0-9]+\.)([0-9]+)-([0-9]+)$")
+
+
+def normalise_range(raw: str) -> str | None:
+    """"192.0.2.10-20" checked end to end and rewritten the way ipaddress reads it; None when raw is
+    not an a-b range. ValueError when it looks like one and is not valid (leading zeros, 300, 20-10)."""
+    m = RANGE_TOKEN.match(raw)
+    if not m:
+        return None
+    first, last = ipaddress.IPv4Address(m.group(1) + m.group(2)), ipaddress.IPv4Address(m.group(1) + m.group(3))
+    if first > last:
+        raise ValueError(raw)
+    return f"{first}-{int(last) & 255}"
 
 
 def load() -> list[dict]:
@@ -35,14 +47,10 @@ def parse(text: str) -> tuple[list[str], list[str]]:
     for raw in re.split(r"[\s,;]+", text.strip()):
         if not raw:
             continue
-        m = RANGE_TOKEN.match(raw)
         try:
-            if m:
-                lo, hi = int(m.group(2)), int(m.group(3))
-                ipaddress.ip_address(m.group(1) + "0")
-                if not 0 <= lo <= hi <= 255:
-                    raise ValueError
-                nets.append(raw)
+            ab = normalise_range(raw)
+            if ab:
+                nets.append(ab)
             else:
                 net = ipaddress.ip_network(raw, strict=False)
                 if net.version != 4 or net.prefixlen < 8:
@@ -57,14 +65,17 @@ def _networks(site: dict) -> list[tuple[ipaddress.IPv4Address, ipaddress.IPv4Add
     """(first, last, specificity) for each range of a site."""
     out = []
     for r in site.get("ranges", []):
-        m = RANGE_TOKEN.match(r)
-        if m:
-            first = ipaddress.ip_address(m.group(1) + m.group(2))
-            last = ipaddress.ip_address(m.group(1) + m.group(3))
-            out.append((first, last, 32 - (int(last) - int(first)).bit_length()))
-        else:
-            net = ipaddress.ip_network(r)
-            out.append((net.network_address, net.broadcast_address, net.prefixlen))
+        try:
+            m = RANGE_TOKEN.match(r)
+            if m:
+                first = ipaddress.ip_address(m.group(1) + m.group(2))
+                last = ipaddress.ip_address(m.group(1) + m.group(3))
+                out.append((first, last, 32 - (int(last) - int(first)).bit_length()))
+            else:
+                net = ipaddress.ip_network(r)
+                out.append((net.network_address, net.broadcast_address, net.prefixlen))
+        except ValueError:
+            continue    # a range saved by an older version that cannot be read: ignored, never a 500
     return out
 
 

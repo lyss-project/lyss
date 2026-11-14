@@ -22,7 +22,7 @@ a support agreement or a schedule: LYSS is provided without warranty (see [LICEN
 - **Every result records the specification version** it was assessed against (`spec_version`
   in each switch result, in exported reports and in JSON output). A conformance level is only
   meaningful together with that version: "Level 2 against 1.0.0-rc.1".
-- **Pin a version** for a stable baseline: `pip install "lyss==0.20.0"`. Upgrade on purpose,
+- **Pin a version** for a stable baseline: `pip install "lyss==0.20.1"`. Upgrade on purpose,
   read the changelog, then rescan. The history keeps the previous results for comparison.
 
 ## Planned from 1.0

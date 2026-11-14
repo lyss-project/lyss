@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4            # in production, pin actions to a full commit SHA
         with:
           persist-credentials: false         # the audit needs no token
-      - uses: lyss-project/lyss@v0.20.0     # same here: the commit SHA of that tag
+      - uses: lyss-project/lyss@v0.20.1     # same here: the commit SHA of that tag
         with:
           path: configs
           level: "2"
@@ -38,10 +38,10 @@ control, the controls that failed and the redacted line that proves it.
 | `path` | `.` | File or folder to assess |
 | `vendor` | `auto` | Adapter name, or `auto` to recognise each file |
 | `level` | `2` | Highest level to assess (1, 2 or 3) |
-| `require-level` | (empty) | Fail the job if any control of level 1..N **fails**. Empty: report only |
+| `require-level` | (empty) | Fail the job if any control of level 1..N **fails** (levels up to N are then assessed, whatever `level` says). Empty: report only |
 | `pattern` | (empty) | File name pattern. Empty: `.cfg .conf .txt .rsc .json` |
 | `recursive` | `true` | Also look in subfolders (hidden ones, such as `.git`, are skipped) |
-| `skip-unrecognised` | `false` | Skip files whose platform is not recognised instead of failing |
+| `skip-unrecognised` | `false` | Skip files that look like no platform at all (a README) instead of failing; they are listed in the summary. A file matching two platforms is never skipped |
 | `accepted-risks` | (empty) | YAML file of accepted risks (see below). Empty: none |
 | `sarif` | `false` | `"true"` also writes the failed controls as SARIF (see "Code scanning") |
 
@@ -69,7 +69,9 @@ configuration file alone usually proves Level 0. The CI gate therefore fails on 
 The gate never vouches for a file it could hardly check. A configuration fails it as
 **not assessable** when fewer than half of its controls up to the required level could be decided.
 That happens with a firmware-only platform such as Zyxel GS1900, or a file that does not look
-like a running configuration. A file whose format matches two platforms is not guessed either:
+like a running configuration. A file is also refused when it is not as the switch prints it: block
+commands not indented, a banner that never ends, or a banner whose text contains its own delimiter
+(the switch and LYSS could disagree on where it ends, and configuration could hide in it). A file whose format matches two platforms is not guessed either:
 give its platform with `vendor`.
 
 ## Accepted risks
@@ -114,7 +116,7 @@ jobs:
         with:
           persist-credentials: false
       - id: lyss
-        uses: lyss-project/lyss@v0.20.0
+        uses: lyss-project/lyss@v0.20.1
         with:
           path: configs
           sarif: "true"
@@ -138,7 +140,7 @@ fails when a required level is not met. Outside the template: `lyss audit --code
 ## Any other CI (Jenkins, ...)
 
 ```sh
-pip install "lyss==0.20.0"
+pip install "lyss==0.20.1"
 lyss audit --recursive --level 2 --require-level 2 --summary lyss-summary.md --json-file lyss.json configs/
 ```
 
@@ -164,6 +166,12 @@ Exit codes:
 - **Files of the audited repository never run.** Every Python call of the action is isolated
   (`python -I`) and starts in the runner's temporary folder, so a pull request adding `lyss/` or
   `json.py` cannot replace LYSS's code. Symbolic links are never followed.
+- **Protect the workflow itself.** A pull or merge request can also change the workflow file or
+  rename a configuration so that it is no longer selected (another suffix, a hidden folder). Make
+  the check required from a place the request cannot edit (a GitHub ruleset or required workflow, a
+  GitLab pipeline execution policy), and review changes to file names like changes to content.
+- **Accepted risks match by name:** a pattern such as `sw-old-*` also covers a new file with such
+  a name in any folder.
 - **Pin a version.** The action runs LYSS from its own files at the ref you use, so pinning a
   tag or, better, a commit SHA pins LYSS too. The only package it installs is PyYAML, pinned by
   hash (`.github/action-requirements.txt`).

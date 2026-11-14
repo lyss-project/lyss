@@ -10,7 +10,7 @@ from pathlib import Path
 
 import yaml
 
-from .config import Config, parse
+from .config import Config, parse, printable
 
 PACKAGE_DIR = Path(__file__).resolve().parent
 _CHECKOUT = PACKAGE_DIR.parents[1]
@@ -70,9 +70,10 @@ _VALUE = rf'({_QUOTED}|[^\s"]+)'
 # type tokens before the value: "7", "level 15", "1 md5" (key id + algorithm), EOS "sha512" / "8a",
 # "ascii 0", IKEv2 "local" / "remote", AOS-CX "plaintext" / "ciphertext", Huawei "simple" /
 # "cipher" / "irreversible-cipher"
-_TYPE = r"(?:\d{1,2}|level \d+|sha512|sha\d*|md5|8a|ascii|hex|local|remote|plaintext|ciphertext|simple|irreversible-cipher|cipher)"
+_TYPE = (r"(?:\d{1,2}|level \d+|sha512|sha\d*|md5|8a|ascii-text|ascii|hexadecimal|hex|local|remote|plaintext|ciphertext|simple"
+         r"|irreversible-cipher|cipher)")
 SECRET_VALUE = re.compile(
-    r'(?i)\b(secret|password|key-string|key|sha1|sha256|plaintext|ciphertext|encrypted|passphrase|psk|pre-shared-key|wpa-psk'
+    r'(?i)\b(secret|plain-text-password-value|password|key-string|key|sha1|sha256|plaintext|ciphertext|encrypted|passphrase|psk|pre-shared-key|wpa-psk'
     r'|auth-pass|priv-pass)'
     # "Password: x", "Password : x", "password:x" in device output
     r'((?:[ \t]*:)?)'
@@ -95,8 +96,21 @@ SNMP_HOST = re.compile(r"(?i)^([+\- ]?\s*snmp-server host\s+\S+(?:\s+vrf\s+\S+)?
                        r"(?:\s+version\s+(?:1|2c|3\s+\w+))?\s+)(?!<redacted>)(?!(?:public|private|informs|traps|version|vrf)\b)(\S+)")
 # first-hop redundancy keys: "standby 1 authentication [text] X", "vrrp 1 authentication text X"
 FHRP_SECRET = re.compile(r"(?i)\b((?:standby|vrrp|glbp)\s+\d+\s+authentication(?:\s+text)?\s+)(?!<redacted>|md5\b)(\S+)")
-WEAK_COMMUNITY_OK = re.compile(r'(?i)\bcommunity(?:\s+name)?(?:[ \t]*:[ \t]*|\s+)"?(public|private)"?(\s|$)')
-COMMUNITY_VALUE = re.compile(r'(?i)\b(community(?:\s+name)?)([ \t]*:[ \t]*|\s+)("?)(?!<redacted>)[^\s"]+("?)')
+# well-known defaults stay visible (they are the finding); the exception applies to that value only,
+# never to another community on the same line
+COMMUNITY_VALUE = re.compile(r'(?i)\b(community(?:\s+name)?)([ \t]*:[ \t]*|\s+)("?)(?!<redacted>)'
+                             r'(?!(?:public|private)"?(?:\s|$))[^\s"]+("?)')
+# Huawei VRP: "snmp-agent community read|write [cipher|simple] <community> [mib-view ..] [acl ..]":
+# the word after "community" is the access right, the community comes after it
+VRP_COMMUNITY_LINE = re.compile(r"(?i)^[+\- ]?\s*snmp-agent community\b")
+VRP_COMMUNITY = re.compile(r"(?i)(\bsnmp-agent community (?:read|write)(?:\s+(?:cipher|simple))?\s+)(?!<redacted>)"
+                           r"(?!(?:public|private)(?:\s|$))(\S+)")
+# Huawei: "authentication-mode sha [cipher] X", "privacy-mode aes128 [cipher] X" (SNMPv3 users),
+# "authentication-mode md5 1 cipher X" (OSPF, IS-IS, VRRP, NTP keys)
+VRP_MODE_SECRET = re.compile(r"(?i)(\b(?:authentication-mode|privacy-mode)\s+(?:hmac-)?(?:sha\d*|md5|aes\d*|3des|des\d*|simple|plain)"
+                             r"(?:-\d+)?(?:\s+\d+)?(?:\s+(?:cipher|plain|simple))?\s+)(?!<redacted>|cipher\b|plain\b|simple\b)(\S+)")
+# credentials inside a URL: "ftp://user:password@host/..."
+URL_SECRET = re.compile(r"(://[^\s:/@]{1,64}:)(?!<redacted>)[^\s@/]{1,256}@")
 
 
 # "name=value" fields: JSON configurations flattened by config.flatten_json (SONiC: "passkey=",
@@ -105,7 +119,8 @@ COMMUNITY_VALUE = re.compile(r'(?i)\b(community(?:\s+name)?)([ \t]*:[ \t]*|\s+)(
 # a field name starts the line or follows a space, "/" or "|" (never inside a quoted base64 value
 # such as encrypted-key "QUJD==")
 FIELD = re.compile(rf'(?i)(?<![^\s/|])([\w-]{{1,64}}=)({_QUOTED}|\S*)')
-SECRET_FIELD_NAME = re.compile(r"(?i)passkey|password|secret|key|psk|passphrase|token|pre-shared")
+SECRET_FIELD_NAME = re.compile(r"(?i)passkey|password|secret|key|psk|passphrase|token|pre-shared"
+                               r"|community|passwd|pwd=|shadow|bindpw|(?:^|[_-])(?:cak|hash)=")
 # SNMP community names used as table keys ("SNMP_COMMUNITY|<name>")
 JSON_COMMUNITY = re.compile(r"(?i)(SNMP_COMMUNITY\|)(?!(?:public|private)(?:[\s/]|$))(?!<redacted>)[^\s/]+")
 # RouterOS SNMP communities ("/snmp community add name=..." and "print terse" with "security="):
@@ -130,6 +145,7 @@ def _secret(m: re.Match) -> str:
 def redact(line: str) -> str:
     if len(line) > MAX_EVIDENCE_LINE:
         line = line[:MAX_EVIDENCE_LINE] + " …(truncated)"
+    line = printable(line)   # evidence is printed in terminals and CI logs: no escape sequence survives
     line = FIELD.sub(_field, line)
     line = JSON_COMMUNITY.sub(r"\1<redacted>", line)
     if ROS_COMMUNITY_LINE.search(line):
@@ -139,9 +155,12 @@ def redact(line: str) -> str:
     line = SNMP_HOST.sub(r"\1<redacted>", line)
     line = FHRP_SECRET.sub(r"\1<redacted>", line)
     line = EOL_SECRET.sub(r"\1<redacted>", line)
+    line = VRP_MODE_SECRET.sub(r"\1<redacted>", line)
+    line = URL_SECRET.sub(r"\1<redacted>@", line)
     line = SECRET_VALUE.sub(_secret, line)
-    if not WEAK_COMMUNITY_OK.search(line):
-        # well-known defaults stay visible (they are the finding); real communities are secrets
+    if VRP_COMMUNITY_LINE.search(line):
+        line = VRP_COMMUNITY.sub(r"\1<redacted>", line)
+    else:
         line = COMMUNITY_VALUE.sub(r"\1\2\3<redacted>\4", line)
     return line
 
@@ -719,7 +738,7 @@ def load_firmware_data() -> list[dict]:
 # that one platform writes: a guess that is not sure returns None ("pick the platform").
 VENDOR_SIGNATURES = (
     # Zyxel GS1900 "show version" / System Information: model name or firmware code V2.90(AAHK.1)C0
-    ("zyxel_gs1900", re.compile(r"(?im)^[ \t]*Model Name[ \t]*:?[ \t]*GS1900-|^[ \t]*Firmware Version[ \t]*:?[ \t]*V?\d+\.\d+\([A-Z]{4}\.\d+\)")),
+    ("zyxel_gs1900", re.compile(r"(?im)^[ \t]*Model Name[ \t]*(?::[ \t]*)?GS1900-|^[ \t]*Firmware Version[ \t]*(?::[ \t]*)?V?\d+\.\d+\([A-Z]{4}\.\d+\)")),
     ("sonic", re.compile(r'\A\s*\{[\s\S]*"(?:DEVICE_METADATA|PORT|AAA|MGMT_INTERFACE)"\s*:')),
     ("mikrotik", re.compile(r"(?m)^#.*\bby RouterOS\b|^/(?:interface|ip|ipv6|system|user|snmp|tool|routing)\b")),
     ("cisco_sb", re.compile(r"(?m)^config-file-header\s*$|^v\d+\.\d+\.\d+\.\d+ / R\S+\s*$")),
@@ -736,6 +755,12 @@ VENDOR_SIGNATURES = (
     ("cisco_ios", re.compile(r"(?m)^version \d+\.\d+\s*$|^(?:no )?service (?:password-encryption|timestamps)\b"
                              r"|^line vty \d+")),
 )
+
+
+def vendor_candidates(text: str) -> list[str]:
+    """Every adapter whose signature the text carries (none: not a switch configuration)."""
+    text = text.lstrip("﻿")
+    return [vendor for vendor, signature in VENDOR_SIGNATURES if signature.search(text)]
 
 
 def detect_vendor(text: str) -> str | None:

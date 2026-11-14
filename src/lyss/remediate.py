@@ -24,7 +24,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 
-from . import collector, inventory, sealed
+from . import collector, inventory, locks, sealed
 from .config import Config, parse
 from .engine import redact
 
@@ -498,24 +498,37 @@ def apply_device(device: dict, control_ids: list[str], jump, step) -> dict:
         log_change(entry)
         return entry
     entry["stage"] = "saving"
-    session = _open(device, jump)
     try:
-        if failed:
-            step("rolling back the fixes that did not verify: " + ", ".join(f.control_id for f in failed), 85)
-            if not _send_rollback(session, failed, entry):
-                # a rejected rollback leaves an unverified change in the running configuration:
-                # saving now would make it permanent
-                entry["outcome"] = ("ROLLBACK FAILED for " + ", ".join(entry.get("rollback_rejected", []))
-                                    + ", not saved: a reboot restores the saved configuration")
-                log_change(entry)
-                return entry
-        entry["applied"] = [f.control_id for f in fixes if f not in failed]
-        if entry["applied"]:
-            step("saving the configuration", 90)
-            session.save()
-            entry["saved"] = True
-    finally:
-        session.close()
+        session = _open(device, jump)
+        try:
+            if failed:
+                step("rolling back the fixes that did not verify: " + ", ".join(f.control_id for f in failed), 85)
+                if not _send_rollback(session, failed, entry):
+                    # a rejected rollback leaves an unverified change in the running configuration:
+                    # saving now would make it permanent
+                    entry["outcome"] = ("ROLLBACK FAILED for " + ", ".join(entry.get("rollback_rejected", []))
+                                        + ", not saved: a reboot restores the saved configuration")
+                    log_change(entry)
+                    return entry
+            entry["applied"] = [f.control_id for f in fixes if f not in failed]
+            if entry["applied"]:
+                step("saving the configuration", 90)
+                session.save()
+                entry["saved"] = True
+        finally:
+            try:
+                session.close()
+            except Exception:
+                pass
+    except Exception as exc:
+        # the save connection could not be opened, or the save failed: the fixes are live but not
+        # saved. Undo them rather than leave the running and saved configurations apart.
+        left = [f for f in fixes if f.control_id not in entry["rolled_back"]]
+        ok = _rollback(device, jump, left, entry, step)
+        entry["applied"] = []
+        entry["outcome"] = (f"could not save ({redact(f'{type(exc).__name__}: {exc}')[:200]}); " + _rolled_back(ok))
+        log_change(entry)
+        return entry
     if failed:
         _collect(device, jump)
         scan.audit_device(device, "change", archive=False)
@@ -541,15 +554,16 @@ def start(selection: dict[str, list[str]]) -> str | None:
     from . import firmware, scan
     if not settings()["enabled"]:
         raise PermissionError("remediation is disabled")
-    sj = scan.current_job()
     devices = [d for d in inventory.load_devices() if d["id"] in selection and selection[d["id"]]]
-    firmware_busy = firmware.running()   # before taking our lock: firmware.start does the reverse
-    with _lock:
-        if (_job and not _job["finished"]) or (sj and not sj["finished"]) or firmware_busy:
-            return None
-        _job = {"id": uuid.uuid4().hex[:8], "started": time.time(), "finished": None, "percent": 0,
-                "items": {d["id"]: {"status": "queued", "message": "", "outcome": "", "percent": 0} for d in devices}}
-        job_id = _job["id"]
+    with locks.job_start:                # check and registration in one step, for the three kinds of job
+        sj = scan.current_job()
+        firmware_busy = firmware.running()   # before taking our lock: firmware.start does the reverse
+        with _lock:
+            if (_job and not _job["finished"]) or (sj and not sj["finished"]) or firmware_busy:
+                return None
+            _job = {"id": uuid.uuid4().hex[:8], "started": time.time(), "finished": None, "percent": 0,
+                    "items": {d["id"]: {"status": "queued", "message": "", "outcome": "", "percent": 0} for d in devices}}
+            job_id = _job["id"]
 
     def update(device_id, **kw):
         with _lock:
