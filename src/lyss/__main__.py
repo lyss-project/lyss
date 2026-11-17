@@ -78,6 +78,29 @@ def config_files(path: Path, pattern: str | None = None, recursive: bool = False
     return sorted(picked, key=lambda p: p.as_posix())   # same order on every OS
 
 
+def left_out(path: Path, picked: list[Path], recursive: bool) -> list[str]:
+    """Files of the audited folder that look like a configuration by their content but were not
+    selected (another suffix such as ".cfg.bak", a hidden name): in CI, renaming a file must not
+    take it out of the assessment without a word. Only the first 64 KB of each file is read."""
+    if not path.is_dir():
+        return []
+    chosen, out = {p.resolve() for p in picked}, []
+    for p in (path.rglob("*") if recursive else path.iterdir()):
+        rel = p.relative_to(path)
+        if ".git" in rel.parts or p.is_symlink() or not p.is_file() or p.name.endswith(".state.txt"):
+            continue
+        if p.resolve() in chosen or p.stat().st_size > MAX_CONFIG_BYTES:
+            continue
+        try:
+            with p.open("rb") as handle:
+                head = handle.read(65536).decode("utf-8", errors="replace")
+        except OSError:
+            continue
+        if vendor_candidates(head):
+            out.append(rel.as_posix())
+    return sorted(out)
+
+
 MAX_CONFIG_BYTES = 20 * 1024 * 1024
 MIN_CONFIG_LINES = 5     # with --require-level: fewer configuration lines is not a switch configuration
 
@@ -215,6 +238,14 @@ def cmd_audit(args) -> int:
     if skipped:   # visible in the summary: a file that left the assessment is never silent
         problems.append(f"skipped, platform not recognised ({len(skipped)}): " + ", ".join(skipped[:20])
                         + (" ..." if len(skipped) > 20 else ""))
+    if args.require_level:
+        others = left_out(args.path, files, args.recursive)
+        if others:
+            note = (f"not assessed although they look like switch configurations ({len(others)}): "
+                    + ", ".join(others[:20]) + (" ..." if len(others) > 20 else "")
+                    + ": check their names (suffix, hidden file or folder)")
+            print(note, file=sys.stderr)
+            problems.append(note)
     bad = ci.failing(results, args.require_level)
     if args.require_level and not results:
         problems.append("no switch configuration found")

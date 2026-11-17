@@ -17,7 +17,7 @@ lyss-audit:
   stage: test
   image: python:3.12-slim
   variables:
-    LYSS_VERSION: "0.20.1"          # pin: upgrade on purpose, after reading the changelog
+    LYSS_VERSION: "0.20.2"          # pin: upgrade on purpose, after reading the changelog
     LYSS_PATH: "."                  # file or folder of saved configurations
     LYSS_LEVEL: "2"                 # highest level to assess (1, 2 or 3)
     LYSS_REQUIRE_LEVEL: ""          # "1", "2" or "3": fail the job on a failed control up to it
@@ -29,6 +29,9 @@ lyss-audit:
     # repository (a merge request can add any file) can be imported instead of LYSS's own code
     - python -I -m venv /tmp/lyss-venv
     - '/tmp/lyss-venv/bin/python -I -m pip install --quiet --only-binary=:all: "lyss==${LYSS_VERSION}"'
+    # a merge request may commit files (or links) with the names of the reports: removed first, so
+    # the reports are always the ones this job writes
+    - rm -f lyss-results.json gl-code-quality-report.json lyss-summary.md
     - set -- audit --recursive --level "$LYSS_LEVEL" --report-root "$CI_PROJECT_DIR"
         --json-file lyss-results.json --codequality gl-code-quality-report.json --summary lyss-summary.md
     - if [ -n "$LYSS_REQUIRE_LEVEL" ]; then set -- "$@" --require-level "$LYSS_REQUIRE_LEVEL"; fi

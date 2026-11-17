@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4            # in production, pin actions to a full commit SHA
         with:
           persist-credentials: false         # the audit needs no token
-      - uses: lyss-project/lyss@v0.20.1     # same here: the commit SHA of that tag
+      - uses: lyss-project/lyss@v0.20.2     # same here: the commit SHA of that tag
         with:
           path: configs
           level: "2"
@@ -116,7 +116,7 @@ jobs:
         with:
           persist-credentials: false
       - id: lyss
-        uses: lyss-project/lyss@v0.20.1
+        uses: lyss-project/lyss@v0.20.2
         with:
           path: configs
           sarif: "true"
@@ -140,7 +140,7 @@ fails when a required level is not met. Outside the template: `lyss audit --code
 ## Any other CI (Jenkins, ...)
 
 ```sh
-pip install "lyss==0.20.1"
+pip install "lyss==0.20.2"
 lyss audit --recursive --level 2 --require-level 2 --summary lyss-summary.md --json-file lyss.json configs/
 ```
 
@@ -167,7 +167,8 @@ Exit codes:
   (`python -I`) and starts in the runner's temporary folder, so a pull request adding `lyss/` or
   `json.py` cannot replace LYSS's code. Symbolic links are never followed.
 - **Protect the workflow itself.** A pull or merge request can also change the workflow file or
-  rename a configuration so that it is no longer selected (another suffix, a hidden folder). Make
+  rename a configuration so that it is no longer selected (another suffix, a hidden folder). With
+  `require-level`, LYSS lists the files that look like configurations but were not selected. Make
   the check required from a place the request cannot edit (a GitHub ruleset or required workflow, a
   GitLab pipeline execution policy), and review changes to file names like changes to content.
 - **Accepted risks match by name:** a pattern such as `sw-old-*` also covers a new file with such

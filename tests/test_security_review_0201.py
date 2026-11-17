@@ -419,3 +419,67 @@ def test_deeply_nested_json_and_odd_accepted_risks_do_not_crash(tmp_path):
         path.write_text(base.format(control=control, expires=expires), encoding="utf-8")
         with pytest.raises(ValueError):
             accepted.load(path)
+
+# ---------------- 0.20.2: what the review left open ----------------
+
+@pytest.mark.parametrize("line", [
+    " cak {s}", "macsec / cak {s}", "aruba-central / token {s}", "wlan x / security wpa psk set-key ascii 0 {s}",
+    "snmp-server host 192.0.2.1 use-vrf m version 2c {s}", "snmp-server host 192.0.2.1 trap version 2c {s}",
+    "snmp-server host 192.0.2.1 inform version 2c {s}", "snmp-server host 192.0.2.1 community {s} trap-level all",
+    "password manager {s}", "encrypted-password manager {s}", "password operator {s}",
+    "vrrp 1 peer authentication text {s}", "ip rip authentication string {s}",
+    "exec /usr/bin/TerminAttr -cvaddr=x -cvauth=token,{s}",
+    'set system ntp authentication-key 1 type md5 value "{s}"',
+    'set security authentication-key-chains key-chain k key 1 secret "{s}"',
+    "set snmp trap-group {s} targets 192.0.2.1", "set snmp v3 snmp-community i community-name {s}",
+    'set system master-password plain-text-password-value "{s}"',
+    'set security macsec connectivity-association ca pre-shared-key cak "{s}"',
+    "snmp-agent target-host trap address udp-domain 192.0.2.1 params securityname cipher {s} v2c",
+    " rip authentication-mode md5 usual cipher {s}", " security wpa2 psk pass-phrase {s} aes",
+    "  key-string plain {s}", " mpls ldp / md5-password cipher 192.0.2.1 {s}",
+    '/system scheduler add on-event="/tool fetch user=u password={s}"', "/container envs add key=PASS value={s}",
+    "NTP_KEY|1 / value={s}", "SNMP_SERVER_COMMUNITY|{s}", "  pass={s}", "  credentials={s}",
+])
+def test_rarer_secret_formats_are_redacted(line):
+    from lyss.engine import redact
+    assert FICTITIOUS not in redact(line.format(s=FICTITIOUS))
+
+
+def test_names_that_are_not_secrets_stay_readable():
+    from lyss.engine import redact
+    for line in ('password manager user-name "admin" sha256 <secret hidden>', "hostname demo-sw-01",
+                 "mka pre-shared-key key-chain DEMO", " authentication-mode aaa", "snmp-server host 192.0.2.1 version 2c public"):
+        kept = line.split(" <secret")[0]
+        assert redact(line).startswith(kept), redact(line)
+
+
+def test_a_renamed_configuration_is_reported(tmp_path):
+    """Renaming a weak configuration to "sw2.cfg.bak" or ".sw3.cfg" took it out of the gate in
+    silence: the job passed on the files that were left."""
+    import subprocess
+    import sys
+    from conftest import load_case
+    (tmp_path / "ok.cfg").write_text(load_case("ios-hardened")["config"], encoding="utf-8")
+    (tmp_path / "sw2.cfg.bak").write_text(load_case("ios-weak")["config"], encoding="utf-8")
+    (tmp_path / ".sw3.cfg").write_text(load_case("ios-weak")["config"], encoding="utf-8")
+    (tmp_path / "notes.md").write_text("Demo lab notes.\n", encoding="utf-8")
+    summary = tmp_path / "out.md"
+    r = subprocess.run([sys.executable, "-m", "lyss", "audit", "--vendor", "cisco_ios", "--level", "2", "--require-level", "2",
+                        "--summary", str(summary), str(tmp_path)], capture_output=True, text=True)
+    assert "not assessed although they look like switch configurations (2)" in r.stderr
+    assert "sw2.cfg.bak" in r.stderr and ".sw3.cfg" in r.stderr and "notes.md" not in r.stderr
+    assert "not assessed although" in summary.read_text(encoding="utf-8")
+
+
+def test_release_files_are_uploaded_before_third_party_code_runs():
+    """The smoke test and the SBOM tool install unpinned packages: the files to publish must
+    already be uploaded, so that nothing installed afterwards can change them."""
+    import yaml
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    steps = yaml.safe_load((root / ".github/workflows/release.yml").read_text(encoding="utf-8"))["jobs"]["build"]["steps"]
+    names = [s.get("name") or (s.get("with") or {}).get("name") or s.get("uses", "") for s in steps]
+    assert names.index("dist") < names.index("Smoke test of the wheel, outside the repository")
+    assert names.index("dist") == names.index("Build") + 1
+    gitlab = (root / "integrations/gitlab/lyss.gitlab-ci.yml").read_text(encoding="utf-8")
+    assert gitlab.index("rm -f lyss-results.json gl-code-quality-report.json lyss-summary.md") < gitlab.index("set -- audit")

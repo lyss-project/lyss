@@ -32,6 +32,12 @@ jobs:
           python -m pip install -c .github/build-constraints.txt build twine
           python -m build
           python -m twine check dist/*
+      # uploaded now, before anything else is installed: the smoke test and the SBOM tool pull
+      # third-party packages, which must not be able to change the files that get published
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: dist
+          path: dist/
       - name: Smoke test of the wheel, outside the repository
         run: |
           python -m venv /tmp/lyss-venv
@@ -58,10 +64,6 @@ jobs:
           /tmp/sbom-tool/bin/pip install --disable-pip-version-check "cyclonedx-bom==8.0.1"
           mkdir -p sbom
           /tmp/sbom-tool/bin/cyclonedx-py environment --of JSON -o "sbom/lyss-${GITHUB_REF_NAME#v}.cdx.json" /tmp/lyss-venv/bin/python
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
-        with:
-          name: dist
-          path: dist/
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: sbom

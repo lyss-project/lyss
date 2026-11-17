@@ -2,6 +2,23 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.20.2 (2026-11-17)
+
+Hardening left open by the security review of 0.20.1. No change to the specification (1.0.0-rc.1),
+to control identifiers or to the CISO Assistant library.
+
+- **More secret formats redacted**: MACsec keys ("cak"), tokens, SNMP trap hosts with "use-vrf",
+  "trap" / "inform" or "community", HPE "password manager|operator X", "authentication string|text",
+  Arista TerminAttr "-cvauth=token,X", Junos NTP keys, key-chain secrets, master password, trap
+  groups and community names, Huawei "securityname", "pass-phrase", "key-string plain" and
+  "md5-password", RouterOS scripts ("source=", "on-event=") and container variables, SONiC NTP
+  keys and "SNMP_SERVER_COMMUNITY".
+- **CI gate:** with `--require-level`, files that look like switch configurations but were not
+  selected (renamed to ".cfg.bak", hidden with a leading dot) are listed in the log and in the summary.
+- **GitLab template:** report files committed by a merge request are removed before the audit writes its own.
+- **Release pipeline:** the files to publish are uploaded before the smoke test and the SBOM tool
+  install third-party packages.
+
 ## 0.20.1 (2026-11-14)
 
 Security review of the whole tool (web interface, collector, offline audit and CI). No change to the

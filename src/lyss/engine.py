@@ -71,13 +71,15 @@ _VALUE = rf'({_QUOTED}|[^\s"]+)'
 # "ascii 0", IKEv2 "local" / "remote", AOS-CX "plaintext" / "ciphertext", Huawei "simple" /
 # "cipher" / "irreversible-cipher"
 _TYPE = (r"(?:\d{1,2}|level \d+|sha512|sha\d*|md5|8a|ascii-text|ascii|hexadecimal|hex|local|remote|plaintext|ciphertext|simple"
-         r"|irreversible-cipher|cipher)")
+         r"|irreversible-cipher|cipher|plain|manager|operator)")
 SECRET_VALUE = re.compile(
     r'(?i)\b(secret|plain-text-password-value|password|key-string|key|sha1|sha256|plaintext|ciphertext|encrypted|passphrase|psk|pre-shared-key|wpa-psk'
-    r'|auth-pass|priv-pass)'
+    r'|auth-pass|priv-pass|cak|token|pass-phrase|set-key|community-name|securityname|trap-group|rocommunity|rwcommunity'
+    r'|community-string|passwd)'
     # "Password: x", "Password : x", "password:x" in device output
     r'((?:[ \t]*:)?)'
-    rf'((?:\s+{_TYPE}(?=\s)){{0,3}})(?:\s+|(?<=:))(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level|auth|priv)\b)'
+    rf'((?:\s+{_TYPE}(?=\s)){{0,3}})(?:\s+|(?<=:))(?!<redacted>|<masked>)(?!(?:manager|operator|encrypted|level|auth|priv|secret|plain-text-password-value|set-key|pass-phrase|cak|ckn'
+    r'|key-chain|type|user-name|string|text)\b)'
     rf'(?![^\s"]+\s+<masked>){_VALUE}')
 # IOS commands whose secret is the rest of the line (IOS accepts spaces in it):
 # "username bob privilege 15 password 0 correct horse battery", "radius-server key my shared key"
@@ -92,8 +94,9 @@ SNMP_SECRET = re.compile(
 # SNMPv3 user lines, also as diff lines ("+snmp-server user ...") and Cisco SB "encrypted snmp-server user"
 SNMP_USER_LINE = re.compile(r"(?i)^[+\- ]?\s*(?:encrypted\s+)?(?:snmp-server user|snmpv3 user)\b")
 # "snmp-server host 192.0.2.1 [vrf X] [informs|traps] [version 1|2c|3 <level>] <community>"
-SNMP_HOST = re.compile(r"(?i)^([+\- ]?\s*snmp-server host\s+\S+(?:\s+vrf\s+\S+)?(?:\s+(?:informs|traps))?"
-                       r"(?:\s+version\s+(?:1|2c|3\s+\w+))?\s+)(?!<redacted>)(?!(?:public|private|informs|traps|version|vrf)\b)(\S+)")
+SNMP_HOST = re.compile(r"(?i)^([+\- ]?\s*snmp-server host\s+\S+(?:\s+(?:vrf|use-vrf)\s+\S+)?(?:\s+(?:informs?|traps?))?"
+                       r"(?:\s+version\s+(?:1|2c|3\s+\w+))?(?:\s+community)?\s+)(?!<redacted>)"
+                       r"(?!(?:public|private|informs?|traps?|version|vrf|use-vrf|community)\b)(\S+)")
 # first-hop redundancy keys: "standby 1 authentication [text] X", "vrrp 1 authentication text X"
 FHRP_SECRET = re.compile(r"(?i)\b((?:standby|vrrp|glbp)\s+\d+\s+authentication(?:\s+text)?\s+)(?!<redacted>|md5\b)(\S+)")
 # well-known defaults stay visible (they are the finding); the exception applies to that value only,
@@ -108,9 +111,19 @@ VRP_COMMUNITY = re.compile(r"(?i)(\bsnmp-agent community (?:read|write)(?:\s+(?:
 # Huawei: "authentication-mode sha [cipher] X", "privacy-mode aes128 [cipher] X" (SNMPv3 users),
 # "authentication-mode md5 1 cipher X" (OSPF, IS-IS, VRRP, NTP keys)
 VRP_MODE_SECRET = re.compile(r"(?i)(\b(?:authentication-mode|privacy-mode)\s+(?:hmac-)?(?:sha\d*|md5|aes\d*|3des|des\d*|simple|plain)"
-                             r"(?:-\d+)?(?:\s+\d+)?(?:\s+(?:cipher|plain|simple))?\s+)(?!<redacted>|cipher\b|plain\b|simple\b)(\S+)")
+                             r"(?:-\d+)?(?:\s+(?:usual|nonstandard))?(?:\s+\d+)?(?:\s+(?:cipher|plain|simple))?\s+)(?!<redacted>|cipher\b|plain\b|simple\b)(\S+)")
 # credentials inside a URL: "ftp://user:password@host/..."
 URL_SECRET = re.compile(r"(://[^\s:/@]{1,64}:)(?!<redacted>)[^\s@/]{1,256}@")
+# Huawei "md5-password cipher|plain [<peer address>] X" (LDP, BGP)
+VRP_MD5 = re.compile(r"(?i)(\bmd5-password\s+(?:cipher|plain)\s+(?:\d+\.\d+\.\d+\.\d+\s+)?)(?!<redacted>)(\S+)")
+# Junos "authentication-key 1 type md5 value X"; "authentication string|text X" (RIP, VRRP)
+TYPE_VALUE = re.compile(rf'(?i)(\btype\s+\S+\s+value\s+)(?!<redacted>){_VALUE}')
+AUTH_TEXT = re.compile(r"(?i)(\bauthentication\s+(?:string|text)\s+)(?!<redacted>)(\S+)")
+# Arista TerminAttr "-cvauth=token,X" / "-cvauth=key,X"
+CVAUTH = re.compile(r"(?i)(-cvauth=(?:token|key),)(?!<redacted>)\S+")
+# "value=" is a secret only in these tables (SONiC NTP keys, RouterOS container environment)
+VALUE_FIELD_LINE = re.compile(r"(?i)\bNTP_KEY\b|/container envs\b")
+VALUE_FIELD = re.compile(rf'(?i)(\bvalue=)(?!<redacted>)({_QUOTED}|\S+)')
 
 
 # "name=value" fields: JSON configurations flattened by config.flatten_json (SONiC: "passkey=",
@@ -120,9 +133,10 @@ URL_SECRET = re.compile(r"(://[^\s:/@]{1,64}:)(?!<redacted>)[^\s@/]{1,256}@")
 # such as encrypted-key "QUJD==")
 FIELD = re.compile(rf'(?i)(?<![^\s/|])([\w-]{{1,64}}=)({_QUOTED}|\S*)')
 SECRET_FIELD_NAME = re.compile(r"(?i)passkey|password|secret|key|psk|passphrase|token|pre-shared"
-                               r"|community|passwd|pwd=|shadow|bindpw|(?:^|[_-])(?:cak|hash)=")
+                               r"|community|passwd|pwd=|shadow|bindpw|credential|(?:^|[_-])(?:cak|hash)=|^pass="
+                               r"|^(?:source|on-event)=")     # RouterOS scripts: free text that may hold a password
 # SNMP community names used as table keys ("SNMP_COMMUNITY|<name>")
-JSON_COMMUNITY = re.compile(r"(?i)(SNMP_COMMUNITY\|)(?!(?:public|private)(?:[\s/]|$))(?!<redacted>)[^\s/]+")
+JSON_COMMUNITY = re.compile(r"(?i)(SNMP(?:_SERVER)?_COMMUNITY\|)(?!(?:public|private)(?:[\s/]|$))(?!<redacted>)[^\s/]+")
 # RouterOS SNMP communities ("/snmp community add name=..." and "print terse" with "security="):
 # the community name is the v1/v2c secret
 ROS_COMMUNITY_LINE = re.compile(r"(?i)/snmp community\b|\bsecurity=")
@@ -156,6 +170,12 @@ def redact(line: str) -> str:
     line = FHRP_SECRET.sub(r"\1<redacted>", line)
     line = EOL_SECRET.sub(r"\1<redacted>", line)
     line = VRP_MODE_SECRET.sub(r"\1<redacted>", line)
+    line = VRP_MD5.sub(r"\1<redacted>", line)
+    line = TYPE_VALUE.sub(r"\1<redacted>", line)
+    line = AUTH_TEXT.sub(r"\1<redacted>", line)
+    line = CVAUTH.sub(r"\1<redacted>", line)
+    if VALUE_FIELD_LINE.search(line):
+        line = VALUE_FIELD.sub(r"\1<redacted>", line)
     line = URL_SECRET.sub(r"\1<redacted>@", line)
     line = SECRET_VALUE.sub(_secret, line)
     if VRP_COMMUNITY_LINE.search(line):
