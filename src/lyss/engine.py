@@ -247,12 +247,13 @@ def _ports(cfg: Config, spec: dict) -> set[str]:
     return {normalize_port(m.group(1)) for line in lines if (m := pattern.search(line))}
 
 
-PORT_TOKEN = re.compile(r"^([A-Za-z]*)(\d{1,6})$")
+PORT_TOKEN = re.compile(r"^((?:\d{1,2}/)?[A-Za-z]*)(\d{1,6})$")   # "24", "A1", stack / VSF "1/24", "2/A1"
 MAX_PORT_RANGE = 1024
 
 
 def expand_ports(text: str) -> set[str]:
-    """HP-style port lists -> normalized names: "1-4,A1-A2,Trk1" -> {"1".."4", "a1", "a2", "trk1"}."""
+    """HP-style port lists -> normalized names: "1-4,A1-A2,Trk1" -> {"1".."4", "a1", "a2", "trk1"};
+    stack and VSF members: "1/1-1/3,2/A1" -> {"1/1", "1/2", "1/3", "2/a1"}."""
     ports = set()
     for item in text.replace('"', "").split(","):
         item = item.strip()
@@ -601,7 +602,8 @@ def observed_failures(control_id: str, context: dict | None) -> list[str]:
     elif control_id == "LYSS-MGMT-001":
         hits = [o for o in seen if o.get("port") == 23]
     elif control_id == "LYSS-MGMT-003":
-        hits = [o for o in seen if o.get("port") in (80, 8080)]
+        # a port that only redirects to HTTPS is not a plain-HTTP management service
+        hits = [o for o in seen if o.get("port") in (80, 8080) and o.get("http") != "redirect-https"]
     else:
         hits = []
     return [f"probe: {o['service']} (TCP {o['port']}) answers from {o.get('source_ip') or 'the tested network'} "

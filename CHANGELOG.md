@@ -2,6 +2,28 @@
 
 Specification versions (`spec_version`) and tool versions are tracked together until 1.0.
 
+## 0.20.3 (2026-11-22)
+
+First comments of the public review of specification 1.0.0-rc.1, by @jaba0x (SwitchDesk): the
+adapter and tool fixes. The specification itself is unchanged (still 1.0.0-rc.1); his comments on the
+controls (LYSS-ACC-010, LYSS-ACC-024, loop protection) are discussed in issue #6.
+
+- **Correction:** the validation matrix and the notes of 0.19.1 and 0.20.0 said that the HPE AOS-S
+  checks had been confirmed on a real 2930F and 3810M stack. That was wrong: the configurations were
+  written by hand in AOS-S 16.x syntax, not exported from switches (the reporter corrected it). AOS-S
+  is back to "simulator, synthetic" in docs/VALIDATION.md; a real AOS-S switch is still wanted.
+- **HPE AOS-S stacks and VSF:** ports named member/port ("1/16", "2/A1", "1/16-Trk1") are now
+  read in "show interfaces brief" and in port lists ("1/1-1/24,2/A1"). Before, LYSS-ACC-010, -011,
+  -022, -023 and -024 were all unknown on a stack.
+- **HPE AOS-S LYSS-MGMT-011:** with "management-vlan N", an address on VLAN 1 is not a management
+  address and no longer fails; only the declared management VLAN is checked for access ports.
+- **LYSS-MGMT-003 and the reachability probe:** on an open TCP 80 / 8080, the probe now sends one
+  anonymous "GET /" and records whether the port only redirects to HTTPS; such a port no longer
+  fails cleartext HTTP (it failed correctly configured switches). "lyss probe --no-http-check"
+  keeps the old behaviour (nothing sent). LYSS-MGMT-010 is unchanged: the port still answers.
+- **HPE AOS-S LYSS-AUTH-002:** the note now says that only some models and releases can store local
+  passwords as SHA-256, and that the control fails elsewhere while a local manager password exists.
+
 ## 0.20.2 (2026-11-17)
 
 Hardening left open by the security review of 0.20.1. No change to the specification (1.0.0-rc.1),
@@ -78,12 +100,14 @@ those of 0.8.1-draft: no control added, removed or changed, no identifier change
 - docs/REVIEW-1.0.md: what to review, how to comment, how comments are handled.
 - CISO Assistant library version 5 ("release candidate" in its name and description; same
   requirements, URNs and reference IDs as version 4).
-- Validation matrix: HPE Aruba AOS-S configurations checked on a real 2930F and 3810M stack
+- Validation matrix: HPE Aruba AOS-S configurations checked on a real 2930F and 3810M stack (wrong:
+  corrected in 0.20.3)
   (field report of 0.19.1); the platform stays preview until a live collection is confirmed.
 
 ## 0.19.1 (2026-11-12)
 
-Fixes from the first field report on real HPE AOS-S switches (a 2930F and a 3810M stack), by
+Fixes from the first report by an HPE AOS-S user (configurations for a 2930F and a 3810M stack; see
+the correction in 0.20.3: they were written by hand, not exported from real switches), by
 @jaba0x, maintainer of SwitchDesk (jaba0x/SwitchDesk discussion #29). Thank you! Specification
 0.8.1-draft (one sentence added to LYSS-ACC-011); no control added or removed, no identifier changed;
 CISO Assistant library version 4.

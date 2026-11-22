@@ -6,19 +6,22 @@ The configuration says "SSH only from the admin network"; a probe run from a use
 whether that is true. Two steps:
 
 1. "lyss probe" on any PC of the network to test (for example a user VLAN): for each switch
-   address it only opens and closes TCP connections to the management ports. No data, no
-   credentials, no exploit. The result is a JSON file.
+   address it only opens and closes TCP connections to the management ports. No credentials, no
+   exploit, and no data except one anonymous "GET /" on an open HTTP port (80 / 8080), to tell a
+   web interface from a port that only redirects to HTTPS. The result is a JSON file.
 2. The file is imported into LYSS (web page "Reachability" or "lyss reachability import"), with a
    label and whether that network is authorised to reach switch management.
 
 Effect on the assessment (engine.observed_failures), probes of the last MAX_AGE_DAYS:
   - LYSS-MGMT-010 fails when a management port answers from a network marked "not authorised";
   - LYSS-MGMT-001 fails when Telnet (TCP 23) answers, from any network;
-  - LYSS-MGMT-003 fails when plain HTTP (TCP 80 / 8080) answers, from any network.
+  - LYSS-MGMT-003 fails when plain HTTP (TCP 80 / 8080) answers, from any network, unless the probe
+    saw that the port only redirects to HTTPS.
 A probe never makes a control pass: a closed port from one PC proves nothing about others.
 """
 
 import json
+import re
 import socket
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -38,7 +41,47 @@ KEEP_IMPORTS = 30
 
 # ---------------- probe (runs on any PC, needs nothing but Python) ----------------
 
-def _connect(target: str, port: int, timeout: float) -> dict:
+HTTP_PORTS = (80, 8080)
+HTTP_KINDS = ("redirect-https", "page", "")
+_STATUS_3XX = re.compile(r"\AHTTP/\d(?:\.\d)?[ \t]+3\d\d\b")
+_LOCATION_HTTPS = re.compile(r"(?im)^location[ \t]*:[ \t]*https://")
+_FORWARD_HTTPS = re.compile(r"(?i)http-equiv=[\"']?refresh[^>]{0,200}url=[\"']?https://|location(?:\.href)?[ \t]*=[ \t]*[\"']https://"
+                            r"|location\.replace\([\"']https://|[\"']https:[\"']?[ \t]*\+[ \t]*(?:window\.)?location")
+_LOGIN_FORM = re.compile(r"(?i)<form\b|<input\b|type=[\"']?password")
+
+
+def http_kind(answer: str) -> str:
+    """What an HTTP port answered to "GET /": "redirect-https" when it only sends the browser to
+    https:// (a 3xx with an https:// Location, or a page that only forwards there, without any
+    form), "page" for anything else, "" for no answer. Read leniently: embedded web servers do not
+    always follow HTTP to the letter."""
+    if not answer.strip():
+        return ""
+    head, _, body = answer.replace("\r\n", "\n").partition("\n\n")
+    if _STATUS_3XX.search(head.lstrip()) and _LOCATION_HTTPS.search(head):
+        return "redirect-https"
+    if _FORWARD_HTTPS.search(body or head) and not _LOGIN_FORM.search(body or head):
+        return "redirect-https"
+    return "page"
+
+
+def _ask_http(s: socket.socket, target: str) -> str:
+    """One anonymous "GET /"; at most 8 KB of the answer is read."""
+    data = b""
+    try:
+        host = f"[{target}]" if ":" in target else target
+        s.sendall(f"GET / HTTP/1.0\r\nHost: {host}\r\nUser-Agent: lyss-probe\r\nAccept: */*\r\n\r\n".encode("ascii"))
+        while len(data) < 8192:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            data += chunk
+    except OSError:
+        pass
+    return http_kind(data.decode("latin-1", errors="replace"))
+
+
+def _connect(target: str, port: int, timeout: float, http_check: bool = True) -> dict:
     result = {"target": target, "port": port, "service": PORTS.get(port, str(port)), "state": "filtered",
               "source_ip": ""}
     s = None
@@ -48,6 +91,8 @@ def _connect(target: str, port: int, timeout: float) -> dict:
         s.connect((target, port))
         result["state"] = "open"
         result["source_ip"] = s.getsockname()[0]
+        if http_check and port in HTTP_PORTS:
+            result["http"] = _ask_http(s, target)
     except ConnectionRefusedError:
         result["state"] = "closed"
     except (socket.timeout, TimeoutError):
@@ -56,7 +101,7 @@ def _connect(target: str, port: int, timeout: float) -> dict:
         result["state"] = "error"       # no route, no IPv6 on this PC, network unreachable...
     finally:
         if s is not None:
-            s.close()                   # nothing is ever sent
+            s.close()                   # nothing is sent, except the "GET /" above on an HTTP port
     return result
 
 
@@ -71,7 +116,8 @@ def canonical(value: str) -> str | None:
     return str(mapped or addr)
 
 
-def probe(targets: list[str], ports: list[int] | None = None, timeout: float = 2.0, workers: int = 32) -> dict:
+def probe(targets: list[str], ports: list[int] | None = None, timeout: float = 2.0, workers: int = 32,
+          http_check: bool = True) -> dict:
     """TCP connect test of each management port of each target. Targets must be IP addresses of
     switches: no ranges, no "any" address, no broadcast or multicast."""
     import ipaddress
@@ -93,7 +139,7 @@ def probe(targets: list[str], ports: list[int] | None = None, timeout: float = 2
     started = datetime.now().isoformat(timespec="seconds")
     jobs = [(t, p) for t in clean for p in ports]
     with ThreadPoolExecutor(max_workers=max(1, min(workers, 64))) as pool:
-        results = list(pool.map(lambda tp: _connect(tp[0], tp[1], timeout), jobs))
+        results = list(pool.map(lambda tp: _connect(tp[0], tp[1], timeout, http_check), jobs))
     return {"tool": "LYSS", "version": __version__, "kind": "reachability", "started": started,
             "finished": datetime.now().isoformat(timespec="seconds"),
             "source": {"hostname": socket.gethostname()[:100]}, "results": results}
@@ -149,6 +195,8 @@ def validate(report: dict, known_hosts: set[str] | None = None) -> tuple[list[di
         if state == "open":
             kept[(target, port)] = {"target": target, "port": port, "service": PORTS[port], "state": "open",
                                     "source_ip": canonical(r.get("source_ip") or "") or ""}
+            if port in HTTP_PORTS and r.get("http") in HTTP_KINDS:
+                kept[(target, port)]["http"] = r["http"]
     return list(kept.values()), {"targets": len(targets), "tested": tested}
 
 

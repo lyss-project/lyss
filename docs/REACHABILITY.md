@@ -28,12 +28,15 @@ lyss probe --targets-file switches.txt
 **What the probe does:**
 - For every address, it opens and then closes a TCP connection to each management port: 22
   SSH, 23 Telnet, 80/8080 HTTP, 443/8443 HTTPS, 830 NETCONF, 8291 Winbox, 8728/8729 RouterOS API.
-- It sends no data and no credentials, and runs no exploit. A switch logs at most a connection
-  attempt.
+- It sends no credentials and runs no exploit. The only data it sends is one anonymous `GET /` on an
+  open HTTP port (80 / 8080), to tell a web interface from a port that only redirects to HTTPS
+  (many switches keep port 80 open for that redirect). `--no-http-check` sends nothing at all: an
+  open port 80 then counts as plain HTTP. A switch logs at most a connection attempt.
 - It refuses ranges, host names, the "any" address, broadcast and multicast addresses, and more
   than 32 ports: it is a management check, not a port scanner.
 - It writes `lyss-reachability.json`. The file contains:
   - each address, port and state: open, closed, filtered or error;
+  - for an open HTTP port, whether it only redirects to HTTPS;
   - the probe PC's own address for open ports;
   - the probe PC's host name;
   - the date and the LYSS version.

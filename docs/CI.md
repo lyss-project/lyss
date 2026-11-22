@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4            # in production, pin actions to a full commit SHA
         with:
           persist-credentials: false         # the audit needs no token
-      - uses: lyss-project/lyss@v0.20.2     # same here: the commit SHA of that tag
+      - uses: lyss-project/lyss@v0.20.3     # same here: the commit SHA of that tag
         with:
           path: configs
           level: "2"
@@ -116,7 +116,7 @@ jobs:
         with:
           persist-credentials: false
       - id: lyss
-        uses: lyss-project/lyss@v0.20.2
+        uses: lyss-project/lyss@v0.20.3
         with:
           path: configs
           sarif: "true"
@@ -140,7 +140,7 @@ fails when a required level is not met. Outside the template: `lyss audit --code
 ## Any other CI (Jenkins, ...)
 
 ```sh
-pip install "lyss==0.20.2"
+pip install "lyss==0.20.3"
 lyss audit --recursive --level 2 --require-level 2 --summary lyss-summary.md --json-file lyss.json configs/
 ```
 

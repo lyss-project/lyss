@@ -55,7 +55,8 @@
       addresses (no name, no credential). On the PC to test, with LYSS 0.15 or later (<code>pip install --upgrade lyss</code>):</p>
     <pre class="code">lyss probe --targets-file switches.txt</pre>
     <p class="muted small">It opens and closes TCP connections to the management ports
-      ({% for p, s in ports.items() %}{{ p }} {{ s }}{% if not loop.last %}, {% endif %}{% endfor %}) and sends nothing else.
+      ({% for p, s in ports.items() %}{{ p }} {{ s }}{% if not loop.last %}, {% endif %}{% endfor %}) and sends nothing else,
+      except one anonymous <code>GET /</code> on an open HTTP port, to see whether it only redirects to HTTPS.
       Only probe networks and switches you are responsible for.</p>
     <h2>2. Import the result</h2>
     <form method="post" action="/reachability/import" enctype="multipart/form-data" class="stack">

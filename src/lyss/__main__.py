@@ -431,13 +431,14 @@ def cmd_probe(args) -> int:
         return 2
     ports = [int(p) for p in args.ports.split(",")] if args.ports else None
     try:
-        report = reachability.probe(targets, ports, args.timeout, args.workers)
+        report = reachability.probe(targets, ports, args.timeout, args.workers, not args.no_http_check)
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return 2
     opened = [r for r in report["results"] if r["state"] == "open"]
     for r in opened:
-        print(f"OPEN   {r['target']:<40} TCP {r['port']:<5} {r['service']}")
+        print(f"OPEN   {r['target']:<40} TCP {r['port']:<5} {r['service']}"
+              + ("  (only redirects to HTTPS)" if r.get("http") == "redirect-https" else ""))
     print(f"{len(report['results'])} test(s), {len(opened)} open, on {len({r['target'] for r in report['results']})} switch(es)")
     args.out.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(f"written {args.out}: import it in LYSS (Reachability page, or lyss reachability import)")
@@ -644,13 +645,15 @@ def main(argv=None) -> int:
     dt.add_argument("--yes", action="store_true", help="confirm unseal")
     dt.set_defaults(func=cmd_data)
 
-    pr = sub.add_parser("probe", help="test from this PC which switch management ports answer (TCP connect only)")
+    pr = sub.add_parser("probe", help="test from this PC which switch management ports answer (TCP connect; one GET / on HTTP ports)")
     pr.add_argument("targets", nargs="*", help="switch IP addresses")
     pr.add_argument("--targets-file", type=Path, help="file with one IP address per line (lyss reachability targets)")
     pr.add_argument("--ports", help="comma-separated TCP ports (default: the management ports of every platform)")
     pr.add_argument("--timeout", type=float, default=2.0, help="seconds per connection (default 2)")
     pr.add_argument("--workers", type=int, default=32, help="parallel connections (default 32, max 64)")
     pr.add_argument("--out", type=Path, default=Path("lyss-reachability.json"), help="result file")
+    pr.add_argument("--no-http-check", action="store_true",
+                    help='never send anything: an open TCP 80 / 8080 then counts as plain HTTP, even if it only redirects to HTTPS')
     pr.set_defaults(func=cmd_probe)
 
     rc = sub.add_parser("reachability", help="probe results: import a file, list imports, or print the switch addresses")

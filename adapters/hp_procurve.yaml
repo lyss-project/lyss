@@ -88,11 +88,15 @@ checks:
   LYSS-AUTH-002:
     fail_if_any:
       - {line: '^password manager .*\bplaintext\b'}
-      - {line: '^password manager .*\bsha1\b', say: 'manager password stored as SHA-1: not accepted (use a firmware storing it as sha256)'}
+      - {line: '^password manager .*\bsha1\b', say: 'manager password stored as SHA-1: not accepted (platform limit where the firmware cannot store it as sha256)'}
     pass_if_all:
       - {line: '^password manager .*\bsha256\b'}
     otherwise: unknown
-    note: Manager password not visible (include-credentials off) or not set; confirm on the device. SHA-1 is not accepted.
+    note: >-
+      Manager password not visible (include-credentials off) or not set; confirm on the device. SHA-1 is
+      not accepted. Platform limit: only some AOS-S models and releases can store local passwords as
+      SHA-256 ("password non-plaintext-sha256"); elsewhere this control fails as long as a local manager
+      password exists, whatever the rest of the hardening.
     remediation: |
       password manager user-name <name> plaintext <new-secret>   ! stored as a hash by the switch
       encrypt-credentials
@@ -171,13 +175,25 @@ checks:
 
   LYSS-MGMT-011:
     fail_if_any:
-      - {block: '^vlan 1$', line: '^ip address (\d|dhcp)'}
+      # with "management-vlan N" the switch only accepts management on VLAN N: an address on VLAN 1
+      # (the factory "ip address dhcp-bootp", or one used for routing) is then not a management address
+      - all:
+          - {block: '^vlan 1$', line: '^ip address (\d|dhcp)'}
+          - {not: {line: '^management-vlan (?!1\s*$)\d+'}}
       # access ports (untagged, not tagged in any VLAN, not trunk groups) in the management VLAN
-      - captures_in_both:
-          - [{line: '^management-vlan (\d+)'}, {block: '^vlan (\d+)$', where: '^ip address \d'}]
-          - {untagged_access_vlans: true}
+      # (the management VLAN when one is declared, otherwise every VLAN with an address)
+      - all:
+          - {line: '^management-vlan \d+'}
+          - captures_in_both:
+              - {line: '^management-vlan (\d+)'}
+              - {untagged_access_vlans: true}
+      - all:
+          - {not: {line: '^management-vlan \d+'}}
+          - captures_in_both:
+              - {block: '^vlan (\d+)$', where: '^ip address \d'}
+              - {untagged_access_vlans: true}
     pass_if_any:
-      - {line: '^management-vlan \d+'}
+      - {line: '^management-vlan (?!1\s*$)\d+'}
       - {block: '^vlan (?!1$)\d+$', line: '^ip address \d'}
     otherwise: unknown
     remediation: |
@@ -245,9 +261,9 @@ checks:
   LYSS-ACC-010:
     fail_if_any:
       # "show interfaces brief": Enabled = Yes and Status = Down (enabled but nothing connected)
-      - {state: '^\s*[A-Z]?\d+(-Trk\d+)?\s.*\|\s+\S+\s+Yes\s+Down\b', section: show interfaces brief}
+      - {state: '^\s*(?:\d+/)?[A-Z]?\d+(-Trk\d+)?\s.*\|\s+\S+\s+Yes\s+Down\b', section: show interfaces brief}
     pass_if_any:
-      - {state: '^\s*[A-Z]?\d+(-Trk\d+)?\s.*\|', section: show interfaces brief, say: 'show interfaces brief: no port is enabled without a link'}
+      - {state: '^\s*(?:\d+/)?[A-Z]?\d+(-Trk\d+)?\s.*\|', section: show interfaces brief, say: 'show interfaces brief: no port is enabled without a link'}
     otherwise: unknown
     note: Needs "show interfaces brief".
     remediation: |
@@ -260,7 +276,7 @@ checks:
     # several VLANs); "spanning-tree <ports> bpdu-protection" must cover the rest
     fail_if_any:
       - edge_ports_missing: &edge
-          ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
+          ports: {section: show interfaces brief, line: '^\s*((?:\d+/)?[A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
           uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
           disabled_config: '^disable\s*$'
           require_lists: '^spanning-tree (\S+) bpdu-protection'
@@ -340,7 +356,7 @@ checks:
     not_applicable_if_any: *hp_no_access
     fail_if_any:
       - edge_ports_missing: &hp_nac
-          ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
+          ports: {section: show interfaces brief, line: '^\s*((?:\d+/)?[A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
           uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
           require_lists: '^aaa port-access (?:authenticator|mac-based) ([A-Z]?\d[\w,-]*)'
     pass_if_any:
@@ -362,7 +378,7 @@ checks:
           covered: *hp_uplinks
           lists: ports
       - edge_ports_missing: &hp_storm
-          ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
+          ports: {section: show interfaces brief, line: '^\s*((?:\d+/)?[A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
           uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
           require: '^(broadcast-limit|rate-limit bcast in)\b'
     pass_if_any:
@@ -381,7 +397,7 @@ checks:
       - all:
           - {not: {line: '^no lldp run'}}
           - edge_ports_missing: &hp_lldp
-              ports: {section: show interfaces brief, line: '^\s*([A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
+              ports: {section: show interfaces brief, line: '^\s*((?:\d+/)?[A-Z]?\d+)(?:-Trk\d+)?\s.*\|'}
               uplink_lists: ['^trunk (\S+) ', '^tagged (\S+)']
               require_lists: '^lldp admin-status (\S+) (?:rxonly|disable)'
     pass_if_any:

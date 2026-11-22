@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 # Copyright 2026 Mouad Lyaazale. Additional terms (author attribution, names): see NOTICE.
-"""First field report on real HPE AOS-S switches (2930F, 3810M stack; SwitchDesk discussion #29,
+"""First report from an AOS-S user (configurations written by hand in AOS-S 16.x syntax for a 2930F
+and a 3810M stack, not exported from switches: corrected by the reporter on 21/11/2026; SwitchDesk discussion #29,
 12/11/2026). Each case reproduces what was reported, with fictitious data."""
 
 from pathlib import Path
